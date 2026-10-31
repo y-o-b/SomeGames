@@ -148,7 +148,7 @@
             <button class="setting-button" data-wrap="on" type="button">Randlos</button>
           </div>
         </div>
-        <div class="setting-row">
+        <div class="setting-row" id="sizeButtonsRow">
           <span>Größe</span>
           <div class="setting-buttons" role="group" aria-label="Spielfeldgröße">
             <button class="setting-button" data-size="9x9" type="button">9×9</button>
@@ -156,11 +156,11 @@
             <button class="setting-button" data-size="12x21" type="button">12×21</button>
           </div>
         </div>
-        <div class="setting-row" id="wrapSizeRow" hidden>
-          <label for="wrapSize">Fenstergröße</label>
+        <div class="setting-row" id="wrapBoardSizeRow" hidden>
+          <label for="wrapBoardSize">Spielfeldgröße</label>
           <div class="mine-setting">
-            <input id="wrapSize" type="range" min="6" max="18" step="1" value="12" />
-            <output id="wrapSizeValue" for="wrapSize">12×12</output>
+            <input id="wrapBoardSize" type="range" min="0" max="2" step="1" value="0" aria-label="Spielfeldgröße auswählen" />
+            <output id="wrapBoardSizeValue" for="wrapBoardSize">9×9</output>
           </div>
         </div>
         <div class="setting-row">
@@ -173,22 +173,21 @@
       </div>
       <button class="settings-done" id="settingsDone" type="button">Fertig</button>
     </dialog>
-    <button class="version" data-version type="button" title="Klicken, um die Seite neu zu laden">Version 1.55</button>
+    <button class="version" data-version type="button" title="Klicken, um die Seite neu zu laden">Version 1.56</button>
     <script>const versionButton = document.querySelector('[data-version]'); versionButton.addEventListener('click', () => location.replace(`${location.pathname}?v=${Date.now()}`)); fetch(`VERSION?${Date.now()}`, { cache: 'no-store' }).then(response => response.text()).then(version => { versionButton.textContent = `Version ${version.trim()}`; }).catch(() => {});</script>
   </main>
   <script>
     const boardSizes = { '9x9': { cols: 9, rows: 9 }, '12x12': { cols: 12, rows: 12 }, '12x21': { cols: 12, rows: 21 } };
-    const WRAP_VIEW_MIN = 6, WRAP_VIEW_MAX = 18, DEFAULT_WRAP_VIEW_SIZE = 12;
+    const boardSizeOptions = Object.keys(boardSizes), WRAP_VIEW_COLS = 12, WRAP_VIEW_ROWS = 12;
     const boardElement = document.getElementById('board'), message = document.getElementById('message'), flagToggle = document.getElementById('flagToggle'), gamePanel = document.querySelector('.game'), appElement = document.querySelector('.app'), detectorElement = document.getElementById('metalDetector');
-    const mineCountInput = document.getElementById('mineCount'), mineCountOutput = document.getElementById('mineCountValue'), wrapSizeInput = document.getElementById('wrapSize'), wrapSizeOutput = document.getElementById('wrapSizeValue'), wrapSizeRow = document.getElementById('wrapSizeRow');
-    const SHAPE_STORAGE_KEY = 'y-o-b.minesweeper.shape.v1', WRAP_STORAGE_KEY = 'y-o-b.minesweeper.wrap.v1', WRAP_VIEW_SIZE_KEY = 'y-o-b.minesweeper.wrap-view-size.v1', SIZE_STORAGE_KEY = 'y-o-b.minesweeper.size.v1', MINE_COUNT_STORAGE_KEY = 'y-o-b.minesweeper.mine-count.v1', LEVEL_STORAGE_KEY = 'y-o-b.minesweeper.level.v1';
-    let boardShape = 'square', boardWrap = false, wrapViewSize = DEFAULT_WRAP_VIEW_SIZE, offsetX = 0, offsetY = 0, pan = null, panEndedAt = 0, panFrame = 0, ghosts = [], boardSize = '9x9', mineCount = 10, activeConfig = null, grid = [], over = false, placed = false, flagMode = false, seconds = 0, timer = null, openCount = 0, flagCount = 0, pressTimer = null, longPressed = false, autoSafeTimer = null, revealTimers = [], revealing = false, detectorTimers = [], detectorRun = 0, shovelIndex = null;
+    const mineCountInput = document.getElementById('mineCount'), mineCountOutput = document.getElementById('mineCountValue'), wrapBoardSizeInput = document.getElementById('wrapBoardSize'), wrapBoardSizeOutput = document.getElementById('wrapBoardSizeValue'), wrapBoardSizeRow = document.getElementById('wrapBoardSizeRow'), sizeButtonsRow = document.getElementById('sizeButtonsRow');
+    const SHAPE_STORAGE_KEY = 'y-o-b.minesweeper.shape.v1', WRAP_STORAGE_KEY = 'y-o-b.minesweeper.wrap.v1', SIZE_STORAGE_KEY = 'y-o-b.minesweeper.size.v1', MINE_COUNT_STORAGE_KEY = 'y-o-b.minesweeper.mine-count.v1', LEVEL_STORAGE_KEY = 'y-o-b.minesweeper.level.v1';
+    let boardShape = 'square', boardWrap = false, offsetX = 0, offsetY = 0, pan = null, panEndedAt = 0, panFrame = 0, ghosts = [], boardSize = '9x9', mineCount = 10, activeConfig = null, grid = [], over = false, placed = false, flagMode = false, seconds = 0, timer = null, openCount = 0, flagCount = 0, pressTimer = null, longPressed = false, autoSafeTimer = null, revealTimers = [], revealing = false, detectorTimers = [], detectorRun = 0, shovelIndex = null;
     const maxMineCount = size => ({ '9x9': 60, '12x12': 80, '12x21': 120 })[size];
     try {
-      const savedSize = localStorage.getItem(SIZE_STORAGE_KEY), savedMineCount = localStorage.getItem(MINE_COUNT_STORAGE_KEY), savedWrapViewSize = Number(localStorage.getItem(WRAP_VIEW_SIZE_KEY));
+      const savedSize = localStorage.getItem(SIZE_STORAGE_KEY), savedMineCount = localStorage.getItem(MINE_COUNT_STORAGE_KEY);
       const validSavedMineCount = Number.isInteger(Number(savedMineCount)) && Number(savedMineCount) > 0;
       if (boardSizes[savedSize]) boardSize = savedSize;
-      if (Number.isInteger(savedWrapViewSize) && savedWrapViewSize >= WRAP_VIEW_MIN && savedWrapViewSize <= WRAP_VIEW_MAX) wrapViewSize = savedWrapViewSize;
       if (['square', 'hex'].includes(localStorage.getItem(SHAPE_STORAGE_KEY))) boardShape = localStorage.getItem(SHAPE_STORAGE_KEY);
       boardWrap = localStorage.getItem(WRAP_STORAGE_KEY) === 'on';
       if (validSavedMineCount) mineCount = Number(savedMineCount);
@@ -199,22 +198,22 @@
     document.querySelectorAll('[data-size]').forEach(button => button.classList.toggle('active', button.dataset.size === boardSize));
     document.querySelectorAll('[data-shape]').forEach(button => button.classList.toggle('active', button.dataset.shape === boardShape));
     document.querySelectorAll('[data-wrap]').forEach(button => button.classList.toggle('active', (button.dataset.wrap === 'on') === boardWrap));
-    function updateWrapSizeControl() { const label = `${wrapViewSize}×${wrapViewSize}`; wrapSizeInput.value = wrapViewSize; wrapSizeOutput.value = label; wrapSizeOutput.textContent = label; wrapSizeRow.hidden = !boardWrap; }
-    updateWrapSizeControl();
     function updateMineControl() { const max = maxMineCount(boardSize); mineCount = Math.min(mineCount, max); mineCountInput.max = max; mineCountInput.value = mineCount; mineCountOutput.value = `${mineCount} / ${max}`; mineCountOutput.textContent = `${mineCount} / ${max}`; }
     updateMineControl();
     const tabletLandscape = () => matchMedia('(min-width: 768px) and (max-width: 1366px) and (orientation: landscape)').matches;
+    function boardSizeLabel(size, landscape = tabletLandscape()) { const { cols, rows } = boardSizes[size]; return size === '12x21' && landscape ? `${rows}×${cols}` : `${cols}×${rows}`; }
     function selectedConfig() { const size = boardSizes[boardSize], rotate = boardSize === '12x21' && tabletLandscape(); let cols = rotate ? size.rows : size.cols, rows = rotate ? size.cols : size.rows; if (boardShape === 'hex' && boardWrap && rows % 2) rows++; return { cols, rows, mines: mineCount, shape: boardShape, wrap: boardWrap }; }
     const config = () => activeConfig || selectedConfig();
     function updateSizeButtons() {
       const landscape = activeConfig ? activeConfig.cols > activeConfig.rows : tabletLandscape();
-      document.querySelectorAll('[data-size]').forEach(button => { const [cols, rows] = button.dataset.size.split('x').map(Number); button.textContent = button.dataset.size === '12x21' && landscape ? `${rows}×${cols}` : `${cols}×${rows}`; button.classList.toggle('active', button.dataset.size === boardSize); });
+      document.querySelectorAll('[data-size]').forEach(button => { button.textContent = boardSizeLabel(button.dataset.size, landscape); button.classList.toggle('active', button.dataset.size === boardSize); });
     }
+    function updateWrapBoardSizeControl() { sizeButtonsRow.hidden = boardWrap; wrapBoardSizeRow.hidden = !boardWrap; const index = boardSizeOptions.indexOf(boardSize), label = boardSizeLabel(boardSize); wrapBoardSizeInput.value = index; wrapBoardSizeOutput.value = label; wrapBoardSizeOutput.textContent = label; }
     updateSizeButtons();
     const settingsDialog = document.getElementById('settingsDialog'), settingsSummary = document.getElementById('settingsSummary');
     function updateSummary() {
       const { cols, rows, mines, shape, wrap } = config();
-      settingsSummary.innerHTML = `⚙ <b>${shape === 'hex' ? 'Sechsecke' : 'Quadrate'}</b> · ${cols}×${rows} · ${wrap ? `randlos · Ansicht ${wrapViewSize}×${wrapViewSize}` : 'mit Rand'} · ${mines} Minen`;
+      settingsSummary.innerHTML = `⚙ <b>${shape === 'hex' ? 'Sechsecke' : 'Quadrate'}</b> · ${cols}×${rows} · ${wrap ? 'randlos' : 'mit Rand'} · ${mines} Minen`;
       settingsSummary.setAttribute('aria-label', `Einstellungen ändern: ${settingsSummary.textContent.replace('⚙ ', '')}`);
     }
     const openSettings = () => { if (!settingsDialog.open) settingsDialog.showModal(); };
@@ -223,7 +222,7 @@
     document.getElementById('settingsDone').addEventListener('click', () => settingsDialog.close());
     // Ein Tipp neben das Popup schließt es ebenfalls.
     settingsDialog.addEventListener('click', event => { if (event.target === settingsDialog) settingsDialog.close(); });
-    function saveSettings() { try { localStorage.setItem(SHAPE_STORAGE_KEY, boardShape); localStorage.setItem(WRAP_STORAGE_KEY, boardWrap ? 'on' : 'off'); localStorage.setItem(WRAP_VIEW_SIZE_KEY, String(wrapViewSize)); localStorage.setItem(SIZE_STORAGE_KEY, boardSize); localStorage.setItem(MINE_COUNT_STORAGE_KEY, String(mineCount)); } catch (error) { console.warn('Detektor-Einstellungen konnten nicht gespeichert werden.', error); } }
+    function saveSettings() { try { localStorage.setItem(SHAPE_STORAGE_KEY, boardShape); localStorage.setItem(WRAP_STORAGE_KEY, boardWrap ? 'on' : 'off'); localStorage.setItem(SIZE_STORAGE_KEY, boardSize); localStorage.setItem(MINE_COUNT_STORAGE_KEY, String(mineCount)); } catch (error) { console.warn('Detektor-Einstellungen konnten nicht gespeichert werden.', error); } }
     const reduceMotion = () => matchMedia('(prefers-reduced-motion: reduce)').matches;
     // Quadrate: acht Nachbarn. Sechsecke: links, rechts und je zwei darüber und darunter; welche zwei, hängt vom Versatz der Zeile ab.
     const SQUARE_OFFSETS = [[-1, -1], [0, -1], [1, -1], [-1, 0], [1, 0], [-1, 1], [0, 1], [1, 1]];
@@ -236,10 +235,10 @@
       if (config().shape === 'hex') return layoutHexes();
       grid.forEach((_, index) => { const button = boardElement.children[index]; button.style.gridColumn = index % config().cols + 1; button.style.gridRow = Math.floor(index / config().cols) + 1; });
     }
-    // Randlos: Die Fenstergröße wird mit dem Regler gewählt (Standard: mittlere Größe); kleinere Felder
-    // werden darin wiederholt, größere beim Ziehen verschoben. Kopien liegen in ghosts[index].
+    // Randlos: Das Fenster bleibt fest 12×12; je nach Spielfeldgröße werden Felder wiederholt oder
+    // beim Ziehen verschoben. Kopien liegen in ghosts[index].
     function layoutWrapped() {
-      const { cols, rows, shape } = config(), hex = shape === 'hex', cellHeight = hex ? 2 / Math.sqrt(3) : 1, stepY = hex ? .75 * cellHeight : 1, width = cols, height = rows * stepY, viewWidth = wrapViewSize, viewHeight = wrapViewSize * stepY;
+      const { cols, rows, shape } = config(), hex = shape === 'hex', cellHeight = hex ? 2 / Math.sqrt(3) : 1, stepY = hex ? .75 * cellHeight : 1, width = cols, height = rows * stepY, viewWidth = WRAP_VIEW_COLS, viewHeight = WRAP_VIEW_ROWS * stepY;
       boardElement.style.aspectRatio = `${viewWidth} / ${viewHeight}`;
       const place = (element, x, y) => { element.style.display = ''; element.style.left = `${x / viewWidth * 100}%`; element.style.top = `${y / viewHeight * 100}%`; element.style.width = `${100 / viewWidth}%`; element.style.height = `${cellHeight / viewHeight * 100}%`; };
       grid.forEach((_, index) => {
@@ -272,7 +271,7 @@
       });
     }
     function start() {
-      activeConfig = selectedConfig(); updateSizeButtons(); updateWrapSizeControl();
+      activeConfig = selectedConfig(); updateSizeButtons(); updateWrapBoardSizeControl();
       appElement.classList.toggle('tablet-wide', boardSize === '12x21' && tabletLandscape());
       stopDetector();
       shovelIndex = null;
@@ -301,7 +300,7 @@
       };
       // Erst alle Felder (children[index] bleibt das Feld selbst), dahinter die nötigen Wiederholungen fürs feste Fenster.
       grid.forEach((cell, index) => boardElement.appendChild(makeCell(cell, index, false)));
-      const wrapGhostCount = config().wrap ? Math.max(3, (Math.ceil(WRAP_VIEW_MAX / config().cols) + 1) * (Math.ceil(WRAP_VIEW_MAX / config().rows) + 1) - 1) : 0;
+      const wrapGhostCount = config().wrap ? Math.max(3, (Math.ceil(WRAP_VIEW_COLS / config().cols) + 1) * (Math.ceil(WRAP_VIEW_ROWS / config().rows) + 1) - 1) : 0;
       ghosts = grid.map((cell, index) => Array.from({ length: wrapGhostCount }, () => boardElement.appendChild(makeCell(cell, index, true))));
       layoutCells(); updateSummary();
       document.getElementById('time').textContent = '0:00'; message.innerHTML = '<b>Bereit?</b> Der erste Zug ist immer sicher.'; updateStats();
@@ -441,14 +440,14 @@
       const dx = event.clientX - pan.x, dy = event.clientY - pan.y;
       if (!pan.active) { if (Math.hypot(dx, dy) < 12) return; pan.active = true; clearTimeout(pressTimer); pressTimer = null; clearShovel(); boardElement.classList.add('panning'); try { boardElement.setPointerCapture(pan.id); } catch (error) {} }
       // Stufenlos: eine mittlere Feldbreite entspricht boardElement.clientWidth / 12; einmal je Bild neu zeichnen.
-      const unit = boardElement.clientWidth / wrapViewSize;
+      const unit = boardElement.clientWidth / WRAP_VIEW_COLS;
       offsetX = pan.offsetX + dx / unit; offsetY = pan.offsetY + dy / unit;
       if (!panFrame) panFrame = requestAnimationFrame(() => { panFrame = 0; layoutCells(); });
     });
     ['pointerup', 'pointercancel'].forEach(type => boardElement.addEventListener(type, event => { if (!pan || event.pointerId !== pan.id) return; if (pan.active) { panEndedAt = Date.now(); boardElement.classList.remove('panning'); } pan = null; }));
     document.querySelectorAll('[data-wrap]').forEach(button => button.addEventListener('click', () => { boardWrap = button.dataset.wrap === 'on'; saveSettings(); document.querySelectorAll('[data-wrap]').forEach(item => item.classList.toggle('active', item === button)); start(); }));
-    wrapSizeInput.addEventListener('input', () => { wrapViewSize = Number(wrapSizeInput.value); updateWrapSizeControl(); layoutCells(); updateSummary(); });
-    wrapSizeInput.addEventListener('change', saveSettings);
+    wrapBoardSizeInput.addEventListener('input', () => { const size = boardSizeOptions[Number(wrapBoardSizeInput.value)]; wrapBoardSizeOutput.value = boardSizeLabel(size); wrapBoardSizeOutput.textContent = wrapBoardSizeOutput.value; });
+    wrapBoardSizeInput.addEventListener('change', () => { const size = boardSizeOptions[Number(wrapBoardSizeInput.value)]; if (!size || size === boardSize) return; boardSize = size; updateMineControl(); saveSettings(); start(); });
     document.querySelectorAll('[data-shape]').forEach(button => button.addEventListener('click', () => { boardShape = button.dataset.shape; saveSettings(); document.querySelectorAll('[data-shape]').forEach(item => item.classList.toggle('active', item === button)); start(); }));
     document.querySelectorAll('[data-size]').forEach(button => button.addEventListener('click', () => { boardSize = button.dataset.size; updateMineControl(); saveSettings(); document.querySelectorAll('[data-size]').forEach(item => item.classList.toggle('active', item === button)); start(); }));
     mineCountInput.addEventListener('input', () => { mineCountOutput.value = `${mineCountInput.value} / ${mineCountInput.max}`; mineCountOutput.textContent = mineCountOutput.value; });
