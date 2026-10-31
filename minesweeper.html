@@ -159,7 +159,7 @@
         <div class="setting-row" id="wrapBoardSizeRow" hidden>
           <label for="wrapBoardSize">Spielfeldgröße</label>
           <div class="mine-setting">
-            <input id="wrapBoardSize" type="range" min="0" max="2" step="1" value="0" aria-label="Spielfeldgröße auswählen" />
+            <input id="wrapBoardSize" type="range" min="9" max="25" step="1" value="9" aria-label="Spielfeldgröße auswählen" />
             <output id="wrapBoardSizeValue" for="wrapBoardSize">9×9</output>
           </div>
         </div>
@@ -173,19 +173,19 @@
       </div>
       <button class="settings-done" id="settingsDone" type="button">Fertig</button>
     </dialog>
-    <button class="version" data-version type="button" title="Klicken, um die Seite neu zu laden">Version 1.56</button>
+    <button class="version" data-version type="button" title="Klicken, um die Seite neu zu laden">Version 1.57</button>
     <script>const versionButton = document.querySelector('[data-version]'); versionButton.addEventListener('click', () => location.replace(`${location.pathname}?v=${Date.now()}`)); fetch(`VERSION?${Date.now()}`, { cache: 'no-store' }).then(response => response.text()).then(version => { versionButton.textContent = `Version ${version.trim()}`; }).catch(() => {});</script>
   </main>
   <script>
     const boardSizes = { '9x9': { cols: 9, rows: 9 }, '12x12': { cols: 12, rows: 12 }, '12x21': { cols: 12, rows: 21 } };
-    const boardSizeOptions = Object.keys(boardSizes), WRAP_VIEW_COLS = 12, WRAP_VIEW_ROWS = 12;
+    const WRAP_BOARD_MIN = 9, WRAP_BOARD_MAX = 25, WRAP_VIEW_COLS = 12, WRAP_VIEW_ROWS = 12;
     const boardElement = document.getElementById('board'), message = document.getElementById('message'), flagToggle = document.getElementById('flagToggle'), gamePanel = document.querySelector('.game'), appElement = document.querySelector('.app'), detectorElement = document.getElementById('metalDetector');
     const mineCountInput = document.getElementById('mineCount'), mineCountOutput = document.getElementById('mineCountValue'), wrapBoardSizeInput = document.getElementById('wrapBoardSize'), wrapBoardSizeOutput = document.getElementById('wrapBoardSizeValue'), wrapBoardSizeRow = document.getElementById('wrapBoardSizeRow'), sizeButtonsRow = document.getElementById('sizeButtonsRow');
-    const SHAPE_STORAGE_KEY = 'y-o-b.minesweeper.shape.v1', WRAP_STORAGE_KEY = 'y-o-b.minesweeper.wrap.v1', SIZE_STORAGE_KEY = 'y-o-b.minesweeper.size.v1', MINE_COUNT_STORAGE_KEY = 'y-o-b.minesweeper.mine-count.v1', LEVEL_STORAGE_KEY = 'y-o-b.minesweeper.level.v1';
-    let boardShape = 'square', boardWrap = false, offsetX = 0, offsetY = 0, pan = null, panEndedAt = 0, panFrame = 0, ghosts = [], boardSize = '9x9', mineCount = 10, activeConfig = null, grid = [], over = false, placed = false, flagMode = false, seconds = 0, timer = null, openCount = 0, flagCount = 0, pressTimer = null, longPressed = false, autoSafeTimer = null, revealTimers = [], revealing = false, detectorTimers = [], detectorRun = 0, shovelIndex = null;
-    const maxMineCount = size => ({ '9x9': 60, '12x12': 80, '12x21': 120 })[size];
+    const SHAPE_STORAGE_KEY = 'y-o-b.minesweeper.shape.v1', WRAP_STORAGE_KEY = 'y-o-b.minesweeper.wrap.v1', WRAP_BOARD_SIZE_KEY = 'y-o-b.minesweeper.wrap-board-size.v1', SIZE_STORAGE_KEY = 'y-o-b.minesweeper.size.v1', MINE_COUNT_STORAGE_KEY = 'y-o-b.minesweeper.mine-count.v1', LEVEL_STORAGE_KEY = 'y-o-b.minesweeper.level.v1';
+    let boardShape = 'square', boardWrap = false, wrapBoardSize = 9, offsetX = 0, offsetY = 0, pan = null, panEndedAt = 0, panFrame = 0, ghosts = [], boardSize = '9x9', mineCount = 10, activeConfig = null, grid = [], over = false, placed = false, flagMode = false, seconds = 0, timer = null, openCount = 0, flagCount = 0, pressTimer = null, longPressed = false, autoSafeTimer = null, revealTimers = [], revealing = false, detectorTimers = [], detectorRun = 0, shovelIndex = null;
+    function maxMineCount(size) { return boardWrap ? Math.min(300, Math.max(60, Math.floor(wrapBoardSize * wrapBoardSize * .5))) : ({ '9x9': 60, '12x12': 80, '12x21': 120 })[size]; }
     try {
-      const savedSize = localStorage.getItem(SIZE_STORAGE_KEY), savedMineCount = localStorage.getItem(MINE_COUNT_STORAGE_KEY);
+      const savedSize = localStorage.getItem(SIZE_STORAGE_KEY), savedMineCount = localStorage.getItem(MINE_COUNT_STORAGE_KEY), savedWrapBoardSize = Number(localStorage.getItem(WRAP_BOARD_SIZE_KEY));
       const validSavedMineCount = Number.isInteger(Number(savedMineCount)) && Number(savedMineCount) > 0;
       if (boardSizes[savedSize]) boardSize = savedSize;
       if (['square', 'hex'].includes(localStorage.getItem(SHAPE_STORAGE_KEY))) boardShape = localStorage.getItem(SHAPE_STORAGE_KEY);
@@ -193,6 +193,8 @@
       if (validSavedMineCount) mineCount = Number(savedMineCount);
       const legacyPresets = { easy: ['9x9', 10], medium: ['12x12', 25], hard: ['12x21', 40] }, legacy = legacyPresets[localStorage.getItem(LEVEL_STORAGE_KEY)];
       if (legacy) { if (!boardSizes[savedSize]) boardSize = legacy[0]; if (!validSavedMineCount) mineCount = legacy[1]; }
+      const preset = boardSizes[boardSize], presetWrapSize = Math.max(preset.cols, preset.rows);
+      wrapBoardSize = Number.isInteger(savedWrapBoardSize) && savedWrapBoardSize >= WRAP_BOARD_MIN && savedWrapBoardSize <= WRAP_BOARD_MAX ? savedWrapBoardSize : presetWrapSize;
     } catch (error) { console.warn('Detektor-Einstellungen konnten nicht geladen werden.', error); }
     mineCount = Math.min(mineCount, maxMineCount(boardSize));
     document.querySelectorAll('[data-size]').forEach(button => button.classList.toggle('active', button.dataset.size === boardSize));
@@ -202,13 +204,19 @@
     updateMineControl();
     const tabletLandscape = () => matchMedia('(min-width: 768px) and (max-width: 1366px) and (orientation: landscape)').matches;
     function boardSizeLabel(size, landscape = tabletLandscape()) { const { cols, rows } = boardSizes[size]; return size === '12x21' && landscape ? `${rows}×${cols}` : `${cols}×${rows}`; }
-    function selectedConfig() { const size = boardSizes[boardSize], rotate = boardSize === '12x21' && tabletLandscape(); let cols = rotate ? size.rows : size.cols, rows = rotate ? size.cols : size.rows; if (boardShape === 'hex' && boardWrap && rows % 2) rows++; return { cols, rows, mines: mineCount, shape: boardShape, wrap: boardWrap }; }
+    function selectedConfig() {
+      const size = boardSizes[boardSize], rotate = !boardWrap && boardSize === '12x21' && tabletLandscape();
+      const cols = boardWrap ? wrapBoardSize : rotate ? size.rows : size.cols;
+      let rows = boardWrap ? wrapBoardSize : rotate ? size.cols : size.rows;
+      if (boardShape === 'hex' && boardWrap && rows % 2) rows++;
+      return { cols, rows, mines: mineCount, shape: boardShape, wrap: boardWrap };
+    }
     const config = () => activeConfig || selectedConfig();
     function updateSizeButtons() {
       const landscape = activeConfig ? activeConfig.cols > activeConfig.rows : tabletLandscape();
       document.querySelectorAll('[data-size]').forEach(button => { button.textContent = boardSizeLabel(button.dataset.size, landscape); button.classList.toggle('active', button.dataset.size === boardSize); });
     }
-    function updateWrapBoardSizeControl() { sizeButtonsRow.hidden = boardWrap; wrapBoardSizeRow.hidden = !boardWrap; const index = boardSizeOptions.indexOf(boardSize), label = boardSizeLabel(boardSize); wrapBoardSizeInput.value = index; wrapBoardSizeOutput.value = label; wrapBoardSizeOutput.textContent = label; }
+    function updateWrapBoardSizeControl() { sizeButtonsRow.hidden = boardWrap; wrapBoardSizeRow.hidden = !boardWrap; const label = `${wrapBoardSize}×${wrapBoardSize}`; wrapBoardSizeInput.value = wrapBoardSize; wrapBoardSizeOutput.value = label; wrapBoardSizeOutput.textContent = label; }
     updateSizeButtons();
     const settingsDialog = document.getElementById('settingsDialog'), settingsSummary = document.getElementById('settingsSummary');
     function updateSummary() {
@@ -222,7 +230,7 @@
     document.getElementById('settingsDone').addEventListener('click', () => settingsDialog.close());
     // Ein Tipp neben das Popup schließt es ebenfalls.
     settingsDialog.addEventListener('click', event => { if (event.target === settingsDialog) settingsDialog.close(); });
-    function saveSettings() { try { localStorage.setItem(SHAPE_STORAGE_KEY, boardShape); localStorage.setItem(WRAP_STORAGE_KEY, boardWrap ? 'on' : 'off'); localStorage.setItem(SIZE_STORAGE_KEY, boardSize); localStorage.setItem(MINE_COUNT_STORAGE_KEY, String(mineCount)); } catch (error) { console.warn('Detektor-Einstellungen konnten nicht gespeichert werden.', error); } }
+    function saveSettings() { try { localStorage.setItem(SHAPE_STORAGE_KEY, boardShape); localStorage.setItem(WRAP_STORAGE_KEY, boardWrap ? 'on' : 'off'); localStorage.setItem(WRAP_BOARD_SIZE_KEY, String(wrapBoardSize)); localStorage.setItem(SIZE_STORAGE_KEY, boardSize); localStorage.setItem(MINE_COUNT_STORAGE_KEY, String(mineCount)); } catch (error) { console.warn('Detektor-Einstellungen konnten nicht gespeichert werden.', error); } }
     const reduceMotion = () => matchMedia('(prefers-reduced-motion: reduce)').matches;
     // Quadrate: acht Nachbarn. Sechsecke: links, rechts und je zwei darüber und darunter; welche zwei, hängt vom Versatz der Zeile ab.
     const SQUARE_OFFSETS = [[-1, -1], [0, -1], [1, -1], [-1, 0], [1, 0], [-1, 1], [0, 1], [1, 1]];
@@ -272,7 +280,7 @@
     }
     function start() {
       activeConfig = selectedConfig(); updateSizeButtons(); updateWrapBoardSizeControl();
-      appElement.classList.toggle('tablet-wide', boardSize === '12x21' && tabletLandscape());
+      appElement.classList.toggle('tablet-wide', !boardWrap && boardSize === '12x21' && tabletLandscape());
       stopDetector();
       shovelIndex = null;
       gamePanel.classList.toggle('medium-mode', boardSize === '12x12'); gamePanel.classList.toggle('hard-mode', boardSize === '12x21'); gamePanel.classList.toggle('wrap-mode', config().wrap);
@@ -445,9 +453,9 @@
       if (!panFrame) panFrame = requestAnimationFrame(() => { panFrame = 0; layoutCells(); });
     });
     ['pointerup', 'pointercancel'].forEach(type => boardElement.addEventListener(type, event => { if (!pan || event.pointerId !== pan.id) return; if (pan.active) { panEndedAt = Date.now(); boardElement.classList.remove('panning'); } pan = null; }));
-    document.querySelectorAll('[data-wrap]').forEach(button => button.addEventListener('click', () => { boardWrap = button.dataset.wrap === 'on'; saveSettings(); document.querySelectorAll('[data-wrap]').forEach(item => item.classList.toggle('active', item === button)); start(); }));
-    wrapBoardSizeInput.addEventListener('input', () => { const size = boardSizeOptions[Number(wrapBoardSizeInput.value)]; wrapBoardSizeOutput.value = boardSizeLabel(size); wrapBoardSizeOutput.textContent = wrapBoardSizeOutput.value; });
-    wrapBoardSizeInput.addEventListener('change', () => { const size = boardSizeOptions[Number(wrapBoardSizeInput.value)]; if (!size || size === boardSize) return; boardSize = size; updateMineControl(); saveSettings(); start(); });
+    document.querySelectorAll('[data-wrap]').forEach(button => button.addEventListener('click', () => { boardWrap = button.dataset.wrap === 'on'; updateMineControl(); saveSettings(); document.querySelectorAll('[data-wrap]').forEach(item => item.classList.toggle('active', item === button)); start(); }));
+    wrapBoardSizeInput.addEventListener('input', () => { const size = Number(wrapBoardSizeInput.value); wrapBoardSizeOutput.value = `${size}×${size}`; wrapBoardSizeOutput.textContent = wrapBoardSizeOutput.value; });
+    wrapBoardSizeInput.addEventListener('change', () => { const size = Number(wrapBoardSizeInput.value); if (!Number.isInteger(size) || size < WRAP_BOARD_MIN || size > WRAP_BOARD_MAX || size === wrapBoardSize) return; wrapBoardSize = size; updateMineControl(); saveSettings(); start(); });
     document.querySelectorAll('[data-shape]').forEach(button => button.addEventListener('click', () => { boardShape = button.dataset.shape; saveSettings(); document.querySelectorAll('[data-shape]').forEach(item => item.classList.toggle('active', item === button)); start(); }));
     document.querySelectorAll('[data-size]').forEach(button => button.addEventListener('click', () => { boardSize = button.dataset.size; updateMineControl(); saveSettings(); document.querySelectorAll('[data-size]').forEach(item => item.classList.toggle('active', item === button)); start(); }));
     mineCountInput.addEventListener('input', () => { mineCountOutput.value = `${mineCountInput.value} / ${mineCountInput.max}`; mineCountOutput.textContent = mineCountOutput.value; });
