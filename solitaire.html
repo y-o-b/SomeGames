@@ -123,7 +123,7 @@
       <div class="controls"><button class="undo" id="undo" type="button" disabled>↶ Rückgängig</button><button id="sameGame" class="undo" type="button">↻ Gleiches Deck</button><button id="autoFinish" type="button" hidden>▶ Fertigspielen</button><button id="newGame" type="button">Neues Spiel</button></div>
       <div class="heap" id="heap" aria-hidden="true"></div>
     </section>
-    <button class="version" data-version type="button" title="Klicken, um die Seite neu zu laden">Version 1.52</button>
+    <button class="version" data-version type="button" title="Klicken, um die Seite neu zu laden">Version 1.53</button>
     <script>const versionButton = document.querySelector('[data-version]'); versionButton.addEventListener('click', () => location.replace(`${location.pathname}?v=${Date.now()}`)); fetch(`VERSION?${Date.now()}`, { cache: 'no-store' }).then(response => response.text()).then(version => { versionButton.textContent = `Version ${version.trim()}`; }).catch(() => {});</script>
   </main>
   <script>
