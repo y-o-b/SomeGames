@@ -2,8 +2,8 @@
   "id": "./",
   "name": "LittleGames",
   "short_name": "Spiele",
-  "version": "1.50",
-  "description": "Kleine Spiele für zwischendurch: Tic Tac Toe, Memory, Solitär, Detektor und Detektor Hex.",
+  "version": "1.51",
+  "description": "Kleine Spiele für zwischendurch: Tic Tac Toe, Memory, Solitär und Detektor.",
   "lang": "de",
   "dir": "ltr",
   "start_url": "./",
@@ -75,17 +75,6 @@
       "icons": [
         {
           "src": "icons/minesweeper-180.png",
-          "sizes": "180x180",
-          "type": "image/png"
-        }
-      ]
-    },
-    {
-      "name": "Detektor Hex",
-      "url": "detektor-hex.html",
-      "icons": [
-        {
-          "src": "icons/detektor-hex-180.png",
           "sizes": "180x180",
           "type": "image/png"
         }
