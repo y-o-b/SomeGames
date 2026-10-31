@@ -100,8 +100,9 @@
     .cell.n1 { color: #1f6fd0; } .cell.n2 { color: #2a9d4a; } .cell.n3 { color: #EF4B3F; } .cell.n4 { color: #6a3fc0; } .cell.n5 { color: #b5651d; } .cell.n6 { color: #14a0a0; } .cell.n7 { color: #171717; } .cell.n8 { color: #777; }
     .cell:focus-visible { outline: 3px solid #EF4B3F; outline-offset: -3px; }
     @media (prefers-reduced-motion: reduce) { .cell.flag.wave { animation: none; } .cell.opening { animation-duration: .01ms; } }
-    @media (max-width: 600px) { .game.medium-mode .board, .game.hard-mode .board { width: calc(100% + 18px); max-width: none; margin-left: -9px; margin-right: -9px; } }
+    @media (max-width: 600px) { .game.medium-mode .board, .game.hard-mode .board, .game.wrap-mode .board { width: calc(100% + 18px); max-width: none; margin-left: -9px; margin-right: -9px; } }
     @media (min-width: 768px) and (max-width: 1366px) and (orientation: landscape) { .app.tablet-wide { width: min(100%, 1100px); } .app.tablet-wide .board { max-width: 1040px; } }
+    .app.tablet-wide .game.wrap-mode .board { max-width: 540px; }
     .new-game { display: block; width: 100%; padding: 12px; border: 3px solid #171717; border-radius: 10px; color: #FFFFFF; background: var(--red); font-weight: 800; box-shadow: 4px 4px 0 #171717; }
   </style>
 </head>
@@ -164,11 +165,12 @@
       </div>
       <button class="settings-done" id="settingsDone" type="button">Fertig</button>
     </dialog>
-    <button class="version" data-version type="button" title="Klicken, um die Seite neu zu laden">Version 1.53</button>
+    <button class="version" data-version type="button" title="Klicken, um die Seite neu zu laden">Version 1.54</button>
     <script>const versionButton = document.querySelector('[data-version]'); versionButton.addEventListener('click', () => location.replace(`${location.pathname}?v=${Date.now()}`)); fetch(`VERSION?${Date.now()}`, { cache: 'no-store' }).then(response => response.text()).then(version => { versionButton.textContent = `Version ${version.trim()}`; }).catch(() => {});</script>
   </main>
   <script>
     const boardSizes = { '9x9': { cols: 9, rows: 9 }, '12x12': { cols: 12, rows: 12 }, '12x21': { cols: 12, rows: 21 } };
+    const WRAP_VIEW_COLS = 12, WRAP_VIEW_ROWS = 12;
     const boardElement = document.getElementById('board'), message = document.getElementById('message'), flagToggle = document.getElementById('flagToggle'), gamePanel = document.querySelector('.game'), appElement = document.querySelector('.app'), detectorElement = document.getElementById('metalDetector');
     const mineCountInput = document.getElementById('mineCount'), mineCountOutput = document.getElementById('mineCountValue');
     const SHAPE_STORAGE_KEY = 'y-o-b.minesweeper.shape.v1', WRAP_STORAGE_KEY = 'y-o-b.minesweeper.wrap.v1', SIZE_STORAGE_KEY = 'y-o-b.minesweeper.size.v1', MINE_COUNT_STORAGE_KEY = 'y-o-b.minesweeper.mine-count.v1', LEVEL_STORAGE_KEY = 'y-o-b.minesweeper.level.v1';
@@ -223,20 +225,25 @@
       if (config().shape === 'hex') return layoutHexes();
       grid.forEach((_, index) => { const button = boardElement.children[index]; button.style.gridColumn = index % config().cols + 1; button.style.gridRow = Math.floor(index / config().cols) + 1; });
     }
-    // Randlos: Das Brett zeigt genau eine Periode der endlos wiederholten Fläche und lässt sich stufenlos
-    // verschieben (offsetX/offsetY in Feldbreiten). Ein Feld, das über den rechten oder unteren Rand ragt,
-    // erscheint als Doppel links bzw. oben wieder; die Doppel liegen in ghosts[index] und verhalten sich wie das Feld.
+    // Randlos: Das Fenster bleibt auf mittlerer Größe; kleinere Felder werden darin wiederholt,
+    // größere beim Ziehen verschoben. Versetzte Kopien liegen in ghosts[index] und verhalten sich wie das Feld.
     function layoutWrapped() {
-      const { cols, rows, shape } = config(), hex = shape === 'hex', cellHeight = hex ? 2 / Math.sqrt(3) : 1, stepY = hex ? .75 * cellHeight : 1, width = cols, height = rows * stepY;
-      boardElement.style.aspectRatio = `${width} / ${height}`;
-      const place = (element, x, y) => { element.style.display = ''; element.style.left = `${x / width * 100}%`; element.style.top = `${y / height * 100}%`; element.style.width = `${100 / width}%`; element.style.height = `${cellHeight / height * 100}%`; };
+      const { cols, rows, shape } = config(), hex = shape === 'hex', cellHeight = hex ? 2 / Math.sqrt(3) : 1, stepY = hex ? .75 * cellHeight : 1, width = cols, height = rows * stepY, viewWidth = WRAP_VIEW_COLS, viewHeight = WRAP_VIEW_ROWS * stepY;
+      boardElement.style.aspectRatio = `${viewWidth} / ${viewHeight}`;
+      const place = (element, x, y) => { element.style.display = ''; element.style.left = `${x / viewWidth * 100}%`; element.style.top = `${y / viewHeight * 100}%`; element.style.width = `${100 / viewWidth}%`; element.style.height = `${cellHeight / viewHeight * 100}%`; };
       grid.forEach((_, index) => {
-        const column = index % cols, row = Math.floor(index / cols), x = mod(column + (hex ? (row % 2) * .5 : 0) + offsetX, width), y = mod(row * stepY + offsetY, height);
-        const overX = x + 1 > width, overY = y + cellHeight > height, [ghostX, ghostY, ghostXY] = ghosts[index];
-        place(boardElement.children[index], x, y);
-        if (overX) place(ghostX, x - width, y); else ghostX.style.display = 'none';
-        if (overY) place(ghostY, x, y - height); else ghostY.style.display = 'none';
-        if (overX && overY) place(ghostXY, x - width, y - height); else ghostXY.style.display = 'none';
+        const column = index % cols, row = Math.floor(index / cols), x = mod(column + (hex ? (row % 2) * .5 : 0) + offsetX, width), y = mod(row * stepY + offsetY, height), copies = [];
+        for (let repeatY = -1; repeatY <= Math.ceil(viewHeight / height); repeatY++) {
+          const top = y + repeatY * height;
+          if (top >= viewHeight || top + cellHeight <= 0) continue;
+          for (let repeatX = -1; repeatX <= Math.ceil(viewWidth / width); repeatX++) {
+            const left = x + repeatX * width;
+            if (left < viewWidth && left + 1 > 0) copies.push([left, top]);
+          }
+        }
+        const elements = [boardElement.children[index], ...ghosts[index]];
+        copies.forEach(([left, top], copyIndex) => { if (elements[copyIndex]) place(elements[copyIndex], left, top); });
+        elements.slice(copies.length).forEach(element => { element.style.display = 'none'; });
       });
     }
     function syncGhosts(index) {
@@ -258,7 +265,7 @@
       appElement.classList.toggle('tablet-wide', boardSize === '12x21' && tabletLandscape());
       stopDetector();
       shovelIndex = null;
-      gamePanel.classList.toggle('medium-mode', boardSize === '12x12'); gamePanel.classList.toggle('hard-mode', boardSize === '12x21');
+      gamePanel.classList.toggle('medium-mode', boardSize === '12x12'); gamePanel.classList.toggle('hard-mode', boardSize === '12x21'); gamePanel.classList.toggle('wrap-mode', config().wrap);
       clearInterval(timer); timer = null; clearTimeout(pressTimer); clearTimeout(autoSafeTimer); revealTimers.forEach(clearTimeout); revealTimers = []; revealing = false; autoSafeTimer = null; const { cols, rows } = config();
       grid = Array.from({ length: cols * rows }, () => ({ mine: false, open: false, opening: false, flag: false, wrongFlag: false, hint: '', guess: false, count: 0 })); over = false; placed = false; seconds = openCount = flagCount = 0;
       const hex = config().shape === 'hex'; boardElement.classList.toggle('hex', hex); boardElement.style.gridTemplateColumns = hex || config().wrap ? '' : `repeat(${cols}, 1fr)`; boardElement.style.aspectRatio = ''; boardElement.classList.toggle('wrap', config().wrap); offsetX = offsetY = 0; pan = null; boardElement.classList.remove('panning'); boardElement.innerHTML = '';
@@ -281,9 +288,10 @@
         ['pointerup', 'pointerleave', 'pointercancel'].forEach(type => button.addEventListener(type, () => { clearTimeout(pressTimer); pressTimer = null; pressStart = null; }));
         return button;
       };
-      // Erst alle Felder (children[index] bleibt das Feld selbst), dahinter im Randlos-Modus je drei Doppel.
+      // Erst alle Felder (children[index] bleibt das Feld selbst), dahinter die nötigen Wiederholungen fürs feste Fenster.
       grid.forEach((cell, index) => boardElement.appendChild(makeCell(cell, index, false)));
-      ghosts = grid.map((cell, index) => config().wrap ? [0, 1, 2].map(() => boardElement.appendChild(makeCell(cell, index, true))) : []);
+      const wrapGhostCount = config().wrap ? Math.max(3, (Math.ceil(WRAP_VIEW_COLS / config().cols) + 1) * (Math.ceil(WRAP_VIEW_ROWS / config().rows) + 1) - 1) : 0;
+      ghosts = grid.map((cell, index) => Array.from({ length: wrapGhostCount }, () => boardElement.appendChild(makeCell(cell, index, true))));
       layoutCells(); updateSummary();
       document.getElementById('time').textContent = '0:00'; message.innerHTML = '<b>Bereit?</b> Der erste Zug ist immer sicher.'; updateStats();
     }
@@ -421,8 +429,8 @@
       if (!pan || event.pointerId !== pan.id) return;
       const dx = event.clientX - pan.x, dy = event.clientY - pan.y;
       if (!pan.active) { if (Math.hypot(dx, dy) < 12) return; pan.active = true; clearTimeout(pressTimer); pressTimer = null; clearShovel(); boardElement.classList.add('panning'); try { boardElement.setPointerCapture(pan.id); } catch (error) {} }
-      // Stufenlos: eine Feldbreite entspricht boardElement.clientWidth / Spaltenzahl; neu gezeichnet wird einmal je Bild.
-      const unit = boardElement.clientWidth / config().cols;
+      // Stufenlos: eine mittlere Feldbreite entspricht boardElement.clientWidth / 12; einmal je Bild neu zeichnen.
+      const unit = boardElement.clientWidth / WRAP_VIEW_COLS;
       offsetX = pan.offsetX + dx / unit; offsetY = pan.offsetY + dy / unit;
       if (!panFrame) panFrame = requestAnimationFrame(() => { panFrame = 0; layoutCells(); });
     });
