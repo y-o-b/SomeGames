@@ -173,7 +173,7 @@
       </div>
       <button class="settings-done" id="settingsDone" type="button">Fertig</button>
     </dialog>
-    <button class="version" data-version type="button" title="Klicken, um die Seite neu zu laden">Version 1.57</button>
+    <button class="version" data-version type="button" title="Klicken, um die Seite neu zu laden">Version 1.58</button>
     <script>const versionButton = document.querySelector('[data-version]'); versionButton.addEventListener('click', () => location.replace(`${location.pathname}?v=${Date.now()}`)); fetch(`VERSION?${Date.now()}`, { cache: 'no-store' }).then(response => response.text()).then(version => { versionButton.textContent = `Version ${version.trim()}`; }).catch(() => {});</script>
   </main>
   <script>
@@ -342,9 +342,21 @@
     function hasWrongFlags() { return grid.some(cell => cell.flag && !cell.mine); }
     function clearHints() { grid.forEach(cell => { cell.hint = ''; cell.wrongFlag = false; }); }
     function stopDetector() { detectorRun++; detectorTimers.forEach(clearTimeout); detectorTimers = []; detectorElement.classList.remove('active'); }
-    function moveDetector(index) { const cell = boardElement.children[index], rect = cell.getBoundingClientRect(); detectorElement.style.left = `${rect.left + rect.width / 2}px`; detectorElement.style.top = `${rect.top + rect.height / 2}px`; }
+    // Randlos: Ein Feld zählt nur als erreichbar, wenn eine seiner Kopien mit der Mitte im sichtbaren Fenster liegt.
+    function visibleElement(index) {
+      if (!config().wrap) return boardElement.children[index];
+      const board = boardElement.getBoundingClientRect();
+      return [boardElement.children[index], ...(ghosts[index] || [])].find(element => {
+        if (element.style.display === 'none') return false;
+        const rect = element.getBoundingClientRect(), x = rect.left + rect.width / 2, y = rect.top + rect.height / 2;
+        return x >= board.left && x <= board.right && y >= board.top && y <= board.bottom;
+      }) || null;
+    }
+    const isVisibleCell = index => Boolean(visibleElement(index));
+    function moveDetector(index) { const cell = visibleElement(index); if (!cell) return; const rect = cell.getBoundingClientRect(); detectorElement.style.left = `${rect.left + rect.width / 2}px`; detectorElement.style.top = `${rect.top + rect.height / 2}px`; }
     function sweepDetector(marked, target) {
-      stopDetector(); const run = detectorRun, stops = [...new Set(marked)].sort((a, b) => a - b); if (!stops.includes(target)) stops.push(target);
+      stopDetector(); if (!isVisibleCell(target)) return;
+      const run = detectorRun, stops = [...new Set(marked)].filter(isVisibleCell).sort((a, b) => a - b); if (!stops.includes(target)) stops.push(target);
       detectorElement.classList.add('active'); moveDetector(stops[0]);
       const delay = Math.max(30, Math.min(110, 900 / stops.length));
       stops.forEach((index, step) => detectorTimers.push(setTimeout(() => { if (run === detectorRun) moveDetector(index); }, step * delay)));
@@ -385,11 +397,11 @@
       });
       if (!certainMines.size && !certainSafe.size) {
         guesses.forEach(index => { grid[index].guess = true; });
-        let safeGuesses = [...guesses].filter(index => !grid[index].mine);
-        if (!safeGuesses.length) safeGuesses = grid.map((cell, index) => !cell.open && !cell.flag && !cell.mine ? index : -1).filter(index => index >= 0);
+        let safeGuesses = [...guesses].filter(index => !grid[index].mine && isVisibleCell(index));
+        if (!safeGuesses.length) safeGuesses = grid.map((cell, index) => !cell.open && !cell.flag && !cell.mine && isVisibleCell(index) ? index : -1).filter(index => index >= 0);
         const safeGuess = safeGuesses[Math.floor(Math.random() * safeGuesses.length)];
         if (safeGuess !== undefined && !hasWrongFlags()) {
-          const scanCandidates = guesses.size ? [...guesses] : [safeGuess];
+          const scanCandidates = guesses.size ? [...guesses].filter(isVisibleCell) : [safeGuess];
           autoSafeTimer = setTimeout(() => { autoSafeTimer = null; if (!over && !hasWrongFlags() && !grid[safeGuess]?.open) sweepDetector(scanCandidates, safeGuess); }, 700);
         }
       }
@@ -446,13 +458,13 @@
     boardElement.addEventListener('pointermove', event => {
       if (!pan || event.pointerId !== pan.id) return;
       const dx = event.clientX - pan.x, dy = event.clientY - pan.y;
-      if (!pan.active) { if (Math.hypot(dx, dy) < 12) return; pan.active = true; clearTimeout(pressTimer); pressTimer = null; clearShovel(); boardElement.classList.add('panning'); try { boardElement.setPointerCapture(pan.id); } catch (error) {} }
+      if (!pan.active) { if (Math.hypot(dx, dy) < 12) return; pan.active = true; clearTimeout(pressTimer); pressTimer = null; clearTimeout(autoSafeTimer); autoSafeTimer = null; stopDetector(); clearShovel(); boardElement.classList.add('panning'); try { boardElement.setPointerCapture(pan.id); } catch (error) {} }
       // Stufenlos: eine mittlere Feldbreite entspricht boardElement.clientWidth / 12; einmal je Bild neu zeichnen.
       const unit = boardElement.clientWidth / WRAP_VIEW_COLS;
       offsetX = pan.offsetX + dx / unit; offsetY = pan.offsetY + dy / unit;
       if (!panFrame) panFrame = requestAnimationFrame(() => { panFrame = 0; layoutCells(); });
     });
-    ['pointerup', 'pointercancel'].forEach(type => boardElement.addEventListener(type, event => { if (!pan || event.pointerId !== pan.id) return; if (pan.active) { panEndedAt = Date.now(); boardElement.classList.remove('panning'); } pan = null; }));
+    ['pointerup', 'pointercancel'].forEach(type => boardElement.addEventListener(type, event => { if (!pan || event.pointerId !== pan.id) return; const wasPanning = pan.active; if (wasPanning) { panEndedAt = Date.now(); boardElement.classList.remove('panning'); } pan = null; if (wasPanning && !over && !revealing) requestAnimationFrame(() => requestAnimationFrame(() => { if (!over && !revealing && !pan?.active) updateGuessMarks(); })); }));
     document.querySelectorAll('[data-wrap]').forEach(button => button.addEventListener('click', () => { boardWrap = button.dataset.wrap === 'on'; updateMineControl(); saveSettings(); document.querySelectorAll('[data-wrap]').forEach(item => item.classList.toggle('active', item === button)); start(); }));
     wrapBoardSizeInput.addEventListener('input', () => { const size = Number(wrapBoardSizeInput.value); wrapBoardSizeOutput.value = `${size}×${size}`; wrapBoardSizeOutput.textContent = wrapBoardSizeOutput.value; });
     wrapBoardSizeInput.addEventListener('change', () => { const size = Number(wrapBoardSizeInput.value); if (!Number.isInteger(size) || size < WRAP_BOARD_MIN || size > WRAP_BOARD_MAX || size === wrapBoardSize) return; wrapBoardSize = size; updateMineControl(); saveSettings(); start(); });
