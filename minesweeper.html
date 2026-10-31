@@ -29,6 +29,19 @@
     .game { padding: clamp(14px, 4vw, 26px); border: 3px solid #171717; border-radius: 18px; background: var(--panel); box-shadow: 7px 7px 0 #171717; }
     button { border: 0; color: inherit; font: inherit; cursor: pointer; }
     .settings { display: grid; gap: 10px; margin-bottom: 16px; }
+    /* Einstellungen im Popup: Zahnrad oben rechts oder die Zusammenfassung über dem Spielstand öffnen es. */
+    .settings-open { display: grid; place-items: center; width: 44px; height: 44px; position: absolute; right: 0; top: 50%; margin-top: -22px; padding: 0; border: 3px solid #171717; border-radius: 50%; color: #171717; background: #FFFFFF; box-shadow: 3px 3px 0 #171717; -webkit-tap-highlight-color: transparent; transition: transform .12s, box-shadow .12s; }
+    .settings-open svg { display: block; width: 24px; height: 24px; fill: none; stroke: currentColor; stroke-width: 2.4; stroke-linecap: round; stroke-linejoin: round; }
+    .settings-open:active { transform: translate(2px, 2px); box-shadow: 1px 1px 0 #171717; }
+    .settings-open:focus-visible, .settings-summary:focus-visible { outline: 3px solid #EF4B3F; outline-offset: 3px; }
+    .settings-summary { display: block; width: 100%; margin: 0 0 12px; padding: 8px 10px; border: 2px dashed #171717; border-radius: 10px; color: var(--muted); background: #FFFFFF; font-size: .8rem; }
+    .settings-summary b { color: var(--text); }
+    .settings-dialog { width: min(100% - 32px, 440px); max-width: none; padding: clamp(16px, 4vw, 24px); border: 3px solid #171717; border-radius: 18px; color: var(--text); background: var(--panel); box-shadow: 7px 7px 0 #171717; }
+    .settings-dialog::backdrop { background: rgba(23,23,23,.45); }
+    .settings-dialog h2 { margin: 0 0 14px; font-size: 1.4rem; letter-spacing: -.03em; outline: none; }
+    /* Beim Öffnen bekommt die Überschrift den Fokus, damit kein Knopf hervorgehoben ist. */
+    .settings-dialog .settings { margin-bottom: 18px; }
+    .settings-done { display: block; width: 100%; padding: 11px; border: 3px solid #171717; border-radius: 10px; color: #FFFFFF; background: var(--red); font-weight: 800; box-shadow: 4px 4px 0 #171717; }
     .setting-row { display: grid; grid-template-columns: minmax(86px, .75fr) minmax(0, 1.25fr); align-items: center; gap: 8px; color: var(--muted); font-size: .82rem; }
     .setting-buttons { display: flex; justify-content: flex-end; gap: 5px; }
     .setting-button { min-width: 0; padding: 7px 8px; border: 2px solid #171717; border-radius: 8px; color: var(--muted); background: #FFFFFF; font-size: .78rem; white-space: nowrap; }
@@ -60,6 +73,12 @@
     .board.hex .cell { position: absolute; aspect-ratio: auto; border-radius: 0; font-size: clamp(.9rem, 4.4vw, 1.4rem); clip-path: polygon(50% 1.5%, 96.5% 25.8%, 96.5% 74.2%, 50% 98.5%, 3.5% 74.2%, 3.5% 25.8%); }
     .board.hex .cell.wrong-flag { background: #FFD166; color: #EF4B3F; }
     .board.hex .cell:focus-visible { background: #FFD166; }
+    /* Randlos: gestrichelter Rahmen, das Brett lässt sich ziehen statt die Seite zu scrollen. */
+    .board.wrap { display: block; position: relative; padding: 0; overflow: hidden; border-style: dashed; touch-action: none; cursor: grab; }
+    .board.wrap .cell { position: absolute; aspect-ratio: auto; will-change: left, top; }
+    .board.wrap:not(.hex) .cell { border-radius: 0; clip-path: inset(1px round 3px); }
+    .board.wrap .cell.wrong-flag { background: #FFD166; color: #EF4B3F; }
+    .board.wrap.panning { cursor: grabbing; }
     .cell { position: relative; aspect-ratio: 1; min-width: 0; min-height: 0; overflow: hidden; padding: 0; border-radius: 3px; color: #171717; background: #4B8ED8; font-weight: 900; font-size: clamp(1rem, 5vw, 1.5rem); line-height: 1; -webkit-tap-highlight-color: transparent; }
     .shovel-action { position: absolute; z-index: 2; top: 50%; left: 50%; display: grid; place-items: center; width: 84%; aspect-ratio: 1; background: transparent; transform: translate(-50%, -50%); }
     .shovel-action svg { display: block; width: 100%; height: 100%; }
@@ -91,14 +110,40 @@
     <header>
       <a class="back-button" href="index.html" aria-label="Zur Startseite" title="Zur Startseite"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 4 7 12l8 8"/></svg></a>
       <h1>Detektor</h1>
+      <button class="settings-open" id="settingsOpen" type="button" aria-label="Einstellungen" title="Einstellungen" aria-haspopup="dialog"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="3.2"/><path d="M12 2.8v2.4M12 18.8v2.4M2.8 12h2.4M18.8 12h2.4M5.5 5.5l1.7 1.7M16.8 16.8l1.7 1.7M5.5 18.5l1.7-1.7M16.8 7.2l1.7-1.7"/><circle cx="12" cy="12" r="6.6"/></svg></button>
     </header>
     <section class="game" aria-label="Detektor-Spiel">
+      <button class="settings-summary" id="settingsSummary" type="button" aria-haspopup="dialog"></button>
+      <div class="stats" aria-label="Spielstatistik">
+        <div class="stat"><strong id="mines">0</strong><span>Minen übrig</span></div>
+        <div class="stat"><strong id="moves">0</strong><span>Felder offen</span></div>
+        <div class="stat"><strong id="time">0:00</strong><span>Zeit</span></div>
+      </div>
+      <div class="board-tools">
+        <button class="flag-toggle" id="flagToggle" type="button" aria-pressed="false">⚑ Flaggen-Modus: aus</button>
+        <button class="hint-button" id="hintButton" type="button">💡 Hinweis</button>
+      </div>
+      <p class="hint" id="hint">Tipp: Rechtsklick, langes Drücken oder den Flaggen-Modus verwenden.</p>
+      <p class="message" id="message" aria-live="polite"><b>Bereit?</b> Der erste Zug ist immer sicher.</p>
+      <div class="board" id="board" role="grid" aria-label="Minenfeld"></div>
+      <div class="metal-detector" id="metalDetector" aria-hidden="true"><svg viewBox="0 0 64 64"><rect x="7" y="5" width="29" height="13" rx="4" fill="#EF4B3F" stroke="#171717" stroke-width="3"/><rect x="12" y="8" width="9" height="5" rx="1" fill="#FFFFFF"/><path d="M30 17 48 47" fill="none" stroke="#171717" stroke-width="6" stroke-linecap="round"/><path d="M31 19 46 44" fill="none" stroke="#4B8ED8" stroke-width="2"/><ellipse cx="49" cy="53" rx="12" ry="6" transform="rotate(-28 49 53)" fill="none" stroke="#171717" stroke-width="4"/></svg></div>
+      <button class="new-game" id="newGame" type="button">Neues Spiel</button>
+    </section>
+    <dialog class="settings-dialog" id="settingsDialog" aria-labelledby="settingsTitle">
+      <h2 id="settingsTitle" tabindex="-1" autofocus>Einstellungen</h2>
       <div class="settings" aria-label="Spielfeldeinstellungen">
         <div class="setting-row">
           <span>Felder</span>
           <div class="setting-buttons" role="group" aria-label="Form der Felder">
             <button class="setting-button" data-shape="square" type="button">◼ Quadrate</button>
             <button class="setting-button" data-shape="hex" type="button">⬢ Sechsecke</button>
+          </div>
+        </div>
+        <div class="setting-row">
+          <span>Rand</span>
+          <div class="setting-buttons" role="group" aria-label="Spielfeldrand">
+            <button class="setting-button" data-wrap="off" type="button">Mit Rand</button>
+            <button class="setting-button" data-wrap="on" type="button">Randlos</button>
           </div>
         </div>
         <div class="setting-row">
@@ -117,36 +162,24 @@
           </div>
         </div>
       </div>
-      <div class="stats" aria-label="Spielstatistik">
-        <div class="stat"><strong id="mines">0</strong><span>Minen übrig</span></div>
-        <div class="stat"><strong id="moves">0</strong><span>Felder offen</span></div>
-        <div class="stat"><strong id="time">0:00</strong><span>Zeit</span></div>
-      </div>
-      <div class="board-tools">
-        <button class="flag-toggle" id="flagToggle" type="button" aria-pressed="false">⚑ Flaggen-Modus: aus</button>
-        <button class="hint-button" id="hintButton" type="button">💡 Hinweis</button>
-      </div>
-      <p class="hint">Tipp: Rechtsklick, langes Drücken oder den Flaggen-Modus verwenden.</p>
-      <p class="message" id="message" aria-live="polite"><b>Bereit?</b> Der erste Zug ist immer sicher.</p>
-      <div class="board" id="board" role="grid" aria-label="Minenfeld"></div>
-      <div class="metal-detector" id="metalDetector" aria-hidden="true"><svg viewBox="0 0 64 64"><rect x="7" y="5" width="29" height="13" rx="4" fill="#EF4B3F" stroke="#171717" stroke-width="3"/><rect x="12" y="8" width="9" height="5" rx="1" fill="#FFFFFF"/><path d="M30 17 48 47" fill="none" stroke="#171717" stroke-width="6" stroke-linecap="round"/><path d="M31 19 46 44" fill="none" stroke="#4B8ED8" stroke-width="2"/><ellipse cx="49" cy="53" rx="12" ry="6" transform="rotate(-28 49 53)" fill="none" stroke="#171717" stroke-width="4"/></svg></div>
-      <button class="new-game" id="newGame" type="button">Neues Spiel</button>
-    </section>
-    <button class="version" data-version type="button" title="Klicken, um die Seite neu zu laden">Version 1.51</button>
+      <button class="settings-done" id="settingsDone" type="button">Fertig</button>
+    </dialog>
+    <button class="version" data-version type="button" title="Klicken, um die Seite neu zu laden">Version 1.52</button>
     <script>const versionButton = document.querySelector('[data-version]'); versionButton.addEventListener('click', () => location.replace(`${location.pathname}?v=${Date.now()}`)); fetch(`VERSION?${Date.now()}`, { cache: 'no-store' }).then(response => response.text()).then(version => { versionButton.textContent = `Version ${version.trim()}`; }).catch(() => {});</script>
   </main>
   <script>
     const boardSizes = { '9x9': { cols: 9, rows: 9 }, '12x12': { cols: 12, rows: 12 }, '12x21': { cols: 12, rows: 21 } };
     const boardElement = document.getElementById('board'), message = document.getElementById('message'), flagToggle = document.getElementById('flagToggle'), gamePanel = document.querySelector('.game'), appElement = document.querySelector('.app'), detectorElement = document.getElementById('metalDetector');
     const mineCountInput = document.getElementById('mineCount'), mineCountOutput = document.getElementById('mineCountValue');
-    const SHAPE_STORAGE_KEY = 'y-o-b.minesweeper.shape.v1', SIZE_STORAGE_KEY = 'y-o-b.minesweeper.size.v1', MINE_COUNT_STORAGE_KEY = 'y-o-b.minesweeper.mine-count.v1', LEVEL_STORAGE_KEY = 'y-o-b.minesweeper.level.v1';
-    let boardShape = 'square', boardSize = '9x9', mineCount = 10, activeConfig = null, grid = [], over = false, placed = false, flagMode = false, seconds = 0, timer = null, openCount = 0, flagCount = 0, pressTimer = null, longPressed = false, autoSafeTimer = null, revealTimers = [], revealing = false, detectorTimers = [], detectorRun = 0, shovelIndex = null;
+    const SHAPE_STORAGE_KEY = 'y-o-b.minesweeper.shape.v1', WRAP_STORAGE_KEY = 'y-o-b.minesweeper.wrap.v1', SIZE_STORAGE_KEY = 'y-o-b.minesweeper.size.v1', MINE_COUNT_STORAGE_KEY = 'y-o-b.minesweeper.mine-count.v1', LEVEL_STORAGE_KEY = 'y-o-b.minesweeper.level.v1';
+    let boardShape = 'square', boardWrap = false, offsetX = 0, offsetY = 0, pan = null, panEndedAt = 0, panFrame = 0, ghosts = [], boardSize = '9x9', mineCount = 10, activeConfig = null, grid = [], over = false, placed = false, flagMode = false, seconds = 0, timer = null, openCount = 0, flagCount = 0, pressTimer = null, longPressed = false, autoSafeTimer = null, revealTimers = [], revealing = false, detectorTimers = [], detectorRun = 0, shovelIndex = null;
     const maxMineCount = size => ({ '9x9': 60, '12x12': 80, '12x21': 120 })[size];
     try {
       const savedSize = localStorage.getItem(SIZE_STORAGE_KEY), savedMineCount = localStorage.getItem(MINE_COUNT_STORAGE_KEY);
       const validSavedMineCount = Number.isInteger(Number(savedMineCount)) && Number(savedMineCount) > 0;
       if (boardSizes[savedSize]) boardSize = savedSize;
       if (['square', 'hex'].includes(localStorage.getItem(SHAPE_STORAGE_KEY))) boardShape = localStorage.getItem(SHAPE_STORAGE_KEY);
+      boardWrap = localStorage.getItem(WRAP_STORAGE_KEY) === 'on';
       if (validSavedMineCount) mineCount = Number(savedMineCount);
       const legacyPresets = { easy: ['9x9', 10], medium: ['12x12', 25], hard: ['12x21', 40] }, legacy = legacyPresets[localStorage.getItem(LEVEL_STORAGE_KEY)];
       if (legacy) { if (!boardSizes[savedSize]) boardSize = legacy[0]; if (!validSavedMineCount) mineCount = legacy[1]; }
@@ -154,28 +187,68 @@
     mineCount = Math.min(mineCount, maxMineCount(boardSize));
     document.querySelectorAll('[data-size]').forEach(button => button.classList.toggle('active', button.dataset.size === boardSize));
     document.querySelectorAll('[data-shape]').forEach(button => button.classList.toggle('active', button.dataset.shape === boardShape));
+    document.querySelectorAll('[data-wrap]').forEach(button => button.classList.toggle('active', (button.dataset.wrap === 'on') === boardWrap));
     function updateMineControl() { const max = maxMineCount(boardSize); mineCount = Math.min(mineCount, max); mineCountInput.max = max; mineCountInput.value = mineCount; mineCountOutput.value = `${mineCount} / ${max}`; mineCountOutput.textContent = `${mineCount} / ${max}`; }
     updateMineControl();
     const tabletLandscape = () => matchMedia('(min-width: 768px) and (max-width: 1366px) and (orientation: landscape)').matches;
-    function selectedConfig() { const size = boardSizes[boardSize], rotate = boardSize === '12x21' && tabletLandscape(); return { cols: rotate ? size.rows : size.cols, rows: rotate ? size.cols : size.rows, mines: mineCount, shape: boardShape }; }
+    function selectedConfig() { const size = boardSizes[boardSize], rotate = boardSize === '12x21' && tabletLandscape(); let cols = rotate ? size.rows : size.cols, rows = rotate ? size.cols : size.rows; if (boardShape === 'hex' && boardWrap && rows % 2) rows++; return { cols, rows, mines: mineCount, shape: boardShape, wrap: boardWrap }; }
     const config = () => activeConfig || selectedConfig();
     function updateSizeButtons() {
       const landscape = activeConfig ? activeConfig.cols > activeConfig.rows : tabletLandscape();
       document.querySelectorAll('[data-size]').forEach(button => { const [cols, rows] = button.dataset.size.split('x').map(Number); button.textContent = button.dataset.size === '12x21' && landscape ? `${rows}×${cols}` : `${cols}×${rows}`; button.classList.toggle('active', button.dataset.size === boardSize); });
     }
     updateSizeButtons();
-    function saveSettings() { try { localStorage.setItem(SHAPE_STORAGE_KEY, boardShape); localStorage.setItem(SIZE_STORAGE_KEY, boardSize); localStorage.setItem(MINE_COUNT_STORAGE_KEY, String(mineCount)); } catch (error) { console.warn('Detektor-Einstellungen konnten nicht gespeichert werden.', error); } }
+    const settingsDialog = document.getElementById('settingsDialog'), settingsSummary = document.getElementById('settingsSummary');
+    function updateSummary() {
+      const { cols, rows, mines, shape, wrap } = config();
+      settingsSummary.innerHTML = `⚙ <b>${shape === 'hex' ? 'Sechsecke' : 'Quadrate'}</b> · ${cols}×${rows} · ${wrap ? 'randlos' : 'mit Rand'} · ${mines} Minen`;
+      settingsSummary.setAttribute('aria-label', `Einstellungen ändern: ${settingsSummary.textContent.replace('⚙ ', '')}`);
+    }
+    const openSettings = () => { if (!settingsDialog.open) settingsDialog.showModal(); };
+    document.getElementById('settingsOpen').addEventListener('click', openSettings);
+    settingsSummary.addEventListener('click', openSettings);
+    document.getElementById('settingsDone').addEventListener('click', () => settingsDialog.close());
+    // Ein Tipp neben das Popup schließt es ebenfalls.
+    settingsDialog.addEventListener('click', event => { if (event.target === settingsDialog) settingsDialog.close(); });
+    function saveSettings() { try { localStorage.setItem(SHAPE_STORAGE_KEY, boardShape); localStorage.setItem(WRAP_STORAGE_KEY, boardWrap ? 'on' : 'off'); localStorage.setItem(SIZE_STORAGE_KEY, boardSize); localStorage.setItem(MINE_COUNT_STORAGE_KEY, String(mineCount)); } catch (error) { console.warn('Detektor-Einstellungen konnten nicht gespeichert werden.', error); } }
     const reduceMotion = () => matchMedia('(prefers-reduced-motion: reduce)').matches;
     // Quadrate: acht Nachbarn. Sechsecke: links, rechts und je zwei darüber und darunter; welche zwei, hängt vom Versatz der Zeile ab.
     const SQUARE_OFFSETS = [[-1, -1], [0, -1], [1, -1], [-1, 0], [1, 0], [-1, 1], [0, 1], [1, 1]];
     const HEX_OFFSETS = [[[-1, 0], [1, 0], [-1, -1], [0, -1], [-1, 1], [0, 1]], [[-1, 0], [1, 0], [0, -1], [1, -1], [0, 1], [1, 1]]];
-    const neighbors = (index) => { const { cols, rows, shape } = config(), x = index % cols, y = Math.floor(index / cols), list = []; (shape === 'hex' ? HEX_OFFSETS[y % 2] : SQUARE_OFFSETS).forEach(([dx, dy]) => { const nx = x + dx, ny = y + dy; if (nx >= 0 && ny >= 0 && nx < cols && ny < rows) list.push(ny * cols + nx); }); return list; };
+    // Randlos: Was links hinausgeht, kommt rechts wieder herein, ebenso oben und unten.
+    const mod = (value, size) => ((value % size) + size) % size;
+    const neighbors = (index) => { const { cols, rows, shape, wrap } = config(), x = index % cols, y = Math.floor(index / cols), list = []; (shape === 'hex' ? HEX_OFFSETS[y % 2] : SQUARE_OFFSETS).forEach(([dx, dy]) => { let nx = x + dx, ny = y + dy; if (wrap) { nx = mod(nx, cols); ny = mod(ny, rows); } if (nx >= 0 && ny >= 0 && nx < cols && ny < rows) list.push(ny * cols + nx); }); return list; };
+    function layoutCells() {
+      if (config().wrap) return layoutWrapped();
+      if (config().shape === 'hex') return layoutHexes();
+      grid.forEach((_, index) => { const button = boardElement.children[index]; button.style.gridColumn = index % config().cols + 1; button.style.gridRow = Math.floor(index / config().cols) + 1; });
+    }
+    // Randlos: Das Brett zeigt genau eine Periode der endlos wiederholten Fläche und lässt sich stufenlos
+    // verschieben (offsetX/offsetY in Feldbreiten). Ein Feld, das über den rechten oder unteren Rand ragt,
+    // erscheint als Doppel links bzw. oben wieder; die Doppel liegen in ghosts[index] und verhalten sich wie das Feld.
+    function layoutWrapped() {
+      const { cols, rows, shape } = config(), hex = shape === 'hex', cellHeight = hex ? 2 / Math.sqrt(3) : 1, stepY = hex ? .75 * cellHeight : 1, width = cols, height = rows * stepY;
+      boardElement.style.aspectRatio = `${width} / ${height}`;
+      const place = (element, x, y) => { element.style.display = ''; element.style.left = `${x / width * 100}%`; element.style.top = `${y / height * 100}%`; element.style.width = `${100 / width}%`; element.style.height = `${cellHeight / height * 100}%`; };
+      grid.forEach((_, index) => {
+        const column = index % cols, row = Math.floor(index / cols), x = mod(column + (hex ? (row % 2) * .5 : 0) + offsetX, width), y = mod(row * stepY + offsetY, height);
+        const overX = x + 1 > width, overY = y + cellHeight > height, [ghostX, ghostY, ghostXY] = ghosts[index];
+        place(boardElement.children[index], x, y);
+        if (overX) place(ghostX, x - width, y); else ghostX.style.display = 'none';
+        if (overY) place(ghostY, x, y - height); else ghostY.style.display = 'none';
+        if (overX && overY) place(ghostXY, x - width, y - height); else ghostXY.style.display = 'none';
+      });
+    }
+    function syncGhosts(index) {
+      const button = boardElement.children[index];
+      (ghosts[index] || []).forEach(ghost => { ghost.className = button.className; ghost.replaceChildren(...[...button.childNodes].map(node => node.cloneNode(true))); });
+    }
     // Lage der Sechsecke in Prozent der Brettgröße; das Seitenverhältnis des Bretts folgt aus der Feldzahl.
     function layoutHexes() {
       const { cols, rows } = config(), hexHeight = 2 / Math.sqrt(3), width = cols + .5, height = hexHeight * (1 + .75 * (rows - 1));
       boardElement.style.aspectRatio = `${width} / ${height}`;
-      [...boardElement.children].forEach((button, index) => {
-        const x = index % cols, y = Math.floor(index / cols);
+      grid.forEach((_, index) => {
+        const button = boardElement.children[index], x = index % cols, y = Math.floor(index / cols);
         button.style.left = `${(x + (y % 2) * .5) / width * 100}%`; button.style.top = `${y * .75 * hexHeight / height * 100}%`;
         button.style.width = `${100 / width}%`; button.style.height = `${hexHeight / height * 100}%`;
       });
@@ -188,11 +261,14 @@
       gamePanel.classList.toggle('medium-mode', boardSize === '12x12'); gamePanel.classList.toggle('hard-mode', boardSize === '12x21');
       clearInterval(timer); timer = null; clearTimeout(pressTimer); clearTimeout(autoSafeTimer); revealTimers.forEach(clearTimeout); revealTimers = []; revealing = false; autoSafeTimer = null; const { cols, rows } = config();
       grid = Array.from({ length: cols * rows }, () => ({ mine: false, open: false, opening: false, flag: false, wrongFlag: false, hint: '', guess: false, count: 0 })); over = false; placed = false; seconds = openCount = flagCount = 0;
-      const hex = config().shape === 'hex'; boardElement.classList.toggle('hex', hex); boardElement.style.gridTemplateColumns = hex ? '' : `repeat(${cols}, 1fr)`; boardElement.style.aspectRatio = ''; boardElement.innerHTML = '';
-      grid.forEach((cell, index) => {
-        const button = document.createElement('button'); button.type = 'button'; button.className = 'cell'; button.dataset.index = index; button.setAttribute('role', 'gridcell'); button.setAttribute('aria-label', 'Verdecktes Feld');
+      const hex = config().shape === 'hex'; boardElement.classList.toggle('hex', hex); boardElement.style.gridTemplateColumns = hex || config().wrap ? '' : `repeat(${cols}, 1fr)`; boardElement.style.aspectRatio = ''; boardElement.classList.toggle('wrap', config().wrap); offsetX = offsetY = 0; pan = null; boardElement.classList.remove('panning'); boardElement.innerHTML = '';
+      document.getElementById('hint').textContent = config().wrap ? 'Randlos: Das Feld setzt sich an jedem Rand fort. Zum Verschieben ziehen.' : 'Tipp: Rechtsklick, langes Drücken oder den Flaggen-Modus verwenden.';
+      const makeCell = (cell, index, ghost) => {
+        const button = document.createElement('button'); button.type = 'button'; button.className = 'cell'; button.dataset.index = index;
+        if (ghost) { button.tabIndex = -1; button.setAttribute('aria-hidden', 'true'); } else { button.setAttribute('role', 'gridcell'); button.setAttribute('aria-label', 'Verdecktes Feld'); }
         button.addEventListener('animationend', event => { if (event.animationName === 'revealCell') { cell.opening = false; button.classList.remove('opening'); } });
         button.addEventListener('click', event => {
+          if (Date.now() - panEndedAt < 350) return;
           if (longPressed) { longPressed = false; return; }
           if (flagMode) { clearShovel(); toggleFlag(index); return; }
           if (shovelIndex === index && (event.target.closest?.('.shovel-action') || event.detail === 0)) { clearShovel(); reveal(index); return; }
@@ -203,9 +279,12 @@
         button.addEventListener('pointerdown', event => { if (event.pointerType === 'mouse') return; longPressed = false; pressStart = { x: event.clientX, y: event.clientY }; clearTimeout(pressTimer); pressTimer = setTimeout(() => { pressTimer = null; longPressed = true; toggleFlag(index); }, 450); });
         button.addEventListener('pointermove', event => { if (pressStart && Math.hypot(event.clientX - pressStart.x, event.clientY - pressStart.y) > 12) { clearTimeout(pressTimer); pressTimer = null; pressStart = null; } });
         ['pointerup', 'pointerleave', 'pointercancel'].forEach(type => button.addEventListener(type, () => { clearTimeout(pressTimer); pressTimer = null; pressStart = null; }));
-        boardElement.appendChild(button);
-      });
-      if (hex) layoutHexes();
+        return button;
+      };
+      // Erst alle Felder (children[index] bleibt das Feld selbst), dahinter im Randlos-Modus je drei Doppel.
+      grid.forEach((cell, index) => boardElement.appendChild(makeCell(cell, index, false)));
+      ghosts = grid.map((cell, index) => config().wrap ? [0, 1, 2].map(() => boardElement.appendChild(makeCell(cell, index, true))) : []);
+      layoutCells(); updateSummary();
       document.getElementById('time').textContent = '0:00'; message.innerHTML = '<b>Bereit?</b> Der erste Zug ist immer sicher.'; updateStats();
     }
     function placeMines(safe) {
@@ -226,6 +305,7 @@
         button.appendChild(shovel);
       }
       button.setAttribute('aria-label', cell.open ? (cell.count ? `${cell.count} Minen in der Nähe` : 'Leeres Feld') : shovelIndex === index && !cell.flag ? 'Schaufel über dem Feld; erneut aktivieren, um zu öffnen' : cell.wrongFlag && cell.flag ? 'Falsch gesetzte Flagge' : cell.hint === 'safe' ? 'Sicheres Feld' : cell.hint === 'mine' ? 'Sichere Mine' : cell.flag ? 'Flagge' : 'Verdecktes Feld');
+      syncGhosts(index);
     }
     function clearShovel() { const previous = shovelIndex; shovelIndex = null; if (previous !== null && grid[previous] && boardElement.children[previous]) draw(previous); }
     function selectShovel(index) {
@@ -331,10 +411,23 @@
       }, step * delay)));
     }
     function finish() { over = true; revealing = false; revealTimers.forEach(clearTimeout); revealTimers = []; clearInterval(timer); grid.forEach((_, index) => draw(index)); }
-    function lose(index) { finish(); boardElement.children[index].classList.add('mine'); message.innerHTML = '<b>Boom!</b> Eine Mine wurde ausgelöst. Versuche es noch einmal.'; }
+    function lose(index) { finish(); boardElement.children[index].classList.add('mine'); syncGhosts(index); message.innerHTML = '<b>Boom!</b> Eine Mine wurde ausgelöst. Versuche es noch einmal.'; }
     function win() { grid.forEach(cell => { if (cell.mine) cell.flag = true; }); flagCount = config().mines; finish(); updateStats(); boardElement.querySelectorAll('.cell.flag').forEach((cell, index) => { cell.style.animationDelay = `${index * 35}ms`; cell.classList.add('wave'); }); message.innerHTML = `<b>Gewonnen!</b> Alle Minen gefunden in ${document.getElementById('time').textContent}.`; }
     flagToggle.addEventListener('click', () => { clearShovel(); flagMode = !flagMode; flagToggle.setAttribute('aria-pressed', flagMode); flagToggle.textContent = `⚑ Flaggen-Modus: ${flagMode ? 'an' : 'aus'}`; });
     document.getElementById('hintButton').addEventListener('click', showHint);
+    // Verschieben im Randlos-Modus: erst ab 12 px Bewegung, dann in ganzen Feldern; Sechsecke um zwei Zeilen, damit der Versatz stimmt.
+    boardElement.addEventListener('pointerdown', event => { if (!config().wrap || event.button > 0) return; pan = { id: event.pointerId, x: event.clientX, y: event.clientY, offsetX, offsetY, active: false }; });
+    boardElement.addEventListener('pointermove', event => {
+      if (!pan || event.pointerId !== pan.id) return;
+      const dx = event.clientX - pan.x, dy = event.clientY - pan.y;
+      if (!pan.active) { if (Math.hypot(dx, dy) < 12) return; pan.active = true; clearTimeout(pressTimer); pressTimer = null; clearShovel(); boardElement.classList.add('panning'); try { boardElement.setPointerCapture(pan.id); } catch (error) {} }
+      // Stufenlos: eine Feldbreite entspricht boardElement.clientWidth / Spaltenzahl; neu gezeichnet wird einmal je Bild.
+      const unit = boardElement.clientWidth / config().cols;
+      offsetX = pan.offsetX + dx / unit; offsetY = pan.offsetY + dy / unit;
+      if (!panFrame) panFrame = requestAnimationFrame(() => { panFrame = 0; layoutCells(); });
+    });
+    ['pointerup', 'pointercancel'].forEach(type => boardElement.addEventListener(type, event => { if (!pan || event.pointerId !== pan.id) return; if (pan.active) { panEndedAt = Date.now(); boardElement.classList.remove('panning'); } pan = null; }));
+    document.querySelectorAll('[data-wrap]').forEach(button => button.addEventListener('click', () => { boardWrap = button.dataset.wrap === 'on'; saveSettings(); document.querySelectorAll('[data-wrap]').forEach(item => item.classList.toggle('active', item === button)); start(); }));
     document.querySelectorAll('[data-shape]').forEach(button => button.addEventListener('click', () => { boardShape = button.dataset.shape; saveSettings(); document.querySelectorAll('[data-shape]').forEach(item => item.classList.toggle('active', item === button)); start(); }));
     document.querySelectorAll('[data-size]').forEach(button => button.addEventListener('click', () => { boardSize = button.dataset.size; updateMineControl(); saveSettings(); document.querySelectorAll('[data-size]').forEach(item => item.classList.toggle('active', item === button)); start(); }));
     mineCountInput.addEventListener('input', () => { mineCountOutput.value = `${mineCountInput.value} / ${mineCountInput.max}`; mineCountOutput.textContent = mineCountOutput.value; });
