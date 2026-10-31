@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <meta name="theme-color" content="#4B8ED8" />
-  <meta name="description" content="Kleine Spiele für zwischendurch: Tic Tac Toe, Memory, Solitär und Detektor." />
+  <meta name="description" content="Kleine Spiele für zwischendurch: Tic Tac Toe, Memory, Solitär, Detektor und Detektor Hex." />
   <link rel="manifest" href="manifest.webmanifest" />
   <meta name="application-name" content="Spiele" />
   <meta name="mobile-web-app-capable" content="yes" />
@@ -66,9 +66,16 @@
         <p>Finde Minen, markiere falsche Flaggen und folge dem Metalldetektor.</p>
         <a href="minesweeper.html">Detektor spielen&nbsp; →</a>
       </div>
+      <div class="card wip">
+        <span class="banner">Im Bau</span>
+        <img class="game-icon" src="icons/detektor-hex.svg" width="72" height="72" alt="" />
+        <h2>Detektor Hex</h2>
+        <p>Minensuche auf Sechsecken – jedes Feld hat sechs Nachbarn.</p>
+        <a href="detektor-hex.html">Detektor Hex spielen&nbsp; →</a>
+      </div>
     </div>
     <footer>Eine kleine Spielpause gefällig?</footer>
-    <button class="version" data-version type="button" title="Klicken, um die Seite neu zu laden">Version 1.49</button>
+    <button class="version" data-version type="button" title="Klicken, um die Seite neu zu laden">Version 1.50</button>
     <script>const versionButton = document.querySelector('[data-version]'); versionButton.addEventListener('click', () => location.replace(`${location.pathname}?v=${Date.now()}`)); fetch(`VERSION?${Date.now()}`, { cache: 'no-store' }).then(response => response.text()).then(version => { versionButton.textContent = `Version ${version.trim()}`; }).catch(() => {});</script>
   </main>
   <script>if ('serviceWorker' in navigator) addEventListener('load', () => navigator.serviceWorker.register('sw.js').catch(() => {}));</script>
