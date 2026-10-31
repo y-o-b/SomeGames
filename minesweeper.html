@@ -173,12 +173,12 @@
       </div>
       <button class="settings-done" id="settingsDone" type="button">Fertig</button>
     </dialog>
-    <button class="version" data-version type="button" title="Klicken, um die Seite neu zu laden">Version 1.58</button>
+    <button class="version" data-version type="button" title="Klicken, um die Seite neu zu laden">Version 1.59</button>
     <script>const versionButton = document.querySelector('[data-version]'); versionButton.addEventListener('click', () => location.replace(`${location.pathname}?v=${Date.now()}`)); fetch(`VERSION?${Date.now()}`, { cache: 'no-store' }).then(response => response.text()).then(version => { versionButton.textContent = `Version ${version.trim()}`; }).catch(() => {});</script>
   </main>
   <script>
     const boardSizes = { '9x9': { cols: 9, rows: 9 }, '12x12': { cols: 12, rows: 12 }, '12x21': { cols: 12, rows: 21 } };
-    const WRAP_BOARD_MIN = 9, WRAP_BOARD_MAX = 25, WRAP_VIEW_COLS = 12, WRAP_VIEW_ROWS = 12;
+    const WRAP_BOARD_MIN = 9, WRAP_BOARD_MAX = 25, WRAP_VIEW_COLS = 12, WRAP_VIEW_ROWS = 24;
     const boardElement = document.getElementById('board'), message = document.getElementById('message'), flagToggle = document.getElementById('flagToggle'), gamePanel = document.querySelector('.game'), appElement = document.querySelector('.app'), detectorElement = document.getElementById('metalDetector');
     const mineCountInput = document.getElementById('mineCount'), mineCountOutput = document.getElementById('mineCountValue'), wrapBoardSizeInput = document.getElementById('wrapBoardSize'), wrapBoardSizeOutput = document.getElementById('wrapBoardSizeValue'), wrapBoardSizeRow = document.getElementById('wrapBoardSizeRow'), sizeButtonsRow = document.getElementById('sizeButtonsRow');
     const SHAPE_STORAGE_KEY = 'y-o-b.minesweeper.shape.v1', WRAP_STORAGE_KEY = 'y-o-b.minesweeper.wrap.v1', WRAP_BOARD_SIZE_KEY = 'y-o-b.minesweeper.wrap-board-size.v1', SIZE_STORAGE_KEY = 'y-o-b.minesweeper.size.v1', MINE_COUNT_STORAGE_KEY = 'y-o-b.minesweeper.mine-count.v1', LEVEL_STORAGE_KEY = 'y-o-b.minesweeper.level.v1';
@@ -243,7 +243,7 @@
       if (config().shape === 'hex') return layoutHexes();
       grid.forEach((_, index) => { const button = boardElement.children[index]; button.style.gridColumn = index % config().cols + 1; button.style.gridRow = Math.floor(index / config().cols) + 1; });
     }
-    // Randlos: Das Fenster bleibt fest 12×12; je nach Spielfeldgröße werden Felder wiederholt oder
+    // Randlos: Das Fenster bleibt fest 12×24 (Spalten × Zeilen); je nach Spielfeldgröße werden Felder wiederholt oder
     // beim Ziehen verschoben. Kopien liegen in ghosts[index].
     function layoutWrapped() {
       const { cols, rows, shape } = config(), hex = shape === 'hex', cellHeight = hex ? 2 / Math.sqrt(3) : 1, stepY = hex ? .75 * cellHeight : 1, width = cols, height = rows * stepY, viewWidth = WRAP_VIEW_COLS, viewHeight = WRAP_VIEW_ROWS * stepY;
@@ -459,7 +459,7 @@
       if (!pan || event.pointerId !== pan.id) return;
       const dx = event.clientX - pan.x, dy = event.clientY - pan.y;
       if (!pan.active) { if (Math.hypot(dx, dy) < 12) return; pan.active = true; clearTimeout(pressTimer); pressTimer = null; clearTimeout(autoSafeTimer); autoSafeTimer = null; stopDetector(); clearShovel(); boardElement.classList.add('panning'); try { boardElement.setPointerCapture(pan.id); } catch (error) {} }
-      // Stufenlos: eine mittlere Feldbreite entspricht boardElement.clientWidth / 12; einmal je Bild neu zeichnen.
+      // Stufenlos: eine Feldbreite entspricht boardElement.clientWidth / 12; einmal je Bild neu zeichnen.
       const unit = boardElement.clientWidth / WRAP_VIEW_COLS;
       offsetX = pan.offsetX + dx / unit; offsetY = pan.offsetY + dy / unit;
       if (!panFrame) panFrame = requestAnimationFrame(() => { panFrame = 0; layoutCells(); });
