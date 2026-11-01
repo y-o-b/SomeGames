@@ -80,6 +80,15 @@
     .board.wrap:not(.hex) .cell { border-radius: 0; clip-path: inset(1px round 3px); }
     .board.wrap .cell.wrong-flag { background: #FFD166; color: #EF4B3F; }
     .board.wrap.panning { cursor: grabbing; }
+    .board.wrap .cell { font-size: calc(clamp(1rem, 5vw, 1.5rem) * var(--zoom, 1)); }
+    .board.wrap .cell.flag { font-size: calc(clamp(1.2rem, 6vw, 1.7rem) * var(--zoom, 1)); }
+    .board.wrap.hex .cell { font-size: calc(clamp(.9rem, 4.4vw, 1.4rem) * var(--zoom, 1)); }
+    .zoom-tools { display: flex; align-items: center; justify-content: center; gap: 8px; margin: 0 0 12px; }
+    .zoom-tools[hidden] { display: none; }
+    .zoom-button { width: 44px; height: 38px; border: 3px solid #171717; border-radius: 10px; background: #FFFFFF; font-size: 1.3rem; font-weight: 800; line-height: 1; }
+    .zoom-button:disabled { opacity: .4; cursor: default; }
+    .zoom-button:focus-visible { outline: 3px solid #171717; outline-offset: 3px; }
+    .zoom-value { min-width: 4.2em; color: var(--text); font-size: .85rem; font-weight: 800; text-align: center; }
     .cell { position: relative; aspect-ratio: 1; min-width: 0; min-height: 0; overflow: hidden; padding: 0; border-radius: 3px; color: #171717; background: #4B8ED8; font-weight: 900; font-size: clamp(1rem, 5vw, 1.5rem); line-height: 1; -webkit-tap-highlight-color: transparent; }
     .shovel-action { position: absolute; z-index: 2; top: 50%; left: 50%; display: grid; place-items: center; width: 84%; aspect-ratio: 1; background: transparent; transform: translate(-50%, -50%); }
     .shovel-action svg { display: block; width: 100%; height: 100%; }
@@ -126,6 +135,11 @@
         <button class="hint-button" id="hintButton" type="button">💡 Hinweis</button>
       </div>
       <p class="hint" id="hint">Tipp: Rechtsklick, langes Drücken oder den Flaggen-Modus verwenden.</p>
+      <div class="zoom-tools" id="zoomTools" role="group" aria-label="Zoom" hidden>
+        <button class="zoom-button" id="zoomOut" type="button" aria-label="Verkleinern">−</button>
+        <output class="zoom-value" id="zoomValue" aria-live="polite">100 %</output>
+        <button class="zoom-button" id="zoomIn" type="button" aria-label="Vergrößern">+</button>
+      </div>
       <p class="message" id="message" aria-live="polite"><b>Bereit?</b> Der erste Zug ist immer sicher.</p>
       <div class="board" id="board" role="grid" aria-label="Minenfeld"></div>
       <div class="metal-detector" id="metalDetector" aria-hidden="true"><svg viewBox="0 0 64 64"><rect x="7" y="5" width="29" height="13" rx="4" fill="#EF4B3F" stroke="#171717" stroke-width="3"/><rect x="12" y="8" width="9" height="5" rx="1" fill="#FFFFFF"/><path d="M30 17 48 47" fill="none" stroke="#171717" stroke-width="6" stroke-linecap="round"/><path d="M31 19 46 44" fill="none" stroke="#4B8ED8" stroke-width="2"/><ellipse cx="49" cy="53" rx="12" ry="6" transform="rotate(-28 49 53)" fill="none" stroke="#171717" stroke-width="4"/></svg></div>
@@ -173,12 +187,15 @@
       </div>
       <button class="settings-done" id="settingsDone" type="button">Fertig</button>
     </dialog>
-    <button class="version" data-version type="button" title="Klicken, um die Seite neu zu laden">Version 1.59</button>
+    <button class="version" data-version type="button" title="Klicken, um die Seite neu zu laden">Version 1.60</button>
     <script>const versionButton = document.querySelector('[data-version]'); versionButton.addEventListener('click', () => location.replace(`${location.pathname}?v=${Date.now()}`)); fetch(`VERSION?${Date.now()}`, { cache: 'no-store' }).then(response => response.text()).then(version => { versionButton.textContent = `Version ${version.trim()}`; }).catch(() => {});</script>
   </main>
   <script>
     const boardSizes = { '9x9': { cols: 9, rows: 9 }, '12x12': { cols: 12, rows: 12 }, '12x21': { cols: 12, rows: 21 } };
-    const WRAP_BOARD_MIN = 9, WRAP_BOARD_MAX = 25, WRAP_VIEW_COLS = 12, WRAP_VIEW_ROWS = 24;
+    const WRAP_BOARD_MIN = 9, WRAP_BOARD_MAX = 25, WRAP_VIEW_COLS = 12, WRAP_VIEW_ROWS = 24, ZOOM_MIN = .75, ZOOM_MAX = 2, ZOOM_STEP = 1.25;
+    let wrapZoom = 1, zoomTimer = null, pinch = null;
+    const activePointers = new Map(), zoomTools = document.getElementById('zoomTools'), zoomValue = document.getElementById('zoomValue'), zoomInButton = document.getElementById('zoomIn'), zoomOutButton = document.getElementById('zoomOut');
+    const viewCols = () => WRAP_VIEW_COLS / wrapZoom, viewRows = () => WRAP_VIEW_ROWS / wrapZoom;
     const boardElement = document.getElementById('board'), message = document.getElementById('message'), flagToggle = document.getElementById('flagToggle'), gamePanel = document.querySelector('.game'), appElement = document.querySelector('.app'), detectorElement = document.getElementById('metalDetector');
     const mineCountInput = document.getElementById('mineCount'), mineCountOutput = document.getElementById('mineCountValue'), wrapBoardSizeInput = document.getElementById('wrapBoardSize'), wrapBoardSizeOutput = document.getElementById('wrapBoardSizeValue'), wrapBoardSizeRow = document.getElementById('wrapBoardSizeRow'), sizeButtonsRow = document.getElementById('sizeButtonsRow');
     const SHAPE_STORAGE_KEY = 'y-o-b.minesweeper.shape.v1', WRAP_STORAGE_KEY = 'y-o-b.minesweeper.wrap.v1', WRAP_BOARD_SIZE_KEY = 'y-o-b.minesweeper.wrap-board-size.v1', SIZE_STORAGE_KEY = 'y-o-b.minesweeper.size.v1', MINE_COUNT_STORAGE_KEY = 'y-o-b.minesweeper.mine-count.v1', LEVEL_STORAGE_KEY = 'y-o-b.minesweeper.level.v1';
@@ -246,7 +263,7 @@
     // Randlos: Das Fenster bleibt fest 12×24 (Spalten × Zeilen); je nach Spielfeldgröße werden Felder wiederholt oder
     // beim Ziehen verschoben. Kopien liegen in ghosts[index].
     function layoutWrapped() {
-      const { cols, rows, shape } = config(), hex = shape === 'hex', cellHeight = hex ? 2 / Math.sqrt(3) : 1, stepY = hex ? .75 * cellHeight : 1, width = cols, height = rows * stepY, viewWidth = WRAP_VIEW_COLS, viewHeight = WRAP_VIEW_ROWS * stepY;
+      const { cols, rows, shape } = config(), hex = shape === 'hex', cellHeight = hex ? 2 / Math.sqrt(3) : 1, stepY = hex ? .75 * cellHeight : 1, width = cols, height = rows * stepY, viewWidth = viewCols(), viewHeight = viewRows() * stepY;
       boardElement.style.aspectRatio = `${viewWidth} / ${viewHeight}`;
       const place = (element, x, y) => { element.style.display = ''; element.style.left = `${x / viewWidth * 100}%`; element.style.top = `${y / viewHeight * 100}%`; element.style.width = `${100 / viewWidth}%`; element.style.height = `${cellHeight / viewHeight * 100}%`; };
       grid.forEach((_, index) => {
@@ -279,15 +296,15 @@
       });
     }
     function start() {
-      activeConfig = selectedConfig(); updateSizeButtons(); updateWrapBoardSizeControl();
+      activeConfig = selectedConfig(); updateSizeButtons(); updateWrapBoardSizeControl(); updateZoomControl();
       appElement.classList.toggle('tablet-wide', !boardWrap && boardSize === '12x21' && tabletLandscape());
       stopDetector();
       shovelIndex = null;
       gamePanel.classList.toggle('medium-mode', boardSize === '12x12'); gamePanel.classList.toggle('hard-mode', boardSize === '12x21'); gamePanel.classList.toggle('wrap-mode', config().wrap);
       clearInterval(timer); timer = null; clearTimeout(pressTimer); clearTimeout(autoSafeTimer); revealTimers.forEach(clearTimeout); revealTimers = []; revealing = false; autoSafeTimer = null; const { cols, rows } = config();
       grid = Array.from({ length: cols * rows }, () => ({ mine: false, open: false, opening: false, flag: false, wrongFlag: false, hint: '', guess: false, count: 0 })); over = false; placed = false; seconds = openCount = flagCount = 0;
-      const hex = config().shape === 'hex'; boardElement.classList.toggle('hex', hex); boardElement.style.gridTemplateColumns = hex || config().wrap ? '' : `repeat(${cols}, 1fr)`; boardElement.style.aspectRatio = ''; boardElement.classList.toggle('wrap', config().wrap); offsetX = offsetY = 0; pan = null; boardElement.classList.remove('panning'); boardElement.innerHTML = '';
-      document.getElementById('hint').textContent = config().wrap ? 'Randlos: Das Feld setzt sich an jedem Rand fort. Zum Verschieben ziehen.' : 'Tipp: Rechtsklick, langes Drücken oder den Flaggen-Modus verwenden.';
+      const hex = config().shape === 'hex'; boardElement.classList.toggle('hex', hex); boardElement.style.gridTemplateColumns = hex || config().wrap ? '' : `repeat(${cols}, 1fr)`; boardElement.style.aspectRatio = ''; boardElement.classList.toggle('wrap', config().wrap); offsetX = offsetY = 0; pan = null; pinch = null; activePointers.clear(); boardElement.classList.remove('panning'); boardElement.innerHTML = '';
+      document.getElementById('hint').textContent = config().wrap ? 'Randlos: Das Feld setzt sich an jedem Rand fort. Zum Verschieben ziehen, zum Zoomen mit zwei Fingern spreizen oder + / − nutzen.' : 'Tipp: Rechtsklick, langes Drücken oder den Flaggen-Modus verwenden.';
       const makeCell = (cell, index, ghost) => {
         const button = document.createElement('button'); button.type = 'button'; button.className = 'cell'; button.dataset.index = index;
         if (ghost) { button.tabIndex = -1; button.setAttribute('aria-hidden', 'true'); } else { button.setAttribute('role', 'gridcell'); button.setAttribute('aria-label', 'Verdecktes Feld'); }
@@ -308,7 +325,7 @@
       };
       // Erst alle Felder (children[index] bleibt das Feld selbst), dahinter die nötigen Wiederholungen fürs feste Fenster.
       grid.forEach((cell, index) => boardElement.appendChild(makeCell(cell, index, false)));
-      const wrapGhostCount = config().wrap ? Math.max(3, (Math.ceil(WRAP_VIEW_COLS / config().cols) + 1) * (Math.ceil(WRAP_VIEW_ROWS / config().rows) + 1) - 1) : 0;
+      const wrapGhostCount = config().wrap ? Math.max(3, (Math.ceil(WRAP_VIEW_COLS / ZOOM_MIN / config().cols) + 1) * (Math.ceil(WRAP_VIEW_ROWS / ZOOM_MIN / config().rows) + 1) - 1) : 0;
       ghosts = grid.map((cell, index) => Array.from({ length: wrapGhostCount }, () => boardElement.appendChild(makeCell(cell, index, true))));
       layoutCells(); updateSummary();
       document.getElementById('time').textContent = '0:00'; message.innerHTML = '<b>Bereit?</b> Der erste Zug ist immer sicher.'; updateStats();
@@ -453,18 +470,57 @@
     function win() { grid.forEach(cell => { if (cell.mine) cell.flag = true; }); flagCount = config().mines; finish(); updateStats(); boardElement.querySelectorAll('.cell.flag').forEach((cell, index) => { cell.style.animationDelay = `${index * 35}ms`; cell.classList.add('wave'); }); message.innerHTML = `<b>Gewonnen!</b> Alle Minen gefunden in ${document.getElementById('time').textContent}.`; }
     flagToggle.addEventListener('click', () => { clearShovel(); flagMode = !flagMode; flagToggle.setAttribute('aria-pressed', flagMode); flagToggle.textContent = `⚑ Flaggen-Modus: ${flagMode ? 'an' : 'aus'}`; });
     document.getElementById('hintButton').addEventListener('click', showHint);
-    // Verschieben im Randlos-Modus: erst ab 12 px Bewegung, dann in ganzen Feldern; Sechsecke um zwei Zeilen, damit der Versatz stimmt.
-    boardElement.addEventListener('pointerdown', event => { if (!config().wrap || event.button > 0) return; pan = { id: event.pointerId, x: event.clientX, y: event.clientY, offsetX, offsetY, active: false }; });
+    // Zoom (nur randlos): Das Fenster bleibt 12×24, sichtbar sind 12/Zoom × 24/Zoom Felder; die Mitte bleibt stehen.
+    function updateZoomControl() {
+      zoomTools.hidden = !boardWrap; boardElement.style.setProperty('--zoom', wrapZoom);
+      zoomValue.value = `${Math.round(wrapZoom * 100)} %`; zoomValue.textContent = zoomValue.value;
+      zoomOutButton.disabled = wrapZoom <= ZOOM_MIN + .001; zoomInButton.disabled = wrapZoom >= ZOOM_MAX - .001;
+    }
+    function setZoom(value) {
+      const next = Math.round(Math.min(ZOOM_MAX, Math.max(ZOOM_MIN, value)) * 100) / 100;
+      if (!config().wrap || next === wrapZoom) return;
+      const oldCols = viewCols(), oldRows = viewRows(), stepY = config().shape === 'hex' ? .75 * 2 / Math.sqrt(3) : 1;
+      wrapZoom = next; offsetX += (viewCols() - oldCols) / 2; offsetY += (viewRows() - oldRows) * stepY / 2;
+      updateZoomControl(); layoutCells();
+      clearTimeout(autoSafeTimer); autoSafeTimer = null; stopDetector(); clearShovel();
+      clearTimeout(zoomTimer); zoomTimer = setTimeout(() => { zoomTimer = null; if (!over && !revealing) updateGuessMarks(); }, 300);
+    }
+    zoomInButton.addEventListener('click', () => setZoom(wrapZoom * ZOOM_STEP));
+    zoomOutButton.addEventListener('click', () => setZoom(wrapZoom / ZOOM_STEP));
+    boardElement.addEventListener('wheel', event => { if (!config().wrap || !event.ctrlKey) return; event.preventDefault(); setZoom(wrapZoom * Math.exp(-event.deltaY / 300)); }, { passive: false });
+    // Verschieben im Randlos-Modus: erst ab 12 px Bewegung, stufenlos; mit zwei Fingern wird gezoomt.
+    boardElement.addEventListener('pointerdown', event => {
+      if (!config().wrap || event.button > 0) return;
+      activePointers.set(event.pointerId, { x: event.clientX, y: event.clientY });
+      if (activePointers.size === 2) {
+        const [a, b] = [...activePointers.values()];
+        pinch = { distance: Math.max(1, Math.hypot(a.x - b.x, a.y - b.y)), zoom: wrapZoom };
+        pan = null; clearTimeout(pressTimer); pressTimer = null; longPressed = false; clearShovel(); boardElement.classList.remove('panning');
+        return;
+      }
+      if (activePointers.size === 1) pan = { id: event.pointerId, x: event.clientX, y: event.clientY, offsetX, offsetY, active: false };
+    });
     boardElement.addEventListener('pointermove', event => {
+      if (activePointers.has(event.pointerId)) activePointers.set(event.pointerId, { x: event.clientX, y: event.clientY });
+      if (pinch) {
+        if (activePointers.size < 2) return;
+        const [a, b] = [...activePointers.values()];
+        panEndedAt = Date.now(); setZoom(pinch.zoom * Math.hypot(a.x - b.x, a.y - b.y) / pinch.distance);
+        return;
+      }
       if (!pan || event.pointerId !== pan.id) return;
       const dx = event.clientX - pan.x, dy = event.clientY - pan.y;
       if (!pan.active) { if (Math.hypot(dx, dy) < 12) return; pan.active = true; clearTimeout(pressTimer); pressTimer = null; clearTimeout(autoSafeTimer); autoSafeTimer = null; stopDetector(); clearShovel(); boardElement.classList.add('panning'); try { boardElement.setPointerCapture(pan.id); } catch (error) {} }
-      // Stufenlos: eine Feldbreite entspricht boardElement.clientWidth / 12; einmal je Bild neu zeichnen.
-      const unit = boardElement.clientWidth / WRAP_VIEW_COLS;
+      // Stufenlos: eine Feldbreite entspricht boardElement.clientWidth / viewCols(); einmal je Bild neu zeichnen.
+      const unit = boardElement.clientWidth / viewCols();
       offsetX = pan.offsetX + dx / unit; offsetY = pan.offsetY + dy / unit;
       if (!panFrame) panFrame = requestAnimationFrame(() => { panFrame = 0; layoutCells(); });
     });
-    ['pointerup', 'pointercancel'].forEach(type => boardElement.addEventListener(type, event => { if (!pan || event.pointerId !== pan.id) return; const wasPanning = pan.active; if (wasPanning) { panEndedAt = Date.now(); boardElement.classList.remove('panning'); } pan = null; if (wasPanning && !over && !revealing) requestAnimationFrame(() => requestAnimationFrame(() => { if (!over && !revealing && !pan?.active) updateGuessMarks(); })); }));
+    ['pointerup', 'pointercancel'].forEach(type => boardElement.addEventListener(type, event => {
+      activePointers.delete(event.pointerId);
+      if (pinch) { if (activePointers.size < 2) { pinch = null; pan = null; panEndedAt = Date.now(); boardElement.classList.remove('panning'); } return; }
+      if (!pan || event.pointerId !== pan.id) return; const wasPanning = pan.active; if (wasPanning) { panEndedAt = Date.now(); boardElement.classList.remove('panning'); } pan = null; if (wasPanning && !over && !revealing) requestAnimationFrame(() => requestAnimationFrame(() => { if (!over && !revealing && !pan?.active) updateGuessMarks(); }));
+    }));
     document.querySelectorAll('[data-wrap]').forEach(button => button.addEventListener('click', () => { boardWrap = button.dataset.wrap === 'on'; updateMineControl(); saveSettings(); document.querySelectorAll('[data-wrap]').forEach(item => item.classList.toggle('active', item === button)); start(); }));
     wrapBoardSizeInput.addEventListener('input', () => { const size = Number(wrapBoardSizeInput.value); wrapBoardSizeOutput.value = `${size}×${size}`; wrapBoardSizeOutput.textContent = wrapBoardSizeOutput.value; });
     wrapBoardSizeInput.addEventListener('change', () => { const size = Number(wrapBoardSizeInput.value); if (!Number.isInteger(size) || size < WRAP_BOARD_MIN || size > WRAP_BOARD_MAX || size === wrapBoardSize) return; wrapBoardSize = size; updateMineControl(); saveSettings(); start(); });
