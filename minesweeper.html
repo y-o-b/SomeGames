@@ -60,8 +60,8 @@
     .stat { padding: 8px 3px; border: 2px solid #171717; border-radius: 10px; }
     .stat strong { display: block; font-size: 1.3rem; line-height: 1.1; }
     .stat span { color: var(--muted); font-size: .7rem; }
-    .board-tools { display: flex; justify-content: flex-end; margin-bottom: 14px; }
-    .hint-button { padding: 9px; border: 3px solid #171717; border-radius: 10px; font-weight: 800; }
+    .board-tools { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 10px; }
+    .hint-button { padding: 12px; border: 3px solid #171717; border-radius: 10px; font-weight: 800; box-shadow: 4px 4px 0 #171717; }
     .hint-button { background: #FFD166; white-space: nowrap; }
     .message { min-height: 27px; margin: 0 0 10px; color: var(--muted); text-align: center; font-size: .9rem; }
     .message b { color: var(--text); }
@@ -80,9 +80,6 @@
     .board.wrap .cell { font-size: calc(clamp(1rem, 5vw, 1.5rem) * var(--zoom, 1)); }
     .board.wrap .cell.flag { font-size: calc(clamp(1.2rem, 6vw, 1.7rem) * var(--zoom, 1)); }
     .board.wrap.hex .cell { font-size: calc(clamp(.9rem, 4.4vw, 1.4rem) * var(--zoom, 1)); }
-    .zoom-tools { display: flex; align-items: center; justify-content: center; gap: 8px; margin: 0 0 12px; }
-    .zoom-tools[hidden] { display: none; }
-    .zoom-value { min-width: 4.2em; color: var(--text); font-size: .85rem; font-weight: 800; text-align: center; }
     .cell { position: relative; aspect-ratio: 1; min-width: 0; min-height: 0; overflow: hidden; padding: 0; border-radius: 3px; color: #171717; background: #4B8ED8; font-weight: 900; font-size: clamp(1rem, 5vw, 1.5rem); line-height: 1; -webkit-tap-highlight-color: transparent; }
     .shovel-action { position: absolute; z-index: 2; top: 50%; left: 50%; display: grid; place-items: center; width: 84%; aspect-ratio: 1; background: transparent; transform: translate(-50%, -50%); }
     .shovel-action svg { display: block; width: 100%; height: 100%; }
@@ -124,16 +121,13 @@
         <div class="stat"><strong id="moves">0</strong><span>Felder offen</span></div>
         <div class="stat"><strong id="time">0:00</strong><span>Zeit</span></div>
       </div>
-      <div class="board-tools">
-        <button class="hint-button" id="hintButton" type="button">💡 Hinweis</button>
-      </div>
-      <div class="zoom-tools" id="zoomTools" role="group" aria-label="Zoom" hidden>
-        <output class="zoom-value" id="zoomValue" aria-live="polite">100 %</output>
-      </div>
       <p class="message" id="message" aria-live="polite"><b>Bereit?</b> Der erste Zug ist immer sicher.</p>
       <div class="board" id="board" role="grid" aria-label="Minenfeld"></div>
       <div class="metal-detector" id="metalDetector" aria-hidden="true"><svg viewBox="0 0 64 64"><rect x="7" y="5" width="29" height="13" rx="4" fill="#EF4B3F" stroke="#171717" stroke-width="3"/><rect x="12" y="8" width="9" height="5" rx="1" fill="#FFFFFF"/><path d="M30 17 48 47" fill="none" stroke="#171717" stroke-width="6" stroke-linecap="round"/><path d="M31 19 46 44" fill="none" stroke="#4B8ED8" stroke-width="2"/><ellipse cx="49" cy="53" rx="12" ry="6" transform="rotate(-28 49 53)" fill="none" stroke="#171717" stroke-width="4"/></svg></div>
-      <button class="new-game" id="newGame" type="button">Neues Spiel</button>
+      <div class="board-tools">
+        <button class="new-game" id="newGame" type="button">Neues Spiel</button>
+        <button class="hint-button" id="hintButton" type="button">💡 Hinweis</button>
+      </div>
     </section>
     <dialog class="settings-dialog" id="settingsDialog" aria-labelledby="settingsTitle">
       <h2 id="settingsTitle" tabindex="-1" autofocus>Einstellungen</h2>
@@ -177,14 +171,14 @@
       </div>
       <button class="settings-done" id="settingsDone" type="button">Fertig</button>
     </dialog>
-    <button class="version" data-version type="button" title="Klicken, um die Seite neu zu laden">Version 1.61</button>
+    <button class="version" data-version type="button" title="Klicken, um die Seite neu zu laden">Version 1.62</button>
     <script>const versionButton = document.querySelector('[data-version]'); versionButton.addEventListener('click', () => location.replace(`${location.pathname}?v=${Date.now()}`)); fetch(`VERSION?${Date.now()}`, { cache: 'no-store' }).then(response => response.text()).then(version => { versionButton.textContent = `Version ${version.trim()}`; }).catch(() => {});</script>
   </main>
   <script>
     const boardSizes = { '9x9': { cols: 9, rows: 9 }, '12x12': { cols: 12, rows: 12 }, '12x21': { cols: 12, rows: 21 } };
     const WRAP_BOARD_MIN = 9, WRAP_BOARD_MAX = 25, WRAP_VIEW_COLS = 12, WRAP_VIEW_ROWS = 24, ZOOM_MIN = .75, ZOOM_MAX = 2;
     let wrapZoom = 1, zoomTimer = null, pinch = null;
-    const activePointers = new Map(), zoomTools = document.getElementById('zoomTools'), zoomValue = document.getElementById('zoomValue');
+    const activePointers = new Map();
     const viewCols = () => WRAP_VIEW_COLS / wrapZoom, viewRows = () => WRAP_VIEW_ROWS / wrapZoom;
     const boardElement = document.getElementById('board'), message = document.getElementById('message'), gamePanel = document.querySelector('.game'), appElement = document.querySelector('.app'), detectorElement = document.getElementById('metalDetector');
     const mineCountInput = document.getElementById('mineCount'), mineCountOutput = document.getElementById('mineCountValue'), wrapBoardSizeInput = document.getElementById('wrapBoardSize'), wrapBoardSizeOutput = document.getElementById('wrapBoardSizeValue'), wrapBoardSizeRow = document.getElementById('wrapBoardSizeRow'), sizeButtonsRow = document.getElementById('sizeButtonsRow');
@@ -286,7 +280,7 @@
       });
     }
     function start() {
-      activeConfig = selectedConfig(); updateSizeButtons(); updateWrapBoardSizeControl(); updateZoomControl();
+      activeConfig = selectedConfig(); updateSizeButtons(); updateWrapBoardSizeControl();
       appElement.classList.toggle('tablet-wide', !boardWrap && boardSize === '12x21' && tabletLandscape());
       stopDetector();
       shovelIndex = null;
@@ -458,16 +452,12 @@
     function win() { grid.forEach(cell => { if (cell.mine) cell.flag = true; }); flagCount = config().mines; finish(); updateStats(); boardElement.querySelectorAll('.cell.flag').forEach((cell, index) => { cell.style.animationDelay = `${index * 35}ms`; cell.classList.add('wave'); }); message.innerHTML = `<b>Gewonnen!</b> Alle Minen gefunden in ${document.getElementById('time').textContent}.`; }
     document.getElementById('hintButton').addEventListener('click', showHint);
     // Zoom (nur randlos): Das Fenster bleibt 12×24, sichtbar sind 12/Zoom × 24/Zoom Felder; die Mitte bleibt stehen.
-    function updateZoomControl() {
-      zoomTools.hidden = !boardWrap; boardElement.style.setProperty('--zoom', wrapZoom);
-      zoomValue.value = `${Math.round(wrapZoom * 100)} %`; zoomValue.textContent = zoomValue.value;
-    }
     function setZoom(value) {
       const next = Math.round(Math.min(ZOOM_MAX, Math.max(ZOOM_MIN, value)) * 100) / 100;
       if (!config().wrap || next === wrapZoom) return;
       const oldCols = viewCols(), oldRows = viewRows(), stepY = config().shape === 'hex' ? .75 * 2 / Math.sqrt(3) : 1;
       wrapZoom = next; offsetX += (viewCols() - oldCols) / 2; offsetY += (viewRows() - oldRows) * stepY / 2;
-      updateZoomControl(); layoutCells();
+      boardElement.style.setProperty('--zoom', wrapZoom); layoutCells();
       clearTimeout(autoSafeTimer); autoSafeTimer = null; stopDetector(); clearShovel();
       clearTimeout(zoomTimer); zoomTimer = setTimeout(() => { zoomTimer = null; if (!over && !revealing) updateGuessMarks(); }, 300);
     }
