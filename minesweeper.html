@@ -139,13 +139,6 @@
             <button class="setting-button" data-shape="hex" type="button">⬢ Sechsecke</button>
           </div>
         </div>
-        <div class="setting-row">
-          <span>Rand</span>
-          <div class="setting-buttons" role="group" aria-label="Spielfeldrand">
-            <button class="setting-button" data-wrap="off" type="button">Mit Rand</button>
-            <button class="setting-button" data-wrap="on" type="button">Randlos</button>
-          </div>
-        </div>
         <div class="setting-row" id="sizeButtonsRow">
           <span>Größe</span>
           <div class="setting-buttons" role="group" aria-label="Spielfeldgröße">
@@ -171,26 +164,27 @@
       </div>
       <button class="settings-done" id="settingsDone" type="button">Fertig</button>
     </dialog>
-    <button class="version" data-version type="button" title="Klicken, um die Seite neu zu laden">Version 1.63</button>
+    <button class="version" data-version type="button" title="Klicken, um die Seite neu zu laden">Version 1.64</button>
     <script>const versionButton = document.querySelector('[data-version]'); versionButton.addEventListener('click', () => location.replace(`${location.pathname}?v=${Date.now()}`)); fetch(`VERSION?${Date.now()}`, { cache: 'no-store' }).then(response => response.text()).then(version => { versionButton.textContent = `Version ${version.trim()}`; }).catch(() => {});</script>
   </main>
   <script>
     const boardSizes = { '9x9': { cols: 9, rows: 9 }, '12x12': { cols: 12, rows: 12 }, '12x21': { cols: 12, rows: 21 } };
-    const WRAP_BOARD_MIN = 9, WRAP_BOARD_MAX = 25, WRAP_VIEW_COLS = 12, WRAP_VIEW_ROWS = 24, ZOOM_MIN = .75, ZOOM_MAX = 2;
-    let wrapZoom = 1, zoomTimer = null, pinch = null;
+    // Es gibt nur noch den Randlos-Modus. Das Fenster zeigt 12 Spalten; wie viele Zeilen, richtet sich nach dem Platz
+    // auf dem Bildschirm (fitWrapWindow), höchstens WRAP_VIEW_ROWS_MAX.
+    const WRAP_BOARD_MIN = 9, WRAP_BOARD_MAX = 25, WRAP_VIEW_COLS = 12, WRAP_VIEW_ROWS_MAX = 30, ZOOM_MIN = .75, ZOOM_MAX = 2;
+    let wrapZoom = 1, zoomTimer = null, pinch = null, wrapViewRows = 18;
     const activePointers = new Map();
-    const viewCols = () => WRAP_VIEW_COLS / wrapZoom, viewRows = () => WRAP_VIEW_ROWS / wrapZoom;
+    const viewCols = () => WRAP_VIEW_COLS / wrapZoom, viewRows = () => wrapViewRows / wrapZoom;
     const boardElement = document.getElementById('board'), message = document.getElementById('message'), gamePanel = document.querySelector('.game'), appElement = document.querySelector('.app'), detectorElement = document.getElementById('metalDetector');
     const mineCountInput = document.getElementById('mineCount'), mineCountOutput = document.getElementById('mineCountValue'), wrapBoardSizeInput = document.getElementById('wrapBoardSize'), wrapBoardSizeOutput = document.getElementById('wrapBoardSizeValue'), wrapBoardSizeRow = document.getElementById('wrapBoardSizeRow'), sizeButtonsRow = document.getElementById('sizeButtonsRow');
     const SHAPE_STORAGE_KEY = 'y-o-b.minesweeper.shape.v1', WRAP_STORAGE_KEY = 'y-o-b.minesweeper.wrap.v1', WRAP_BOARD_SIZE_KEY = 'y-o-b.minesweeper.wrap-board-size.v1', SIZE_STORAGE_KEY = 'y-o-b.minesweeper.size.v1', MINE_COUNT_STORAGE_KEY = 'y-o-b.minesweeper.mine-count.v1', LEVEL_STORAGE_KEY = 'y-o-b.minesweeper.level.v1';
-    let boardShape = 'square', boardWrap = false, wrapBoardSize = 9, offsetX = 0, offsetY = 0, pan = null, panEndedAt = 0, panFrame = 0, ghosts = [], boardSize = '9x9', mineCount = 10, activeConfig = null, grid = [], over = false, placed = false, seconds = 0, timer = null, openCount = 0, flagCount = 0, pressTimer = null, longPressed = false, autoSafeTimer = null, revealTimers = [], revealing = false, detectorTimers = [], detectorRun = 0, shovelIndex = null;
+    let boardShape = 'square', boardWrap = true, wrapBoardSize = 9, offsetX = 0, offsetY = 0, pan = null, panEndedAt = 0, panFrame = 0, ghosts = [], boardSize = '9x9', mineCount = 10, activeConfig = null, grid = [], over = false, placed = false, seconds = 0, timer = null, openCount = 0, flagCount = 0, pressTimer = null, longPressed = false, autoSafeTimer = null, revealTimers = [], revealing = false, detectorTimers = [], detectorRun = 0, shovelIndex = null;
     function maxMineCount(size) { return boardWrap ? Math.min(300, Math.max(60, Math.floor(wrapBoardSize * wrapBoardSize * .5))) : ({ '9x9': 60, '12x12': 80, '12x21': 120 })[size]; }
     try {
       const savedSize = localStorage.getItem(SIZE_STORAGE_KEY), savedMineCount = localStorage.getItem(MINE_COUNT_STORAGE_KEY), savedWrapBoardSize = Number(localStorage.getItem(WRAP_BOARD_SIZE_KEY));
       const validSavedMineCount = Number.isInteger(Number(savedMineCount)) && Number(savedMineCount) > 0;
       if (boardSizes[savedSize]) boardSize = savedSize;
       if (['square', 'hex'].includes(localStorage.getItem(SHAPE_STORAGE_KEY))) boardShape = localStorage.getItem(SHAPE_STORAGE_KEY);
-      boardWrap = localStorage.getItem(WRAP_STORAGE_KEY) === 'on';
       if (validSavedMineCount) mineCount = Number(savedMineCount);
       const legacyPresets = { easy: ['9x9', 10], medium: ['12x12', 25], hard: ['12x21', 40] }, legacy = legacyPresets[localStorage.getItem(LEVEL_STORAGE_KEY)];
       if (legacy) { if (!boardSizes[savedSize]) boardSize = legacy[0]; if (!validSavedMineCount) mineCount = legacy[1]; }
@@ -222,7 +216,7 @@
     const settingsDialog = document.getElementById('settingsDialog'), settingsSummary = document.getElementById('settingsSummary');
     function updateSummary() {
       const { cols, rows, mines, shape, wrap } = config();
-      settingsSummary.innerHTML = `⚙ <b>${shape === 'hex' ? 'Sechsecke' : 'Quadrate'}</b> · ${cols}×${rows} · ${wrap ? 'randlos' : 'mit Rand'} · ${mines} Minen`;
+      settingsSummary.innerHTML = `⚙ <b>${shape === 'hex' ? 'Sechsecke' : 'Quadrate'}</b> · ${cols}×${rows} · ${mines} Minen`;
       settingsSummary.setAttribute('aria-label', `Einstellungen ändern: ${settingsSummary.textContent.replace('⚙ ', '')}`);
     }
     const openSettings = () => { if (!settingsDialog.open) settingsDialog.showModal(); };
@@ -246,6 +240,21 @@
     }
     // Randlos: Das Fenster bleibt fest 12×24 (Spalten × Zeilen); je nach Spielfeldgröße werden Felder wiederholt oder
     // beim Ziehen verschoben. Kopien liegen in ghosts[index].
+    // Fenstergröße: so hoch, wie der Bildschirm unter Kopf und Statistik und über den Knöpfen Platz lässt
+    // (höchstens doppelt so hoch wie breit); daraus folgt die Zahl der sichtbaren Zeilen.
+    function fitWrapWindow(extra = 0) {
+      const width = boardElement.clientWidth; if (!width) return;
+      const stepY = config().shape === 'hex' ? .75 * 2 / Math.sqrt(3) : 1, board = boardElement.getBoundingClientRect(), app = appElement.getBoundingClientRect();
+      const below = app.bottom - board.bottom + parseFloat(getComputedStyle(document.body).paddingBottom) + 8;
+      const height = Math.max(width * .75, Math.min(width * 2, innerHeight - (board.top + scrollY) - below - extra));
+      wrapViewRows = Math.min(WRAP_VIEW_ROWS_MAX, WRAP_VIEW_COLS * height / width / stepY);
+    }
+    // Einpassen und zeichnen; ragt die Seite danach noch über den Bildschirm (Schatten, Rundungen), einmal nachkorrigieren.
+    function fitAndLayout() {
+      fitWrapWindow(); layoutCells();
+      const overflow = document.documentElement.scrollHeight - innerHeight;
+      if (overflow > 0 && boardElement.clientHeight > boardElement.clientWidth * .75 + 1) { fitWrapWindow(overflow); layoutCells(); }
+    }
     function layoutWrapped() {
       const { cols, rows, shape } = config(), hex = shape === 'hex', cellHeight = hex ? 2 / Math.sqrt(3) : 1, stepY = hex ? .75 * cellHeight : 1, width = cols, height = rows * stepY, viewWidth = viewCols(), viewHeight = viewRows() * stepY;
       boardElement.style.aspectRatio = `${viewWidth} / ${viewHeight}`;
@@ -307,9 +316,9 @@
       };
       // Erst alle Felder (children[index] bleibt das Feld selbst), dahinter die nötigen Wiederholungen fürs feste Fenster.
       grid.forEach((cell, index) => boardElement.appendChild(makeCell(cell, index, false)));
-      const wrapGhostCount = config().wrap ? Math.max(3, (Math.ceil(WRAP_VIEW_COLS / ZOOM_MIN / config().cols) + 1) * (Math.ceil(WRAP_VIEW_ROWS / ZOOM_MIN / config().rows) + 1) - 1) : 0;
+      const wrapGhostCount = config().wrap ? Math.max(3, (Math.ceil(WRAP_VIEW_COLS / ZOOM_MIN / config().cols) + 1) * (Math.ceil(WRAP_VIEW_ROWS_MAX / ZOOM_MIN / config().rows) + 1) - 1) : 0;
       ghosts = grid.map((cell, index) => Array.from({ length: wrapGhostCount }, () => boardElement.appendChild(makeCell(cell, index, true))));
-      layoutCells(); updateSummary();
+      updateSummary(); fitAndLayout();
       document.getElementById('time').textContent = '0:00'; message.innerHTML = '<b>Bereit?</b> Der erste Zug ist immer sicher.'; updateStats();
     }
     function placeMines(safe) {
@@ -501,7 +510,12 @@
     document.querySelectorAll('[data-size]').forEach(button => button.addEventListener('click', () => { boardSize = button.dataset.size; updateMineControl(); saveSettings(); document.querySelectorAll('[data-size]').forEach(item => item.classList.toggle('active', item === button)); start(); }));
     mineCountInput.addEventListener('input', () => { mineCountOutput.value = `${mineCountInput.value} / ${mineCountInput.max}`; mineCountOutput.textContent = mineCountOutput.value; });
     mineCountInput.addEventListener('change', () => { mineCount = Number(mineCountInput.value); updateMineControl(); saveSettings(); start(); });
+    // Drehen oder Fenstergröße ändern: Fenster neu einpassen, das Spiel läuft weiter.
+    let fitFrame = 0;
+    addEventListener('resize', () => { cancelAnimationFrame(fitFrame); fitFrame = requestAnimationFrame(fitAndLayout); });
     document.getElementById('newGame').addEventListener('click', start); start();
+    // Beim ersten Aufbau stehen Schrift und Kopf noch nicht endgültig; nach dem Laden noch einmal einpassen.
+    addEventListener('load', () => fitAndLayout());
   </script>
   <script>if ('serviceWorker' in navigator) addEventListener('load', () => navigator.serviceWorker.register('sw.js').catch(() => {}));</script>
 </body>
