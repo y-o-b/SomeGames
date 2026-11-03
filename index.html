@@ -36,6 +36,18 @@
     footer { margin-top: 22px; color: var(--muted); font-size: .78rem; }
     .version { margin-top: 8px; padding: 0; border: 0; color: var(--muted); background: transparent; font: inherit; font-size: .72rem; cursor: pointer; }
     .version:focus-visible { outline: 2px solid #171717; outline-offset: 3px; }
+    /* Schmale Bildschirme (iPhone): Icon links, Text und Knopf rechts, damit alle Spiele auf einen Blick passen. */
+    @media (max-width: 600px) {
+      body { padding: 14px 14px 8px; align-content: start; }
+      .card { display: grid; grid-template-columns: 56px 1fr; column-gap: 14px; align-items: center; padding: 14px 16px; text-align: left; }
+      .card + .card { margin-top: 0; }
+      .game-icon { grid-row: span 3; width: 56px; height: 56px; margin: 0; align-self: start; }
+      .card h2 { margin: 0 0 2px; font-size: 1.15rem; }
+      .card p { margin: 0 0 10px; max-width: none; font-size: .82rem; line-height: 1.35; }
+      .card a { justify-self: start; padding: 8px 16px; font-size: .9rem; box-shadow: 3px 3px 0 #171717; }
+      .banner { top: 10px; right: 10px; width: auto; padding: 1px 7px; transform: none; border: 2px solid #171717; border-radius: 6px; font-size: .6rem; }
+      footer { margin-top: 12px; }
+    }
   </style>
 </head>
 <body>
@@ -68,7 +80,7 @@
       </div>
     </div>
     <footer>Eine kleine Spielpause gefällig?</footer>
-    <button class="version" data-version type="button" title="Klicken, um die Seite neu zu laden">Version 1.62</button>
+    <button class="version" data-version type="button" title="Klicken, um die Seite neu zu laden">Version 1.63</button>
     <script>const versionButton = document.querySelector('[data-version]'); versionButton.addEventListener('click', () => location.replace(`${location.pathname}?v=${Date.now()}`)); fetch(`VERSION?${Date.now()}`, { cache: 'no-store' }).then(response => response.text()).then(version => { versionButton.textContent = `Version ${version.trim()}`; }).catch(() => {});</script>
   </main>
   <script>if ('serviceWorker' in navigator) addEventListener('load', () => navigator.serviceWorker.register('sw.js').catch(() => {}));</script>

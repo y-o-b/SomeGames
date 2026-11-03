@@ -31,7 +31,7 @@
     h1 { margin: 0; font-size: clamp(2.7rem, 11vw, 4.7rem); line-height: .95; letter-spacing: -.07em; }
     .game { padding: clamp(17px, 4vw, 28px); border: 3px solid #171717; border-radius: 18px; background: var(--panel); box-shadow: 7px 7px 0 #171717; }
     .mode-switch { display: grid; grid-template-columns: 1fr 1fr; gap: 5px; padding: 4px; margin-bottom: 19px; border-radius: 10px; background: #171717; }
-    .mode { padding: 9px; border-radius: 9px; color: var(--muted); background: transparent; font-weight: 700; }
+    .mode { padding: 9px; border-radius: 9px; color: rgba(255,255,255,.8); background: transparent; font-weight: 700; }
     .mode.active { color: var(--text); background: #FFFFFF; }
     .sizes { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 20px; color: var(--muted); font-size: .82rem; }
     .size-buttons { display: flex; gap: 5px; }
@@ -71,6 +71,8 @@
     .message { min-height: 27px; margin: 0 0 10px; color: var(--muted); text-align: center; font-size: .9rem; }
     .message b { color: var(--text); }
     @media (max-width: 400px) { .game { padding: 15px; } .board { gap: 5px; } .memory-card { border-radius: 8px; } .size { padding: 6px 7px; } }
+    /* Niedrige Bildschirme (iPhone 15 und kleiner): Kopf und Abstände knapper, damit 4×4 ohne Scrollen passt. */
+    @media (max-height: 860px) and (max-width: 600px) { body { padding-top: 16px; padding-bottom: 12px; } header { margin-bottom: 14px; } h1 { font-size: clamp(2.3rem, 10vw, 3.4rem); } .mode-switch { margin-bottom: 12px; } .stats { margin-bottom: 10px; } .board { margin-bottom: 14px; } }
     @media (min-width: 768px) and (max-width: 1366px) and (orientation: landscape) { .app.tablet-wide { width: min(100%, 960px); } .app.tablet-wide .board { max-width: 840px; } }
   </style>
 </head>
@@ -106,7 +108,7 @@
       <div class="board" id="board" role="grid" aria-label="Memory-Spielfeld"></div>
       <button class="new-game" id="newGame" type="button">Neues Spiel</button>
     </section>
-    <button class="version" data-version type="button" title="Klicken, um die Seite neu zu laden">Version 1.62</button>
+    <button class="version" data-version type="button" title="Klicken, um die Seite neu zu laden">Version 1.63</button>
     <script>const versionButton = document.querySelector('[data-version]'); versionButton.addEventListener('click', () => location.replace(`${location.pathname}?v=${Date.now()}`)); fetch(`VERSION?${Date.now()}`, { cache: 'no-store' }).then(response => response.text()).then(version => { versionButton.textContent = `Version ${version.trim()}`; }).catch(() => {});</script>
   </main>
   <script>
