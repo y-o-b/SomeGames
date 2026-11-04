@@ -161,7 +161,7 @@
       </div>
       <button class="settings-done" id="settingsDone" type="button">Fertig</button>
     </dialog>
-    <button class="version" data-version type="button" title="Klicken, um die Seite neu zu laden">Version 1.70</button>
+    <button class="version" data-version type="button" title="Klicken, um die Seite neu zu laden">Version 1.71</button>
     <script>const versionButton = document.querySelector('[data-version]'); versionButton.addEventListener('click', () => location.replace(`${location.pathname}?v=${Date.now()}`)); fetch(`VERSION?${Date.now()}`, { cache: 'no-store' }).then(response => response.text()).then(version => { versionButton.textContent = `Version ${version.trim()}`; }).catch(() => {});</script>
   </main>
   <script>
@@ -231,14 +231,27 @@
     function flushGameState() { clearTimeout(gameSaveTimer); gameSaveTimer = null; persistGameStateNow(); }
     function restoreGameState() {
       try {
-        const saved = JSON.parse(localStorage.getItem(GAME_STATE_KEY) || 'null'), expected = selectedConfig();
-        if (!saved || saved.version !== 1 || saved.boardShape !== boardShape || saved.boardWrap !== boardWrap || saved.wrapBoardSize !== wrapBoardSize || saved.boardSize !== boardSize || saved.mineCount !== mineCount || saved.cols !== expected.cols || saved.rows !== expected.rows || saved.mines !== expected.mines || !Array.isArray(saved.grid) || saved.grid.length !== expected.cols * expected.rows) return null;
+        const saved = JSON.parse(localStorage.getItem(GAME_STATE_KEY) || 'null');
+        if (!saved || saved.version !== 1 || !['square', 'hex'].includes(saved.boardShape) || typeof saved.boardWrap !== 'boolean' || !boardSizes[saved.boardSize] || !Number.isInteger(saved.wrapBoardSize) || saved.wrapBoardSize < WRAP_BOARD_MIN || saved.wrapBoardSize > WRAP_BOARD_MAX || !Number.isInteger(saved.mineCount) || !Number.isInteger(saved.mines)) return null;
+        const selectedSize = boardSizes[saved.boardSize], maxMines = saved.boardWrap ? Math.min(300, Math.max(60, Math.floor(saved.wrapBoardSize * saved.wrapBoardSize * .5))) : ({ '9x9': 60, '12x12': 80, '12x21': 120 })[saved.boardSize];
+        const rotate = !saved.boardWrap && saved.boardSize === '12x21' && tabletLandscape();
+        const cols = saved.boardWrap ? saved.wrapBoardSize : rotate ? selectedSize.rows : selectedSize.cols;
+        let rows = saved.boardWrap ? saved.wrapBoardSize : rotate ? selectedSize.cols : selectedSize.rows;
+        if (saved.boardShape === 'hex' && saved.boardWrap && rows % 2) rows++;
+        const mines = saved.mineCount;
+        if (mines < 1 || mines > maxMines || saved.cols !== cols || saved.rows !== rows || saved.mines !== mines || !Array.isArray(saved.grid) || saved.grid.length !== cols * rows) return null;
         const validCell = cell => cell && typeof cell.mine === 'boolean' && typeof cell.open === 'boolean' && typeof cell.flag === 'boolean' && Number.isInteger(cell.count) && cell.count >= 0 && cell.count <= 8;
-        if (!saved.grid.every(validCell) || typeof saved.over !== 'boolean' || typeof saved.placed !== 'boolean' || !Number.isInteger(saved.seconds) || saved.seconds < 0) return null;
+        if (!saved.grid.every(validCell) || typeof saved.over !== 'boolean' || typeof saved.placed !== 'boolean' || (saved.over && !saved.placed) || !Number.isInteger(saved.seconds) || saved.seconds < 0) return null;
         const restored = saved.grid.map(cell => ({ ...cell, opening: false, guess: false, hint: ['safe', 'mine'].includes(cell.hint) ? cell.hint : '', wrongFlag: Boolean(cell.wrongFlag) }));
-        const openCount = restored.filter(cell => cell.open).length, flagCount = restored.filter(cell => cell.flag).length, mineCount = restored.filter(cell => cell.mine).length;
-        if (saved.openCount !== openCount || saved.flagCount !== flagCount || (saved.placed && mineCount !== expected.mines) || (!saved.placed && mineCount)) return null;
+        const openCount = restored.filter(cell => cell.open).length, flagCount = restored.filter(cell => cell.flag).length, mineTotal = restored.filter(cell => cell.mine).length;
+        if (saved.openCount !== openCount || saved.flagCount !== flagCount || (saved.placed && mineTotal !== mines) || (!saved.placed && mineTotal)) return null;
         if (![saved.offsetX, saved.offsetY, saved.wrapZoom].every(Number.isFinite) || saved.wrapZoom < ZOOM_MIN || saved.wrapZoom > ZOOM_MAX) return null;
+        boardShape = saved.boardShape; boardWrap = saved.boardWrap; wrapBoardSize = saved.wrapBoardSize; boardSize = saved.boardSize; mineCount = mines;
+        updateMineControl(); updateSizeButtons(); updateWrapBoardSizeControl();
+        document.querySelectorAll('[data-shape]').forEach(button => button.classList.toggle('active', button.dataset.shape === boardShape));
+        document.querySelectorAll('[data-wrap]').forEach(button => button.classList.toggle('active', (button.dataset.wrap === 'on') === boardWrap));
+        document.querySelectorAll('[data-size]').forEach(button => button.classList.toggle('active', button.dataset.size === boardSize));
+        saveSettings();
         return { grid: restored, over: saved.over, placed: saved.placed, seconds: saved.seconds, openCount, flagCount, offsetX: saved.offsetX, offsetY: saved.offsetY, wrapZoom: saved.wrapZoom };
       } catch (error) { console.warn('Detektor-Spielstand konnte nicht geladen werden.', error); return null; }
     }
@@ -340,7 +353,7 @@
       fitAndLayout();
       document.getElementById('time').textContent = `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, '0')}`;
       if (over) message.innerHTML = openCount === grid.length - config().mines ? `<b>Gewonnen!</b> Alle Minen gefunden in ${document.getElementById('time').textContent}.` : '<b>Boom!</b> Eine Mine wurde ausgelöst. Versuche es noch einmal.';
-      else message.innerHTML = placed ? '<b>Spielstand geladen.</b> Du kannst weiterspielen.' : '<b>Bereit?</b> Der erste Zug ist immer sicher.';
+      else message.innerHTML = savedState ? '<b>Spielstand geladen.</b> Du kannst weiterspielen.' : '<b>Bereit?</b> Der erste Zug ist immer sicher.';
       if (placed && !over) startTimer();
       updateStats();
     }
