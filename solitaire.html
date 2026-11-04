@@ -123,7 +123,7 @@
       <div class="controls"><button class="undo" id="undo" type="button" disabled>↶ Rückgängig</button><button id="sameGame" class="undo" type="button">↻ Gleiches Deck</button><button id="autoFinish" type="button" hidden>▶ Fertigspielen</button><button id="newGame" type="button">Neues Spiel</button></div>
       <div class="heap" id="heap" aria-hidden="true"></div>
     </section>
-    <button class="version" data-version type="button" title="Klicken, um die Seite neu zu laden">Version 1.66</button>
+    <button class="version" data-version type="button" title="Klicken, um die Seite neu zu laden">Version 1.67</button>
     <script>const versionButton = document.querySelector('[data-version]'); versionButton.addEventListener('click', () => location.replace(`${location.pathname}?v=${Date.now()}`)); fetch(`VERSION?${Date.now()}`, { cache: 'no-store' }).then(response => response.text()).then(version => { versionButton.textContent = `Version ${version.trim()}`; }).catch(() => {});</script>
   </main>
   <script>
@@ -213,6 +213,17 @@
       if (isSelected) { selected = null; lastCardTap = null; render(); return; }
       selected = { source, index, cardIndex }; lastCardTap = { id: card.id, time: now }; render();
     }
+    function finishRevealForDrag(card) {
+      if (!revealedCards.includes(card)) return;
+      document.querySelector(`[data-card-id="${card.id}"] .flip-inner`)?.getAnimations().forEach(animation => { try { animation.finish(); } catch (error) {} });
+      clearTimeout(revealClearTimer); revealClearTimer = null; revealedCards = [];
+    }
+    function cancelCardDrag(drag = cardDrag) {
+      if (!drag) return;
+      document.body.classList.remove('dragging-cards');
+      drag.cards.forEach(item => { const element = document.querySelector(`[data-card-id="${item.id}"]`); if (element) { element.classList.remove('dragging'); element.style.transform = ''; element.style.zIndex = ''; } });
+      if (cardDrag === drag) cardDrag = null;
+    }
     function cardButton(card, source, index, cardIndex = 0) {
       const button = document.createElement('button');
       const isSelected = selected && selected.source === source && selected.index === index && (source === 'tableau' ? cardIndex >= selected.cardIndex : selected.cardIndex === cardIndex);
@@ -232,8 +243,10 @@
       });
       button.addEventListener('pointerdown', event => {
         if (event.pointerType === 'mouse' && event.button !== 0) return;
+        if (cardDrag && cardDrag.pointerId !== event.pointerId) return;
+        finishRevealForDrag(card);
         const cards = source === 'tableau' ? tableau[index].slice(cardIndex).filter(item => item.faceUp) : [card];
-        cardDrag = { source, index, cardIndex, startX: event.clientX, startY: event.clientY, moved: false, button, cards };
+        cardDrag = { source, index, cardIndex, pointerId: event.pointerId, startX: event.clientX, startY: event.clientY, moved: false, button, cards };
         button.setPointerCapture(event.pointerId);
       });
       button.addEventListener('pointermove', event => {
@@ -246,7 +259,7 @@
         if (cardDrag.moved) cardDrag.cards.forEach(item => { const element = document.querySelector(`[data-card-id="${item.id}"]`); if (element) element.style.transform = `translate(${event.clientX - cardDrag.startX}px, ${event.clientY - cardDrag.startY}px)`; });
       });
       button.addEventListener('pointerup', event => {
-        if (!cardDrag) return;
+        if (!cardDrag || cardDrag.pointerId !== event.pointerId) return;
         const touch = event.pointerType !== 'mouse'; if (touch) noteTouchTap();
         document.body.classList.remove('dragging-cards');
         const drag = cardDrag;
@@ -267,11 +280,10 @@
         }
         cardDrag = null;
       });
-      button.addEventListener('pointercancel', () => {
-        document.body.classList.remove('dragging-cards');
-        if (cardDrag) cardDrag.cards.forEach(item => { const element = document.querySelector(`[data-card-id="${item.id}"]`); if (element) { element.classList.remove('dragging'); element.style.transform = ''; element.style.zIndex = ''; } });
-        cardDrag = null;
+      button.addEventListener('pointercancel', event => {
+        if (cardDrag?.pointerId === event.pointerId) cancelCardDrag();
       });
+      button.addEventListener('lostpointercapture', event => { if (cardDrag?.pointerId === event.pointerId) cancelCardDrag(); });
       return button;
     }
     // Karte (oder leerer Platz) unter der obersten Karte von Ablage und Zielstapel: bleibt sichtbar, wenn die oberste gezogen wird oder noch fliegt.
