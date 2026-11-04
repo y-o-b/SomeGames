@@ -29,13 +29,11 @@
     .game { padding: clamp(14px, 4vw, 26px); border: 3px solid #171717; border-radius: 18px; background: var(--panel); box-shadow: 7px 7px 0 #171717; }
     button { border: 0; color: inherit; font: inherit; cursor: pointer; }
     .settings { display: grid; gap: 10px; margin-bottom: 16px; }
-    /* Einstellungen im Popup: Zahnrad oben rechts oder die Zusammenfassung über dem Spielstand öffnen es. */
+    /* Die Einstellungen werden über das Zahnrad oben rechts geöffnet. */
     .settings-open { display: grid; place-items: center; width: 44px; height: 44px; position: absolute; right: 0; top: 50%; margin-top: -22px; padding: 0; border: 3px solid #171717; border-radius: 50%; color: #171717; background: #FFFFFF; box-shadow: 3px 3px 0 #171717; -webkit-tap-highlight-color: transparent; transition: transform .12s, box-shadow .12s; }
     .settings-open svg { display: block; width: 24px; height: 24px; fill: none; stroke: currentColor; stroke-width: 2.4; stroke-linecap: round; stroke-linejoin: round; }
     .settings-open:active { transform: translate(2px, 2px); box-shadow: 1px 1px 0 #171717; }
-    .settings-open:focus-visible, .settings-summary:focus-visible { outline: 3px solid #EF4B3F; outline-offset: 3px; }
-    .settings-summary { display: block; width: 100%; margin: 0 0 12px; padding: 8px 10px; border: 2px dashed #171717; border-radius: 10px; color: var(--muted); background: #FFFFFF; font-size: .8rem; }
-    .settings-summary b { color: var(--text); }
+    .settings-open:focus-visible { outline: 3px solid #EF4B3F; outline-offset: 3px; }
     .settings-dialog { width: min(100% - 32px, 440px); max-width: none; padding: clamp(16px, 4vw, 24px); border: 3px solid #171717; border-radius: 18px; color: var(--text); background: var(--panel); box-shadow: 7px 7px 0 #171717; }
     .settings-dialog::backdrop { background: rgba(23,23,23,.45); }
     .settings-dialog h2 { margin: 0 0 14px; font-size: 1.4rem; letter-spacing: -.03em; outline: none; }
@@ -115,7 +113,6 @@
       <button class="settings-open" id="settingsOpen" type="button" aria-label="Einstellungen" title="Einstellungen" aria-haspopup="dialog"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="3.2"/><path d="M12 2.8v2.4M12 18.8v2.4M2.8 12h2.4M18.8 12h2.4M5.5 5.5l1.7 1.7M16.8 16.8l1.7 1.7M5.5 18.5l1.7-1.7M16.8 7.2l1.7-1.7"/><circle cx="12" cy="12" r="6.6"/></svg></button>
     </header>
     <section class="game" aria-label="Detektor-Spiel">
-      <button class="settings-summary" id="settingsSummary" type="button" aria-haspopup="dialog"></button>
       <div class="stats" aria-label="Spielstatistik">
         <div class="stat"><strong id="mines">0</strong><span>Minen übrig</span></div>
         <div class="stat"><strong id="moves">0</strong><span>Felder offen</span></div>
@@ -164,7 +161,7 @@
       </div>
       <button class="settings-done" id="settingsDone" type="button">Fertig</button>
     </dialog>
-    <button class="version" data-version type="button" title="Klicken, um die Seite neu zu laden">Version 1.69</button>
+    <button class="version" data-version type="button" title="Klicken, um die Seite neu zu laden">Version 1.70</button>
     <script>const versionButton = document.querySelector('[data-version]'); versionButton.addEventListener('click', () => location.replace(`${location.pathname}?v=${Date.now()}`)); fetch(`VERSION?${Date.now()}`, { cache: 'no-store' }).then(response => response.text()).then(version => { versionButton.textContent = `Version ${version.trim()}`; }).catch(() => {});</script>
   </main>
   <script>
@@ -177,8 +174,8 @@
     const viewCols = () => WRAP_VIEW_COLS / wrapZoom, viewRows = () => wrapViewRows / wrapZoom;
     const boardElement = document.getElementById('board'), message = document.getElementById('message'), gamePanel = document.querySelector('.game'), appElement = document.querySelector('.app'), detectorElement = document.getElementById('metalDetector');
     const mineCountInput = document.getElementById('mineCount'), mineCountOutput = document.getElementById('mineCountValue'), wrapBoardSizeInput = document.getElementById('wrapBoardSize'), wrapBoardSizeOutput = document.getElementById('wrapBoardSizeValue'), wrapBoardSizeRow = document.getElementById('wrapBoardSizeRow'), sizeButtonsRow = document.getElementById('sizeButtonsRow');
-    const SHAPE_STORAGE_KEY = 'y-o-b.minesweeper.shape.v1', WRAP_STORAGE_KEY = 'y-o-b.minesweeper.wrap.v1', WRAP_BOARD_SIZE_KEY = 'y-o-b.minesweeper.wrap-board-size.v1', SIZE_STORAGE_KEY = 'y-o-b.minesweeper.size.v1', MINE_COUNT_STORAGE_KEY = 'y-o-b.minesweeper.mine-count.v1', LEVEL_STORAGE_KEY = 'y-o-b.minesweeper.level.v1';
-    let boardShape = 'square', boardWrap = true, wrapBoardSize = 9, offsetX = 0, offsetY = 0, pan = null, panEndedAt = 0, panFrame = 0, ghosts = [], boardSize = '9x9', mineCount = 10, activeConfig = null, grid = [], over = false, placed = false, seconds = 0, timer = null, openCount = 0, flagCount = 0, pressTimer = null, longPressed = false, autoSafeTimer = null, revealTimers = [], revealing = false, detectorTimers = [], detectorRun = 0, shovelIndex = null;
+    const SHAPE_STORAGE_KEY = 'y-o-b.minesweeper.shape.v1', WRAP_STORAGE_KEY = 'y-o-b.minesweeper.wrap.v1', WRAP_BOARD_SIZE_KEY = 'y-o-b.minesweeper.wrap-board-size.v1', SIZE_STORAGE_KEY = 'y-o-b.minesweeper.size.v1', MINE_COUNT_STORAGE_KEY = 'y-o-b.minesweeper.mine-count.v1', LEVEL_STORAGE_KEY = 'y-o-b.minesweeper.level.v1', GAME_STATE_KEY = 'y-o-b.minesweeper.game.v1';
+    let boardShape = 'square', boardWrap = true, wrapBoardSize = 9, offsetX = 0, offsetY = 0, pan = null, panEndedAt = 0, panFrame = 0, ghosts = [], boardSize = '9x9', mineCount = 10, activeConfig = null, grid = [], over = false, placed = false, seconds = 0, timer = null, openCount = 0, flagCount = 0, pressTimer = null, longPressed = false, autoSafeTimer = null, revealTimers = [], revealing = false, detectorTimers = [], detectorRun = 0, shovelIndex = null, gameSaveTimer = null;
     function maxMineCount(size) { return boardWrap ? Math.min(300, Math.max(60, Math.floor(wrapBoardSize * wrapBoardSize * .5))) : ({ '9x9': 60, '12x12': 80, '12x21': 120 })[size]; }
     try {
       const savedSize = localStorage.getItem(SIZE_STORAGE_KEY), savedMineCount = localStorage.getItem(MINE_COUNT_STORAGE_KEY), savedWrapBoardSize = Number(localStorage.getItem(WRAP_BOARD_SIZE_KEY));
@@ -213,19 +210,38 @@
     }
     function updateWrapBoardSizeControl() { sizeButtonsRow.hidden = boardWrap; wrapBoardSizeRow.hidden = !boardWrap; const label = `${wrapBoardSize}×${wrapBoardSize}`; wrapBoardSizeInput.value = wrapBoardSize; wrapBoardSizeOutput.value = label; wrapBoardSizeOutput.textContent = label; }
     updateSizeButtons();
-    const settingsDialog = document.getElementById('settingsDialog'), settingsSummary = document.getElementById('settingsSummary');
-    function updateSummary() {
-      const { cols, rows, mines, shape, wrap } = config();
-      settingsSummary.innerHTML = `⚙ <b>${shape === 'hex' ? 'Sechsecke' : 'Quadrate'}</b> · ${cols}×${rows} · ${mines} Minen`;
-      settingsSummary.setAttribute('aria-label', `Einstellungen ändern: ${settingsSummary.textContent.replace('⚙ ', '')}`);
-    }
+    const settingsDialog = document.getElementById('settingsDialog');
     const openSettings = () => { if (!settingsDialog.open) settingsDialog.showModal(); };
     document.getElementById('settingsOpen').addEventListener('click', openSettings);
-    settingsSummary.addEventListener('click', openSettings);
     document.getElementById('settingsDone').addEventListener('click', () => settingsDialog.close());
     // Ein Tipp neben das Popup schließt es ebenfalls.
     settingsDialog.addEventListener('click', event => { if (event.target === settingsDialog) settingsDialog.close(); });
     function saveSettings() { try { localStorage.setItem(SHAPE_STORAGE_KEY, boardShape); localStorage.setItem(WRAP_STORAGE_KEY, boardWrap ? 'on' : 'off'); localStorage.setItem(WRAP_BOARD_SIZE_KEY, String(wrapBoardSize)); localStorage.setItem(SIZE_STORAGE_KEY, boardSize); localStorage.setItem(MINE_COUNT_STORAGE_KEY, String(mineCount)); } catch (error) { console.warn('Detektor-Einstellungen konnten nicht gespeichert werden.', error); } }
+    function persistGameStateNow() {
+      if (!grid.length || !activeConfig) return;
+      try {
+        const { cols, rows, mines } = config();
+        localStorage.setItem(GAME_STATE_KEY, JSON.stringify({ version: 1, boardShape, boardWrap, wrapBoardSize, boardSize, mineCount, cols, rows, mines, grid, over, placed, seconds, openCount, flagCount, offsetX, offsetY, wrapZoom }));
+      } catch (error) { console.warn('Detektor-Spielstand konnte nicht gespeichert werden.', error); }
+    }
+    function persistGameState() {
+      clearTimeout(gameSaveTimer);
+      gameSaveTimer = setTimeout(() => { gameSaveTimer = null; persistGameStateNow(); }, 120);
+    }
+    function flushGameState() { clearTimeout(gameSaveTimer); gameSaveTimer = null; persistGameStateNow(); }
+    function restoreGameState() {
+      try {
+        const saved = JSON.parse(localStorage.getItem(GAME_STATE_KEY) || 'null'), expected = selectedConfig();
+        if (!saved || saved.version !== 1 || saved.boardShape !== boardShape || saved.boardWrap !== boardWrap || saved.wrapBoardSize !== wrapBoardSize || saved.boardSize !== boardSize || saved.mineCount !== mineCount || saved.cols !== expected.cols || saved.rows !== expected.rows || saved.mines !== expected.mines || !Array.isArray(saved.grid) || saved.grid.length !== expected.cols * expected.rows) return null;
+        const validCell = cell => cell && typeof cell.mine === 'boolean' && typeof cell.open === 'boolean' && typeof cell.flag === 'boolean' && Number.isInteger(cell.count) && cell.count >= 0 && cell.count <= 8;
+        if (!saved.grid.every(validCell) || typeof saved.over !== 'boolean' || typeof saved.placed !== 'boolean' || !Number.isInteger(saved.seconds) || saved.seconds < 0) return null;
+        const restored = saved.grid.map(cell => ({ ...cell, opening: false, guess: false, hint: ['safe', 'mine'].includes(cell.hint) ? cell.hint : '', wrongFlag: Boolean(cell.wrongFlag) }));
+        const openCount = restored.filter(cell => cell.open).length, flagCount = restored.filter(cell => cell.flag).length, mineCount = restored.filter(cell => cell.mine).length;
+        if (saved.openCount !== openCount || saved.flagCount !== flagCount || (saved.placed && mineCount !== expected.mines) || (!saved.placed && mineCount)) return null;
+        if (![saved.offsetX, saved.offsetY, saved.wrapZoom].every(Number.isFinite) || saved.wrapZoom < ZOOM_MIN || saved.wrapZoom > ZOOM_MAX) return null;
+        return { grid: restored, over: saved.over, placed: saved.placed, seconds: saved.seconds, openCount, flagCount, offsetX: saved.offsetX, offsetY: saved.offsetY, wrapZoom: saved.wrapZoom };
+      } catch (error) { console.warn('Detektor-Spielstand konnte nicht geladen werden.', error); return null; }
+    }
     const reduceMotion = () => matchMedia('(prefers-reduced-motion: reduce)').matches;
     // Quadrate: acht Nachbarn. Sechsecke: links, rechts und je zwei darüber und darunter; welche zwei, hängt vom Versatz der Zeile ab.
     const SQUARE_OFFSETS = [[-1, -1], [0, -1], [1, -1], [-1, 0], [1, 0], [-1, 1], [0, 1], [1, 1]];
@@ -288,15 +304,17 @@
         button.style.width = `${100 / width}%`; button.style.height = `${hexHeight / height * 100}%`;
       });
     }
-    function start() {
+    function start(savedState = null) {
       activeConfig = selectedConfig(); updateSizeButtons(); updateWrapBoardSizeControl();
       appElement.classList.toggle('tablet-wide', !boardWrap && boardSize === '12x21' && tabletLandscape());
       stopDetector();
       shovelIndex = null;
       gamePanel.classList.toggle('medium-mode', boardSize === '12x12'); gamePanel.classList.toggle('hard-mode', boardSize === '12x21'); gamePanel.classList.toggle('wrap-mode', config().wrap);
       clearInterval(timer); timer = null; clearTimeout(pressTimer); clearTimeout(autoSafeTimer); revealTimers.forEach(clearTimeout); revealTimers = []; revealing = false; autoSafeTimer = null; const { cols, rows } = config();
-      grid = Array.from({ length: cols * rows }, () => ({ mine: false, open: false, opening: false, flag: false, wrongFlag: false, hint: '', guess: false, count: 0 })); over = false; placed = false; seconds = openCount = flagCount = 0;
-      const hex = config().shape === 'hex'; boardElement.classList.toggle('hex', hex); boardElement.style.gridTemplateColumns = hex || config().wrap ? '' : `repeat(${cols}, 1fr)`; boardElement.style.aspectRatio = ''; boardElement.classList.toggle('wrap', config().wrap); offsetX = offsetY = 0; pan = null; pinch = null; activePointers.clear(); boardElement.classList.remove('panning'); boardElement.innerHTML = '';
+      grid = savedState ? savedState.grid : Array.from({ length: cols * rows }, () => ({ mine: false, open: false, opening: false, flag: false, wrongFlag: false, hint: '', guess: false, count: 0 }));
+      over = savedState?.over ?? false; placed = savedState?.placed ?? false; seconds = savedState?.seconds ?? 0; openCount = savedState?.openCount ?? 0; flagCount = savedState?.flagCount ?? 0;
+      if (savedState) { offsetX = savedState.offsetX; offsetY = savedState.offsetY; wrapZoom = savedState.wrapZoom; } else { offsetX = offsetY = 0; }
+      const hex = config().shape === 'hex'; boardElement.classList.toggle('hex', hex); boardElement.style.gridTemplateColumns = hex || config().wrap ? '' : `repeat(${cols}, 1fr)`; boardElement.style.aspectRatio = ''; boardElement.style.setProperty('--zoom', wrapZoom); boardElement.classList.toggle('wrap', config().wrap); pan = null; pinch = null; activePointers.clear(); boardElement.classList.remove('panning'); boardElement.innerHTML = '';
       const makeCell = (cell, index, ghost) => {
         const button = document.createElement('button'); button.type = 'button'; button.className = 'cell'; button.dataset.index = index;
         if (ghost) { button.tabIndex = -1; button.setAttribute('aria-hidden', 'true'); } else { button.setAttribute('role', 'gridcell'); button.setAttribute('aria-label', 'Verdecktes Feld'); }
@@ -318,15 +336,24 @@
       grid.forEach((cell, index) => boardElement.appendChild(makeCell(cell, index, false)));
       const wrapGhostCount = config().wrap ? Math.max(3, (Math.ceil(WRAP_VIEW_COLS / ZOOM_MIN / config().cols) + 1) * (Math.ceil(WRAP_VIEW_ROWS_MAX / ZOOM_MIN / config().rows) + 1) - 1) : 0;
       ghosts = grid.map((cell, index) => Array.from({ length: wrapGhostCount }, () => boardElement.appendChild(makeCell(cell, index, true))));
-      updateSummary(); fitAndLayout();
-      document.getElementById('time').textContent = '0:00'; message.innerHTML = '<b>Bereit?</b> Der erste Zug ist immer sicher.'; updateStats();
+      if (savedState) grid.forEach((_, index) => draw(index));
+      fitAndLayout();
+      document.getElementById('time').textContent = `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, '0')}`;
+      if (over) message.innerHTML = openCount === grid.length - config().mines ? `<b>Gewonnen!</b> Alle Minen gefunden in ${document.getElementById('time').textContent}.` : '<b>Boom!</b> Eine Mine wurde ausgelöst. Versuche es noch einmal.';
+      else message.innerHTML = placed ? '<b>Spielstand geladen.</b> Du kannst weiterspielen.' : '<b>Bereit?</b> Der erste Zug ist immer sicher.';
+      if (placed && !over) startTimer();
+      updateStats();
+    }
+    function startTimer() {
+      if (timer || !placed || over) return;
+      timer = setInterval(() => { seconds++; document.getElementById('time').textContent = `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, '0')}`; if (seconds % 5 === 0) persistGameState(); }, 1000);
     }
     function placeMines(safe) {
       const forbidden = new Set([safe, ...neighbors(safe)]), choices = grid.map((_, index) => index).filter(index => !forbidden.has(index));
       for (let i = choices.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [choices[i], choices[j]] = [choices[j], choices[i]]; }
       choices.slice(0, config().mines).forEach(index => { grid[index].mine = true; });
       grid.forEach((cell, index) => { cell.count = neighbors(index).filter(n => grid[n].mine).length; });
-      placed = true; timer = setInterval(() => { seconds++; document.getElementById('time').textContent = `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, '0')}`; }, 1000);
+      placed = true; startTimer(); persistGameState();
     }
     function draw(index) {
       const cell = grid[index], button = boardElement.children[index];
@@ -346,7 +373,7 @@
       const cell = grid[index]; if (over || revealing || !cell || cell.open || cell.flag || shovelIndex === index) return;
       const previous = shovelIndex; shovelIndex = index; if (previous !== null && grid[previous]) draw(previous); draw(index);
     }
-    function updateStats() { document.getElementById('mines').textContent = config().mines - flagCount; document.getElementById('moves').textContent = openCount; }
+    function updateStats() { document.getElementById('mines').textContent = config().mines - flagCount; document.getElementById('moves').textContent = openCount; persistGameState(); }
     function hasWrongFlags() { return grid.some(cell => cell.flag && !cell.mine); }
     function clearHints() { grid.forEach(cell => { cell.hint = ''; cell.wrongFlag = false; }); }
     function stopDetector() { detectorRun++; detectorTimers.forEach(clearTimeout); detectorTimers = []; detectorElement.classList.remove('active'); }
@@ -424,6 +451,7 @@
         wrongFlags.forEach(cell => { cell.wrongFlag = true; });
         grid.forEach((_, index) => draw(index));
         message.innerHTML = `<b>${wrongFlags.length === 1 ? 'Eine Flagge ist falsch.' : `${wrongFlags.length} Flaggen sind falsch.`}</b> Korrigiere sie; es wird kein Feld automatisch geöffnet.`;
+        persistGameState();
         return;
       }
       const { certainMines, certainSafe } = analyzeDeductions();
@@ -432,6 +460,7 @@
       grid.forEach((_, index) => draw(index));
       const total = certainMines.size + certainSafe.size;
       message.innerHTML = total ? `<b>Hinweis:</b> ${certainSafe.size} sichere Felder und ${certainMines.size} sichere Minen markiert.` : '<b>Keine falschen Flaggen.</b> Aktuell ist kein weiteres Feld logisch entscheidbar.';
+      persistGameState();
     }
     function toggleFlag(index) { if (over || revealing) return; const cell = grid[index]; if (cell.open) return; clearShovel(); clearHints(); cell.flag = !cell.flag; flagCount += cell.flag ? 1 : -1; updateGuessMarks(); updateStats(); }
     function reveal(index) {
@@ -456,7 +485,7 @@
         if (step === sequence.length - 1) { revealTimers = []; revealing = false; updateGuessMarks(); updateStats(); if (openCount === grid.length - config().mines) win(); }
       }, step * delay)));
     }
-    function finish() { over = true; revealing = false; revealTimers.forEach(clearTimeout); revealTimers = []; clearInterval(timer); grid.forEach((_, index) => draw(index)); }
+    function finish() { over = true; revealing = false; revealTimers.forEach(clearTimeout); revealTimers = []; clearInterval(timer); grid.forEach((_, index) => draw(index)); persistGameState(); }
     function lose(index) { finish(); boardElement.children[index].classList.add('mine'); syncGhosts(index); message.innerHTML = '<b>Boom!</b> Eine Mine wurde ausgelöst. Versuche es noch einmal.'; }
     function win() { grid.forEach(cell => { if (cell.mine) cell.flag = true; }); flagCount = config().mines; finish(); updateStats(); boardElement.querySelectorAll('.cell.flag').forEach((cell, index) => { cell.style.animationDelay = `${index * 35}ms`; cell.classList.add('wave'); }); message.innerHTML = `<b>Gewonnen!</b> Alle Minen gefunden in ${document.getElementById('time').textContent}.`; }
     document.getElementById('hintButton').addEventListener('click', showHint);
@@ -467,6 +496,7 @@
       const oldCols = viewCols(), oldRows = viewRows(), stepY = config().shape === 'hex' ? .75 * 2 / Math.sqrt(3) : 1;
       wrapZoom = next; offsetX += (viewCols() - oldCols) / 2; offsetY += (viewRows() - oldRows) * stepY / 2;
       boardElement.style.setProperty('--zoom', wrapZoom); layoutCells();
+      persistGameState();
       clearTimeout(autoSafeTimer); autoSafeTimer = null; stopDetector(); clearShovel();
       clearTimeout(zoomTimer); zoomTimer = setTimeout(() => { zoomTimer = null; if (!over && !revealing) updateGuessMarks(); }, 300);
     }
@@ -500,8 +530,8 @@
     });
     ['pointerup', 'pointercancel'].forEach(type => boardElement.addEventListener(type, event => {
       activePointers.delete(event.pointerId);
-      if (pinch) { if (activePointers.size < 2) { pinch = null; pan = null; panEndedAt = Date.now(); boardElement.classList.remove('panning'); } return; }
-      if (!pan || event.pointerId !== pan.id) return; const wasPanning = pan.active; if (wasPanning) { panEndedAt = Date.now(); boardElement.classList.remove('panning'); } pan = null; if (wasPanning && !over && !revealing) requestAnimationFrame(() => requestAnimationFrame(() => { if (!over && !revealing && !pan?.active) updateGuessMarks(); }));
+      if (pinch) { if (activePointers.size < 2) { pinch = null; pan = null; panEndedAt = Date.now(); boardElement.classList.remove('panning'); persistGameState(); } return; }
+      if (!pan || event.pointerId !== pan.id) return; const wasPanning = pan.active; if (wasPanning) { panEndedAt = Date.now(); boardElement.classList.remove('panning'); persistGameState(); } pan = null; if (wasPanning && !over && !revealing) requestAnimationFrame(() => requestAnimationFrame(() => { if (!over && !revealing && !pan?.active) updateGuessMarks(); }));
     }));
     document.querySelectorAll('[data-wrap]').forEach(button => button.addEventListener('click', () => { boardWrap = button.dataset.wrap === 'on'; updateMineControl(); saveSettings(); document.querySelectorAll('[data-wrap]').forEach(item => item.classList.toggle('active', item === button)); start(); }));
     wrapBoardSizeInput.addEventListener('input', () => { const size = Number(wrapBoardSizeInput.value); wrapBoardSizeOutput.value = `${size}×${size}`; wrapBoardSizeOutput.textContent = wrapBoardSizeOutput.value; });
@@ -513,7 +543,9 @@
     // Drehen oder Fenstergröße ändern: Fenster neu einpassen, das Spiel läuft weiter.
     let fitFrame = 0;
     addEventListener('resize', () => { cancelAnimationFrame(fitFrame); fitFrame = requestAnimationFrame(fitAndLayout); });
-    document.getElementById('newGame').addEventListener('click', start); start();
+    document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'hidden') flushGameState(); });
+    addEventListener('pagehide', flushGameState);
+    document.getElementById('newGame').addEventListener('click', () => start()); start(restoreGameState());
     // Beim ersten Aufbau stehen Schrift und Kopf noch nicht endgültig; nach dem Laden noch einmal einpassen.
     addEventListener('load', () => fitAndLayout());
   </script>
