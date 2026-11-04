@@ -123,7 +123,7 @@
       <div class="controls"><button class="undo" id="undo" type="button" disabled>↶ Rückgängig</button><button id="sameGame" class="undo" type="button">↻ Gleiches Deck</button><button id="autoFinish" type="button" hidden>▶ Fertigspielen</button><button id="newGame" type="button">Neues Spiel</button></div>
       <div class="heap" id="heap" aria-hidden="true"></div>
     </section>
-    <button class="version" data-version type="button" title="Klicken, um die Seite neu zu laden">Version 1.65</button>
+    <button class="version" data-version type="button" title="Klicken, um die Seite neu zu laden">Version 1.66</button>
     <script>const versionButton = document.querySelector('[data-version]'); versionButton.addEventListener('click', () => location.replace(`${location.pathname}?v=${Date.now()}`)); fetch(`VERSION?${Date.now()}`, { cache: 'no-store' }).then(response => response.text()).then(version => { versionButton.textContent = `Version ${version.trim()}`; }).catch(() => {});</script>
   </main>
   <script>
@@ -395,6 +395,8 @@
       suits.forEach(suit => { const index = piles.findIndex(pile => pile[0]?.suit === suit); if (index >= 0) pileOf.set(suit, index); });
       suits.forEach(suit => { if (!pileOf.has(suit)) pileOf.set(suit, piles.findIndex((pile, index) => !pile.length && ![...pileOf.values()].includes(index))); });
       const order = [...tableau.flat(), ...stock, ...waste].sort((a, b) => a.rank - b.rank || suits.indexOf(a.suit) - suits.indexOf(b.suit));
+      let countedMoves = 0;
+      const countMove = () => { if (aborted() || countedMoves >= order.length) return; countedMoves++; moves++; showStatus(); };
       const startScrollX = window.scrollX, startScrollY = window.scrollY, pileRects = [...foundationsElement.children].map(element => element.getBoundingClientRect());
       try {
         const landed = [];
@@ -411,15 +413,16 @@
           if (source !== stockElement && source !== wasteElement) source.style.visibility = 'hidden';
           document.body.appendChild(flight); flights.push(flight);
           const animation = flight.animate([{ transform: 'translate(0, 0)' }, { transform: `translate(${toX - fromX}px, ${toY - fromY}px)` }], { duration: 450, easing: 'ease-in-out', fill: 'forwards' });
-          landed.push(animation.finished.catch(() => {}).then(() => { flight.style.left = `${toX}px`; flight.style.top = `${toY}px`; animation.cancel(); }));
+          landed.push(animation.finished.catch(() => {}).then(() => { flight.style.left = `${toX}px`; flight.style.top = `${toY}px`; animation.cancel(); countMove(); }));
           await wait(110);
         }
         await Promise.all(landed);
       } catch (error) { console.warn('Fertigspielen-Animation abgebrochen.', error); }
       flights.forEach(flight => flight.remove());
       if (aborted()) return;
+      while (countedMoves < order.length) countMove();
       order.forEach(item => piles[pileOf.get(item.suit)].push(item));
-      foundations = piles; tableau = Array.from({ length: 7 }, () => []); stock = []; waste = []; selected = null; moves += order.length;
+      foundations = piles; tableau = Array.from({ length: 7 }, () => []); stock = []; waste = []; selected = null;
       lockBoard(false); autoFinishing = false; gamePanel.classList.add('victory');
       message.innerHTML = '<b>Automatisch fertiggespielt!</b> Alle Karten liegen auf den Grundstapeln.';
       render(); updateStatus(); later(startHeap, 600);
