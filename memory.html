@@ -51,10 +51,10 @@
     .player.active { color: var(--text); border-color: #171717; background: #F5F5F5; }
     .player strong { display: block; color: var(--cyan); font-size: 1.25rem; }
     .board { position: relative; display: grid; gap: 8px; margin: 0 auto 21px; max-width: 540px; }
-    .memory-card { position: relative; aspect-ratio: 1; min-width: 0; border-radius: 10px; background: var(--bg); color: transparent; font-size: clamp(1.35rem, 7vw, 2.8rem); border: 3px solid #171717; box-shadow: 3px 3px 0 #171717; transform-style: preserve-3d; transition: transform .25s ease; }
-    .board[data-size="8"] .memory-card { font-size: clamp(1.8rem, 8vw, 3.6rem); }
-    .board[data-size="12"] .memory-card { font-size: clamp(1.45rem, 6.5vw, 2.8rem); }
-    .board[data-size="18"] .memory-card { font-size: clamp(1.1rem, 5vw, 2.2rem); }
+    .memory-card { position: relative; aspect-ratio: 1; min-width: 0; border-radius: 10px; background: var(--bg); color: transparent; font-size: clamp(1.8rem, 9vw, 3.4rem); border: 3px solid #171717; box-shadow: 3px 3px 0 #171717; transform-style: preserve-3d; transition: transform .25s ease; }
+    .board[data-size="8"] .memory-card { font-size: clamp(2rem, 9vw, 4rem); }
+    .board[data-size="12"] .memory-card { font-size: clamp(1.8rem, 8vw, 3.2rem); }
+    .board[data-size="18"] .memory-card { font-size: clamp(1.5rem, 7vw, 2.8rem); }
     .memory-card::before, .memory-card::after { position: absolute; inset: 0; display: grid; place-items: center; backface-visibility: hidden; }
     .memory-card::before { content: '?'; color: #FFFFFF; font-size: .8em; font-weight: 800; }
     .memory-card::after { content: attr(data-icon); color: var(--text); background: #FFFFFF; transform: rotateY(180deg); }
@@ -108,7 +108,7 @@
       <div class="board" id="board" role="grid" aria-label="Memory-Spielfeld"></div>
       <button class="new-game" id="newGame" type="button">Neues Spiel</button>
     </section>
-    <button class="version" data-version type="button" title="Klicken, um die Seite neu zu laden">Version 1.76</button>
+    <button class="version" data-version type="button" title="Klicken, um die Seite neu zu laden">Version 1.77</button>
     <script>const versionButton = document.querySelector('[data-version]'); versionButton.addEventListener('click', () => location.replace(`${location.pathname}?v=${Date.now()}`)); fetch(`VERSION?${Date.now()}`, { cache: 'no-store' }).then(response => response.text()).then(version => { versionButton.textContent = `Version ${version.trim()}`; }).catch(() => {});</script>
   </main>
   <script>
