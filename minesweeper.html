@@ -73,8 +73,9 @@
     .board.wrap { display: block; position: relative; padding: 0; overflow: hidden; border-style: dashed; touch-action: none; cursor: grab; }
     .board.wrap .cell { position: absolute; aspect-ratio: auto; will-change: left, top; }
     /* Fugen: Die Felder liegen auf ganzen Pixeln (layoutWrapped) und lassen rechts und unten genau 1 px frei,
-       in dem der dunkle Hintergrund des Bretts zu sehen ist; gleich breit bei jedem Zoom. */
-    .board.wrap:not(.hex) .cell { border-radius: 0; clip-path: inset(0 1px 1px 0 round 2px); }
+       in dem der dunkle Hintergrund des Bretts zu sehen ist; gleich breit bei jedem Zoom. Ohne Eckenrundung,
+       sonst entstehen an den Kreuzungen dunkle Punkte. */
+    .board.wrap:not(.hex) .cell { border-radius: 0; clip-path: inset(0 1px 1px 0); }
     .board.wrap .cell.wrong-flag { background: #FFD166; color: #EF4B3F; }
     .board.wrap.panning { cursor: grabbing; }
     .board.wrap .cell { font-size: calc(clamp(1rem, 5vw, 1.5rem) * var(--zoom, 1)); }
@@ -167,7 +168,7 @@
       </div>
       <button class="settings-done" id="settingsDone" type="button">Fertig</button>
     </dialog>
-    <button class="version" data-version type="button" title="Klicken, um die Seite neu zu laden">Version 1.73</button>
+    <button class="version" data-version type="button" title="Klicken, um die Seite neu zu laden">Version 1.74</button>
     <script>const versionButton = document.querySelector('[data-version]'); versionButton.addEventListener('click', () => location.replace(`${location.pathname}?v=${Date.now()}`)); fetch(`VERSION?${Date.now()}`, { cache: 'no-store' }).then(response => response.text()).then(version => { versionButton.textContent = `Version ${version.trim()}`; }).catch(() => {});</script>
   </main>
   <script>
