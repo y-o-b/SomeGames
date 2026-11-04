@@ -72,12 +72,13 @@
     /* Randlos: gestrichelter Rahmen, das Brett lässt sich ziehen statt die Seite zu scrollen. */
     .board.wrap { display: block; position: relative; padding: 0; overflow: hidden; border-style: dashed; touch-action: none; cursor: grab; }
     .board.wrap .cell { position: absolute; aspect-ratio: auto; will-change: left, top; }
-    .board.wrap:not(.hex) .cell { border-radius: 0; clip-path: inset(1px round 3px); }
+    .board.wrap:not(.hex) .cell { border-radius: 0; clip-path: inset(var(--wrap-cell-gap, 1px) round var(--wrap-cell-radius, 3px)); }
     .board.wrap .cell.wrong-flag { background: #FFD166; color: #EF4B3F; }
     .board.wrap.panning { cursor: grabbing; }
     .board.wrap .cell { font-size: calc(clamp(1rem, 5vw, 1.5rem) * var(--zoom, 1)); }
     .board.wrap .cell.flag { font-size: calc(clamp(1.2rem, 6vw, 1.7rem) * var(--zoom, 1)); }
     .board.wrap.hex .cell { font-size: calc(clamp(.9rem, 4.4vw, 1.4rem) * var(--zoom, 1)); }
+    .board.wrap.hex .cell { clip-path: polygon(50% var(--hex-tip-inset, 1.5%), calc(100% - var(--hex-side-inset, 3.5%)) 25.8%, calc(100% - var(--hex-side-inset, 3.5%)) 74.2%, 50% calc(100% - var(--hex-tip-inset, 1.5%)), var(--hex-side-inset, 3.5%) 74.2%, var(--hex-side-inset, 3.5%) 25.8%); }
     .cell { position: relative; aspect-ratio: 1; min-width: 0; min-height: 0; overflow: hidden; padding: 0; border-radius: 3px; color: #171717; background: #4B8ED8; font-weight: 900; font-size: clamp(1rem, 5vw, 1.5rem); line-height: 1; -webkit-tap-highlight-color: transparent; }
     .shovel-action { position: absolute; z-index: 2; top: 50%; left: 50%; display: grid; place-items: center; width: 84%; aspect-ratio: 1; background: transparent; transform: translate(-50%, -50%); }
     .shovel-action svg { display: block; width: 100%; height: 100%; }
@@ -161,7 +162,7 @@
       </div>
       <button class="settings-done" id="settingsDone" type="button">Fertig</button>
     </dialog>
-    <button class="version" data-version type="button" title="Klicken, um die Seite neu zu laden">Version 1.71</button>
+    <button class="version" data-version type="button" title="Klicken, um die Seite neu zu laden">Version 1.72</button>
     <script>const versionButton = document.querySelector('[data-version]'); versionButton.addEventListener('click', () => location.replace(`${location.pathname}?v=${Date.now()}`)); fetch(`VERSION?${Date.now()}`, { cache: 'no-store' }).then(response => response.text()).then(version => { versionButton.textContent = `Version ${version.trim()}`; }).catch(() => {});</script>
   </main>
   <script>
@@ -327,7 +328,7 @@
       grid = savedState ? savedState.grid : Array.from({ length: cols * rows }, () => ({ mine: false, open: false, opening: false, flag: false, wrongFlag: false, hint: '', guess: false, count: 0 }));
       over = savedState?.over ?? false; placed = savedState?.placed ?? false; seconds = savedState?.seconds ?? 0; openCount = savedState?.openCount ?? 0; flagCount = savedState?.flagCount ?? 0;
       if (savedState) { offsetX = savedState.offsetX; offsetY = savedState.offsetY; wrapZoom = savedState.wrapZoom; } else { offsetX = offsetY = 0; }
-      const hex = config().shape === 'hex'; boardElement.classList.toggle('hex', hex); boardElement.style.gridTemplateColumns = hex || config().wrap ? '' : `repeat(${cols}, 1fr)`; boardElement.style.aspectRatio = ''; boardElement.style.setProperty('--zoom', wrapZoom); boardElement.classList.toggle('wrap', config().wrap); pan = null; pinch = null; activePointers.clear(); boardElement.classList.remove('panning'); boardElement.innerHTML = '';
+      const hex = config().shape === 'hex'; boardElement.classList.toggle('hex', hex); boardElement.style.gridTemplateColumns = hex || config().wrap ? '' : `repeat(${cols}, 1fr)`; boardElement.style.aspectRatio = ''; applyZoomStyles(); boardElement.classList.toggle('wrap', config().wrap); pan = null; pinch = null; activePointers.clear(); boardElement.classList.remove('panning'); boardElement.innerHTML = '';
       const makeCell = (cell, index, ghost) => {
         const button = document.createElement('button'); button.type = 'button'; button.className = 'cell'; button.dataset.index = index;
         if (ghost) { button.tabIndex = -1; button.setAttribute('aria-hidden', 'true'); } else { button.setAttribute('role', 'gridcell'); button.setAttribute('aria-label', 'Verdecktes Feld'); }
@@ -503,12 +504,19 @@
     function win() { grid.forEach(cell => { if (cell.mine) cell.flag = true; }); flagCount = config().mines; finish(); updateStats(); boardElement.querySelectorAll('.cell.flag').forEach((cell, index) => { cell.style.animationDelay = `${index * 35}ms`; cell.classList.add('wave'); }); message.innerHTML = `<b>Gewonnen!</b> Alle Minen gefunden in ${document.getElementById('time').textContent}.`; }
     document.getElementById('hintButton').addEventListener('click', showHint);
     // Zoom (nur randlos): Das Fenster bleibt 12×24, sichtbar sind 12/Zoom × 24/Zoom Felder; die Mitte bleibt stehen.
+    function applyZoomStyles() {
+      boardElement.style.setProperty('--zoom', wrapZoom);
+      boardElement.style.setProperty('--wrap-cell-gap', `${wrapZoom}px`);
+      boardElement.style.setProperty('--wrap-cell-radius', `${3 * wrapZoom}px`);
+      boardElement.style.setProperty('--hex-side-inset', `${3.5 * wrapZoom}%`);
+      boardElement.style.setProperty('--hex-tip-inset', `${1.5 * wrapZoom}%`);
+    }
     function setZoom(value) {
       const next = Math.round(Math.min(ZOOM_MAX, Math.max(ZOOM_MIN, value)) * 100) / 100;
       if (!config().wrap || next === wrapZoom) return;
       const oldCols = viewCols(), oldRows = viewRows(), stepY = config().shape === 'hex' ? .75 * 2 / Math.sqrt(3) : 1;
       wrapZoom = next; offsetX += (viewCols() - oldCols) / 2; offsetY += (viewRows() - oldRows) * stepY / 2;
-      boardElement.style.setProperty('--zoom', wrapZoom); layoutCells();
+      applyZoomStyles(); layoutCells();
       persistGameState();
       clearTimeout(autoSafeTimer); autoSafeTimer = null; stopDetector(); clearShovel();
       clearTimeout(zoomTimer); zoomTimer = setTimeout(() => { zoomTimer = null; if (!over && !revealing) updateGuessMarks(); }, 300);
