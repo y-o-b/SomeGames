@@ -22,7 +22,11 @@
     .app { width: min(100%, 620px); }
     body.fullscreen-mode .app, .app:fullscreen { width: min(100%, 720px); height: 100vh; height: 100dvh; min-height: 0; margin: 0 auto; overflow: auto; background: var(--bg); }
     body.fullscreen-mode header, body.fullscreen-mode .version, .app:fullscreen header, .app:fullscreen > .version { display: none; }
+    body.fullscreen-mode .stats, body.fullscreen-mode .message, body.fullscreen-mode .new-game, body.fullscreen-mode .fullscreen-button,
+    .app:fullscreen .stats, .app:fullscreen .message, .app:fullscreen .new-game, .app:fullscreen .fullscreen-button { display: none; }
     body.fullscreen-mode .game, .app:fullscreen .game { width: 100%; min-height: 100%; display: flex; flex-direction: column; justify-content: center; padding: max(8px, env(safe-area-inset-top)) 12px max(8px, env(safe-area-inset-bottom)); border: 0; border-radius: 0; box-shadow: none; }
+    body.fullscreen-mode .board-tools, .app:fullscreen .board-tools { display: flex; justify-content: center; margin-top: 8px; }
+    body.fullscreen-mode .hint-button, .app:fullscreen .hint-button { width: min(100%, 220px); }
     .back-button { display: grid; place-items: center; width: 44px; height: 44px; position: absolute; left: 0; top: 50%; margin-top: -22px; border: 3px solid #171717; border-radius: 50%; color: #171717; background: #FFFFFF; box-shadow: 3px 3px 0 #171717; text-decoration: none; -webkit-tap-highlight-color: transparent; transition: transform .12s, box-shadow .12s; }
     .back-button svg { display: block; width: 24px; height: 24px; margin-right: 2px; fill: none; stroke: currentColor; stroke-width: 3.2; stroke-linecap: round; stroke-linejoin: round; }
     .back-button:active { transform: translate(2px, 2px); box-shadow: 1px 1px 0 #171717; }
@@ -115,6 +119,7 @@
     @media (max-width: 600px) { .game.medium-mode .board, .game.hard-mode .board, .game.wrap-mode .board { width: calc(100% + 18px); max-width: none; margin-left: -9px; margin-right: -9px; } }
     @media (min-width: 768px) and (max-width: 1366px) and (orientation: landscape) { .app.tablet-wide { width: min(100%, 1100px); } .app.tablet-wide .board { max-width: 1040px; } }
     .app.tablet-wide .game.wrap-mode .board { max-width: 540px; }
+    body.fullscreen-mode .game .board, .app:fullscreen .game .board { width: 100%; max-width: min(100%, calc(133.333dvh - 133px)); margin: 0 auto 10px; }
     .new-game { display: block; width: 100%; padding: 12px; border: 3px solid #171717; border-radius: 10px; color: #FFFFFF; background: var(--red); font-weight: 800; box-shadow: 4px 4px 0 #171717; }
   </style>
 </head>
@@ -175,7 +180,7 @@
       </div>
       <button class="settings-done" id="settingsDone" type="button">Fertig</button>
     </dialog>
-    <button class="version" data-version type="button" title="Klicken, um die Seite neu zu laden">Version 1.80</button>
+    <button class="version" data-version type="button" title="Klicken, um die Seite neu zu laden">Version 1.81</button>
     <script>const versionButton = document.querySelector('[data-version]'); versionButton.addEventListener('click', () => location.replace(`${location.pathname}?v=${Date.now()}`)); fetch(`VERSION?${Date.now()}`, { cache: 'no-store' }).then(response => response.text()).then(version => { versionButton.textContent = `Version ${version.trim()}`; }).catch(() => {});</script>
   </main>
   <script>
@@ -186,7 +191,7 @@
     let wrapZoom = 1, zoomTimer = null, pinch = null, wrapViewRows = 18;
     const activePointers = new Map();
     const viewCols = () => WRAP_VIEW_COLS / wrapZoom, viewRows = () => wrapViewRows / wrapZoom;
-    const boardElement = document.getElementById('board'), message = document.getElementById('message'), gamePanel = document.querySelector('.game'), appElement = document.querySelector('.app'), detectorElement = document.getElementById('metalDetector'), fullscreenButton = document.getElementById('fullscreenToggle');
+    const boardElement = document.getElementById('board'), message = document.getElementById('message'), gamePanel = document.querySelector('.game'), appElement = document.querySelector('.app'), detectorElement = document.getElementById('metalDetector'), fullscreenButton = document.getElementById('fullscreenToggle'), hintButton = document.getElementById('hintButton');
     const mineCountInput = document.getElementById('mineCount'), mineCountOutput = document.getElementById('mineCountValue'), wrapBoardSizeInput = document.getElementById('wrapBoardSize'), wrapBoardSizeOutput = document.getElementById('wrapBoardSizeValue'), wrapBoardSizeRow = document.getElementById('wrapBoardSizeRow'), sizeButtonsRow = document.getElementById('sizeButtonsRow');
     const SHAPE_STORAGE_KEY = 'y-o-b.minesweeper.shape.v1', WRAP_STORAGE_KEY = 'y-o-b.minesweeper.wrap.v1', WRAP_BOARD_SIZE_KEY = 'y-o-b.minesweeper.wrap-board-size.v1', SIZE_STORAGE_KEY = 'y-o-b.minesweeper.size.v1', MINE_COUNT_STORAGE_KEY = 'y-o-b.minesweeper.mine-count.v1', LEVEL_STORAGE_KEY = 'y-o-b.minesweeper.level.v1', GAME_STATE_KEY = 'y-o-b.minesweeper.game.v1';
     let boardShape = 'square', boardWrap = true, wrapBoardSize = 9, offsetX = 0, offsetY = 0, pan = null, panEndedAt = 0, panFrame = 0, ghosts = [], boardSize = '9x9', mineCount = 10, activeConfig = null, grid = [], over = false, placed = false, seconds = 0, timer = null, openCount = 0, flagCount = 0, pressTimer = null, longPressed = false, autoSafeTimer = null, revealTimers = [], revealing = false, detectorTimers = [], detectorRun = 0, shovelIndex = null, gameSaveTimer = null;
@@ -303,6 +308,8 @@
       fullscreenButton.textContent = active ? '⛶ Vollbild beenden' : '⛶ Vollbild';
       fullscreenButton.setAttribute('aria-label', active ? 'Vollbild beenden' : 'Vollbild');
       fullscreenButton.setAttribute('aria-pressed', String(active));
+      hintButton.title = active ? 'Hinweis; lange drücken, um Vollbild zu beenden' : 'Hinweis anzeigen';
+      hintButton.title = active ? 'Hinweis; lange drücken, um Vollbild zu beenden' : 'Hinweis anzeigen';
     }
     async function toggleFullscreen() {
       if (document.fullscreenElement === appElement) {
@@ -315,6 +322,7 @@
       syncFullscreenButton(); requestAnimationFrame(fitAndLayout);
     }
     document.addEventListener('fullscreenchange', () => { syncFullscreenButton(); requestAnimationFrame(fitAndLayout); });
+    document.addEventListener('keydown', event => { if (event.key === 'Escape' && document.body.classList.contains('fullscreen-mode')) { event.preventDefault(); toggleFullscreen(); } });
     function layoutWrapped() {
       const { cols, rows, shape } = config(), hex = shape === 'hex', cellHeight = hex ? 2 / Math.sqrt(3) : 1, stepY = hex ? .75 * cellHeight : 1, viewWidth = viewCols(), viewHeight = viewRows() * stepY;
       boardElement.style.aspectRatio = `${viewWidth} / ${viewHeight}`;
@@ -538,7 +546,14 @@
     function finish() { over = true; revealing = false; revealTimers.forEach(clearTimeout); revealTimers = []; clearInterval(timer); grid.forEach((_, index) => draw(index)); persistGameState(); }
     function lose(index) { finish(); boardElement.children[index].classList.add('mine'); syncGhosts(index); message.innerHTML = '<b>Boom!</b> Eine Mine wurde ausgelöst. Versuche es noch einmal.'; }
     function win() { grid.forEach(cell => { if (cell.mine) cell.flag = true; }); flagCount = config().mines; finish(); updateStats(); boardElement.querySelectorAll('.cell.flag').forEach((cell, index) => { cell.style.animationDelay = `${index * 35}ms`; cell.classList.add('wave'); }); message.innerHTML = `<b>Gewonnen!</b> Alle Minen gefunden in ${document.getElementById('time').textContent}.`; }
-    document.getElementById('hintButton').addEventListener('click', showHint);
+    let hintLongPressTimer = null, hintLongPressTriggered = false;
+    hintButton.addEventListener('pointerdown', event => {
+      if (document.fullscreenElement !== appElement && !document.body.classList.contains('fullscreen-mode')) return;
+      hintLongPressTriggered = false;
+      hintLongPressTimer = setTimeout(() => { hintLongPressTimer = null; hintLongPressTriggered = true; toggleFullscreen(); }, 700);
+    });
+    ['pointerup', 'pointercancel', 'pointerleave'].forEach(type => hintButton.addEventListener(type, () => { clearTimeout(hintLongPressTimer); hintLongPressTimer = null; }));
+    hintButton.addEventListener('click', event => { if (hintLongPressTriggered) { hintLongPressTriggered = false; event.preventDefault(); return; } showHint(); });
     // Zoom (nur randlos): Das Fenster bleibt 12×24, sichtbar sind 12/Zoom × 24/Zoom Felder; die Mitte bleibt stehen.
     function applyZoomStyles() {
       boardElement.style.setProperty('--zoom', wrapZoom);
