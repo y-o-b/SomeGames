@@ -168,7 +168,7 @@
       </div>
       <button class="settings-done" id="settingsDone" type="button">Fertig</button>
     </dialog>
-    <button class="version" data-version type="button" title="Klicken, um die Seite neu zu laden">Version 1.74</button>
+    <button class="version" data-version type="button" title="Klicken, um die Seite neu zu laden">Version 1.75</button>
     <script>const versionButton = document.querySelector('[data-version]'); versionButton.addEventListener('click', () => location.replace(`${location.pathname}?v=${Date.now()}`)); fetch(`VERSION?${Date.now()}`, { cache: 'no-store' }).then(response => response.text()).then(version => { versionButton.textContent = `Version ${version.trim()}`; }).catch(() => {});</script>
   </main>
   <script>
@@ -292,28 +292,27 @@
       if (overflow > 0 && boardElement.clientHeight > boardElement.clientWidth * .75 + 1) { fitWrapWindow(overflow); layoutCells(); }
     }
     function layoutWrapped() {
-      const { cols, rows, shape } = config(), hex = shape === 'hex', cellHeight = hex ? 2 / Math.sqrt(3) : 1, stepY = hex ? .75 * cellHeight : 1, width = cols, height = rows * stepY, viewWidth = viewCols(), viewHeight = viewRows() * stepY;
+      const { cols, rows, shape } = config(), hex = shape === 'hex', cellHeight = hex ? 2 / Math.sqrt(3) : 1, stepY = hex ? .75 * cellHeight : 1, viewWidth = viewCols(), viewHeight = viewRows() * stepY;
       boardElement.style.aspectRatio = `${viewWidth} / ${viewHeight}`;
-      // In Pixeln und auf ganze Pixel gerundet: Benachbarte Felder stoßen so exakt aneinander, und die Fugen
-      // (siehe CSS) sind überall gleich breit, auch beim Ziehen und Zoomen.
+      // Festes Pixelraster: Alle Felder haben dieselbe ganzzahlige Breite W und Höhe H, der Zeilenabstand S ist
+      // ganzzahlig, und das ganze Raster wird nur als Ganzes verschoben. So liegen Nachbarn immer gleich zueinander,
+      // und die Fugen (siehe CSS) sind an jeder Kante gleich breit, auch an den Schrägen der Sechsecke.
+      // Sechsecke: W gerade (Versatz W/2 ganzzahlig, senkrechte Kanten auf ganzen Pixeln), H gerade, S = 3/4 H
+      // (höchstens ein halbes Pixel, für alle Reihen gleich).
       const unit = boardElement.clientWidth / viewWidth;
-      const place = (element, x, y) => {
-        const left = Math.round(x * unit), top = Math.round(y * unit);
-        element.style.display = ''; element.style.left = `${left}px`; element.style.top = `${top}px`;
-        element.style.width = `${Math.round((x + 1) * unit) - left}px`; element.style.height = `${Math.round((y + cellHeight) * unit) - top}px`;
-      };
+      const W = hex ? Math.max(4, 2 * Math.round(unit / 2)) : Math.max(2, Math.round(unit));
+      const H = hex ? Math.max(4, 2 * Math.round(cellHeight * W / 2)) : W, S = hex ? H * 3 / 4 : W;
+      const totalW = cols * W, totalH = rows * S, areaW = boardElement.clientWidth, areaH = boardElement.clientHeight;
+      const originX = Math.round(offsetX * W), originY = Math.round(offsetY / stepY * S);
       grid.forEach((_, index) => {
-        const column = index % cols, row = Math.floor(index / cols), x = mod(column + (hex ? (row % 2) * .5 : 0) + offsetX, width), y = mod(row * stepY + offsetY, height), copies = [];
-        for (let repeatY = -1; repeatY <= Math.ceil(viewHeight / height); repeatY++) {
-          const top = y + repeatY * height;
-          if (top >= viewHeight || top + cellHeight <= 0) continue;
-          for (let repeatX = -1; repeatX <= Math.ceil(viewWidth / width); repeatX++) {
-            const left = x + repeatX * width;
-            if (left < viewWidth && left + 1 > 0) copies.push([left, top]);
-          }
+        const column = index % cols, row = Math.floor(index / cols), copies = [];
+        const x = mod(column * W + (hex && row % 2 ? W / 2 : 0) + originX, totalW), y = mod(row * S + originY, totalH);
+        for (let top = y - totalH; top < areaH; top += totalH) {
+          if (top + H <= 0) continue;
+          for (let left = x - totalW; left < areaW; left += totalW) if (left + W > 0) copies.push([left, top]);
         }
         const elements = [boardElement.children[index], ...ghosts[index]];
-        copies.forEach(([left, top], copyIndex) => { if (elements[copyIndex]) place(elements[copyIndex], left, top); });
+        copies.forEach(([left, top], copyIndex) => { const element = elements[copyIndex]; if (!element) return; element.style.display = ''; element.style.left = `${left}px`; element.style.top = `${top}px`; element.style.width = `${W}px`; element.style.height = `${H}px`; });
         elements.slice(copies.length).forEach(element => { element.style.display = 'none'; });
       });
     }
