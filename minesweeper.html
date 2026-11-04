@@ -72,13 +72,18 @@
     /* Randlos: gestrichelter Rahmen, das Brett lässt sich ziehen statt die Seite zu scrollen. */
     .board.wrap { display: block; position: relative; padding: 0; overflow: hidden; border-style: dashed; touch-action: none; cursor: grab; }
     .board.wrap .cell { position: absolute; aspect-ratio: auto; will-change: left, top; }
-    .board.wrap:not(.hex) .cell { border-radius: 0; clip-path: inset(var(--wrap-cell-gap, 1px) round var(--wrap-cell-radius, 3px)); }
+    /* Fugen: Die Felder liegen auf ganzen Pixeln (layoutWrapped) und lassen rechts und unten genau 1 px frei,
+       in dem der dunkle Hintergrund des Bretts zu sehen ist; gleich breit bei jedem Zoom. */
+    .board.wrap:not(.hex) .cell { border-radius: 0; clip-path: inset(0 1px 1px 0 round 2px); }
     .board.wrap .cell.wrong-flag { background: #FFD166; color: #EF4B3F; }
     .board.wrap.panning { cursor: grabbing; }
     .board.wrap .cell { font-size: calc(clamp(1rem, 5vw, 1.5rem) * var(--zoom, 1)); }
     .board.wrap .cell.flag { font-size: calc(clamp(1.2rem, 6vw, 1.7rem) * var(--zoom, 1)); }
     .board.wrap.hex .cell { font-size: calc(clamp(.9rem, 4.4vw, 1.4rem) * var(--zoom, 1)); }
-    .board.wrap.hex .cell { clip-path: polygon(50% var(--hex-tip-inset, 1.5%), calc(100% - var(--hex-side-inset, 3.5%)) 25.8%, calc(100% - var(--hex-side-inset, 3.5%)) 74.2%, 50% calc(100% - var(--hex-tip-inset, 1.5%)), var(--hex-side-inset, 3.5%) 74.2%, var(--hex-side-inset, 3.5%) 25.8%); }
+    /* Sechsecke: um 0,5 px senkrecht zu jeder Kante eingerückt, zusammen mit dem Nachbarn eine 1-px-Fuge.
+       Bei einem regelmäßigen Sechseck mit Spitze oben liegen die Seiten bei 0,5 px, die Spitzen 0,5/cos 30° = 0,577 px
+       und die Schrägecken 0,289 px weiter innen. */
+    .board.wrap.hex .cell { clip-path: polygon(50% .577px, calc(100% - .5px) calc(25% + .289px), calc(100% - .5px) calc(75% - .289px), 50% calc(100% - .577px), .5px calc(75% - .289px), .5px calc(25% + .289px)); }
     .cell { position: relative; aspect-ratio: 1; min-width: 0; min-height: 0; overflow: hidden; padding: 0; border-radius: 3px; color: #171717; background: #4B8ED8; font-weight: 900; font-size: clamp(1rem, 5vw, 1.5rem); line-height: 1; -webkit-tap-highlight-color: transparent; }
     .shovel-action { position: absolute; z-index: 2; top: 50%; left: 50%; display: grid; place-items: center; width: 84%; aspect-ratio: 1; background: transparent; transform: translate(-50%, -50%); }
     .shovel-action svg { display: block; width: 100%; height: 100%; }
@@ -162,7 +167,7 @@
       </div>
       <button class="settings-done" id="settingsDone" type="button">Fertig</button>
     </dialog>
-    <button class="version" data-version type="button" title="Klicken, um die Seite neu zu laden">Version 1.72</button>
+    <button class="version" data-version type="button" title="Klicken, um die Seite neu zu laden">Version 1.73</button>
     <script>const versionButton = document.querySelector('[data-version]'); versionButton.addEventListener('click', () => location.replace(`${location.pathname}?v=${Date.now()}`)); fetch(`VERSION?${Date.now()}`, { cache: 'no-store' }).then(response => response.text()).then(version => { versionButton.textContent = `Version ${version.trim()}`; }).catch(() => {});</script>
   </main>
   <script>
@@ -288,7 +293,14 @@
     function layoutWrapped() {
       const { cols, rows, shape } = config(), hex = shape === 'hex', cellHeight = hex ? 2 / Math.sqrt(3) : 1, stepY = hex ? .75 * cellHeight : 1, width = cols, height = rows * stepY, viewWidth = viewCols(), viewHeight = viewRows() * stepY;
       boardElement.style.aspectRatio = `${viewWidth} / ${viewHeight}`;
-      const place = (element, x, y) => { element.style.display = ''; element.style.left = `${x / viewWidth * 100}%`; element.style.top = `${y / viewHeight * 100}%`; element.style.width = `${100 / viewWidth}%`; element.style.height = `${cellHeight / viewHeight * 100}%`; };
+      // In Pixeln und auf ganze Pixel gerundet: Benachbarte Felder stoßen so exakt aneinander, und die Fugen
+      // (siehe CSS) sind überall gleich breit, auch beim Ziehen und Zoomen.
+      const unit = boardElement.clientWidth / viewWidth;
+      const place = (element, x, y) => {
+        const left = Math.round(x * unit), top = Math.round(y * unit);
+        element.style.display = ''; element.style.left = `${left}px`; element.style.top = `${top}px`;
+        element.style.width = `${Math.round((x + 1) * unit) - left}px`; element.style.height = `${Math.round((y + cellHeight) * unit) - top}px`;
+      };
       grid.forEach((_, index) => {
         const column = index % cols, row = Math.floor(index / cols), x = mod(column + (hex ? (row % 2) * .5 : 0) + offsetX, width), y = mod(row * stepY + offsetY, height), copies = [];
         for (let repeatY = -1; repeatY <= Math.ceil(viewHeight / height); repeatY++) {
@@ -506,10 +518,6 @@
     // Zoom (nur randlos): Das Fenster bleibt 12×24, sichtbar sind 12/Zoom × 24/Zoom Felder; die Mitte bleibt stehen.
     function applyZoomStyles() {
       boardElement.style.setProperty('--zoom', wrapZoom);
-      boardElement.style.setProperty('--wrap-cell-gap', `${wrapZoom}px`);
-      boardElement.style.setProperty('--wrap-cell-radius', `${3 * wrapZoom}px`);
-      boardElement.style.setProperty('--hex-side-inset', `${3.5 * wrapZoom}%`);
-      boardElement.style.setProperty('--hex-tip-inset', `${1.5 * wrapZoom}%`);
     }
     function setZoom(value) {
       const next = Math.round(Math.min(ZOOM_MAX, Math.max(ZOOM_MIN, value)) * 100) / 100;
