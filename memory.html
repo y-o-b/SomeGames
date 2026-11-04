@@ -108,7 +108,7 @@
       <div class="board" id="board" role="grid" aria-label="Memory-Spielfeld"></div>
       <button class="new-game" id="newGame" type="button">Neues Spiel</button>
     </section>
-    <button class="version" data-version type="button" title="Klicken, um die Seite neu zu laden">Version 1.75</button>
+    <button class="version" data-version type="button" title="Klicken, um die Seite neu zu laden">Version 1.76</button>
     <script>const versionButton = document.querySelector('[data-version]'); versionButton.addEventListener('click', () => location.replace(`${location.pathname}?v=${Date.now()}`)); fetch(`VERSION?${Date.now()}`, { cache: 'no-store' }).then(response => response.text()).then(version => { versionButton.textContent = `Version ${version.trim()}`; }).catch(() => {});</script>
   </main>
   <script>
@@ -122,13 +122,33 @@
       { symbol: '🛸', color: '#D0F4DE' }, { symbol: '🦋', color: '#A9DEF9' }, { symbol: '🍓', color: '#FFADAD' },
       { symbol: '🐼', color: '#E5E5E5' }, { symbol: '🌺', color: '#FEC5BB' }, { symbol: '🍦', color: '#FFF1E6' },
       { symbol: '🎨', color: '#CFBAF0' }, { symbol: '🐸', color: '#BDE0A8' }, { symbol: '🍋', color: '#FFF3B0' },
-      { symbol: '🦁', color: '#F9C74F' }, { symbol: '🎈', color: '#F28482' }, { symbol: '🌍', color: '#90DBF4' }
+      { symbol: '🦁', color: '#F9C74F' }, { symbol: '🎈', color: '#F28482' }, { symbol: '🌍', color: '#90DBF4' },
+      { symbol: '🍎', color: '#FFB4A2' }, { symbol: '🍒', color: '#F28482' }, { symbol: '🍇', color: '#CDB4DB' },
+      { symbol: '🍌', color: '#FFE69C' }, { symbol: '🍍', color: '#F6BD60' }, { symbol: '🥑', color: '#B7E4C7' },
+      { symbol: '🥕', color: '#F4A261' }, { symbol: '🍔', color: '#E9C46A' }, { symbol: '🍪', color: '#DDB892' },
+      { symbol: '🍰', color: '#FFC8DD' }, { symbol: '🧁', color: '#CFBAF0' }, { symbol: '🍿', color: '#FFF1E6' },
+      { symbol: '🧸', color: '#DDB892' }, { symbol: '🐶', color: '#F6BD60' }, { symbol: '🐱', color: '#CFBAF0' },
+      { symbol: '🐨', color: '#DDE7F0' }, { symbol: '🐯', color: '#F4A261' }, { symbol: '🐢', color: '#B7E4C7' },
+      { symbol: '🐬', color: '#A2D2FF' }, { symbol: '🦉', color: '#CDB4DB' }, { symbol: '🦜', color: '#B7E4C7' },
+      { symbol: '🐝', color: '#FFE69C' }, { symbol: '🐞', color: '#FFADAD' }, { symbol: '🦖', color: '#BDE0A8' },
+      { symbol: '🐌', color: '#D0F4DE' }, { symbol: '🐧', color: '#DDE7F0' }, { symbol: '🦓', color: '#E5E5E5' },
+      { symbol: '🐴', color: '#F6BD60' }, { symbol: '🐑', color: '#FFF1E6' }, { symbol: '🐘', color: '#DDE7F0' },
+      { symbol: '🦒', color: '#FFE69C' }, { symbol: '🦔', color: '#DDB892' }, { symbol: '🦩', color: '#FFAFCC' },
+      { symbol: '🦀', color: '#FFADAD' }, { symbol: '🎁', color: '#FFC8DD' }, { symbol: '🎹', color: '#CDB4DB' },
+      { symbol: '📚', color: '#BDE0FE' }, { symbol: '🚲', color: '#B7E4C7' }, { symbol: '🚂', color: '#F28482' },
+      { symbol: '🏀', color: '#F4A261' }, { symbol: '🎯', color: '#FFB4A2' }, { symbol: '💎', color: '#A2D2FF' },
+      { symbol: '🔑', color: '#FFE69C' }, { symbol: '🪁', color: '#A9DEF9' }, { symbol: '⚓', color: '#BDE0FE' },
+      { symbol: '🌋', color: '#F28482' }, { symbol: '🪼', color: '#CDB4DB' }, { symbol: '🪇', color: '#CFBAF0' }
     ];
     const boardElement = document.getElementById('board'), appElement = document.querySelector('.app');
     const sizeButtons = [...document.querySelectorAll('.size')];
     const gamePanel = document.querySelector('.game');
     let size = 8, mode = 'single', currentPlayer = 1, playerScores = [0, 0], cards = [], first = null, second = null, locked = false, moves = 0, pairs = 0, seconds = 0, timer;
-    function shuffle(items) { return [...items].sort(() => Math.random() - .5); }
+    function shuffle(items) {
+      const shuffled = [...items];
+      for (let index = shuffled.length - 1; index > 0; index--) { const other = Math.floor(Math.random() * (index + 1)); [shuffled[index], shuffled[other]] = [shuffled[other], shuffled[index]]; }
+      return shuffled;
+    }
     const reduceMotion = () => matchMedia('(prefers-reduced-motion: reduce)').matches;
     const tabletLandscape = () => matchMedia('(min-width: 768px) and (max-width: 1366px) and (orientation: landscape)').matches;
     const boardColumns = () => size === 18 || (size === 12 && tabletLandscape()) ? 6 : 4;
