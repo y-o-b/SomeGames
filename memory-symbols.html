@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="theme-color" content="#4B8ED8" />
+  <meta name="description" content="Alle Symbole aus dem Memory-Spiel auf einen Blick." />
+  <link rel="manifest" href="manifest.webmanifest" />
+  <meta name="application-name" content="Spiele" />
+  <meta name="mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-title" content="Spiele" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+  <link rel="icon" href="icons/memory.svg" type="image/svg+xml" />
+  <link rel="apple-touch-icon" href="icons/memory-180.png" />
+  <title>Memory-Symbole</title>
+  <style>
+    :root { --bg: #4B8ED8; --panel: #FFFFFF; --text: #171717; --muted: rgba(23,23,23,.7); --cyan: #171717; }
+    * { box-sizing: border-box; }
+    body { min-height: 100vh; margin: 0; padding: 24px 15px 30px; display: grid; justify-items: center; align-content: start; color: var(--text); background: var(--bg); font: 16px/1.5 Arial, Helvetica, sans-serif; }
+    .app { width: min(100%, 680px); }
+    header { position: relative; display: flex; align-items: center; justify-content: center; min-height: 64px; margin-bottom: 22px; text-align: center; }
+    .back-button { display: grid; place-items: center; width: 44px; height: 44px; position: absolute; left: 0; top: 50%; margin-top: -22px; border: 3px solid #171717; border-radius: 50%; color: #171717; background: #FFFFFF; box-shadow: 3px 3px 0 #171717; text-decoration: none; -webkit-tap-highlight-color: transparent; }
+    .back-button svg { display: block; width: 24px; height: 24px; margin-right: 2px; fill: none; stroke: currentColor; stroke-width: 3.2; stroke-linecap: round; stroke-linejoin: round; }
+    .back-button:focus-visible, .play-link:focus-visible { outline: 3px solid #EF4B3F; outline-offset: 3px; }
+    h1 { margin: 0; font-size: clamp(2rem, 8vw, 3.4rem); line-height: .98; letter-spacing: -.06em; }
+    .panel { padding: clamp(16px, 4vw, 26px); border: 3px solid #171717; border-radius: 18px; background: var(--panel); box-shadow: 7px 7px 0 #171717; }
+    .intro { margin: 0 0 18px; color: var(--muted); text-align: center; }
+    .symbol-count { color: var(--text); font-weight: 800; }
+    .symbols { display: grid; grid-template-columns: repeat(auto-fill, minmax(64px, 1fr)); gap: 9px; }
+    .symbol { display: grid; place-items: center; aspect-ratio: 1; border: 2px solid #171717; border-radius: 11px; background: var(--symbol-bg, #FFFFFF); box-shadow: 2px 2px 0 #171717; font-size: clamp(2rem, 7vw, 2.8rem); line-height: 1; }
+    .play-link { display: block; width: fit-content; margin: 22px auto 0; padding: 11px 20px; border: 3px solid #171717; border-radius: 10px; color: #FFFFFF; background: #EF4B3F; box-shadow: 4px 4px 0 #171717; font-weight: 800; text-decoration: none; }
+    .version { display: block; margin: 12px auto 0; padding: 0; border: 0; color: rgba(23,23,23,.7); background: transparent; font: inherit; font-size: .72rem; cursor: pointer; }
+    .version:focus-visible { outline: 2px solid #171717; outline-offset: 3px; }
+    @media (max-width: 400px) { body { padding: 16px 12px 24px; } header { margin-bottom: 14px; } .symbols { grid-template-columns: repeat(auto-fill, minmax(52px, 1fr)); gap: 7px; } .symbol { border-radius: 9px; font-size: 2rem; } }
+  </style>
+</head>
+<body>
+  <main class="app">
+    <header>
+      <a class="back-button" href="memory.html" aria-label="Zurück zu Memory" title="Zurück zu Memory"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 4 7 12l8 8"/></svg></a>
+      <h1>Memory-Symbole</h1>
+    </header>
+    <section class="panel" aria-label="Alle Memory-Symbole">
+      <p class="intro"><span class="symbol-count" id="symbolCount"></span> – im Spiel wird pro Partie zufällig ausgewählt.</p>
+      <div class="symbols" id="symbols" role="list" aria-label="Symbole"></div>
+      <a class="play-link" href="memory.html">Memory spielen&nbsp; →</a>
+    </section>
+    <button class="version" data-version type="button" title="Klicken, um die Seite neu zu laden">Version 1.78</button>
+    <script>const versionButton = document.querySelector('[data-version]'); versionButton.addEventListener('click', () => location.replace(`${location.pathname}?v=${Date.now()}`)); fetch(`VERSION?${Date.now()}`, { cache: 'no-store' }).then(response => response.text()).then(version => { versionButton.textContent = `Version ${version.trim()}`; }).catch(() => {});</script>
+  </main>
+  <script src="memory-symbols.js"></script>
+  <script>
+    const symbolGrid = document.getElementById('symbols');
+    document.getElementById('symbolCount').textContent = `${MEMORY_SYMBOLS.length} Symbole`;
+    MEMORY_SYMBOLS.forEach(({ symbol, color }) => {
+      const tile = document.createElement('div'); tile.className = 'symbol'; tile.setAttribute('role', 'listitem'); tile.setAttribute('aria-label', symbol); tile.textContent = symbol; tile.style.setProperty('--symbol-bg', color); symbolGrid.appendChild(tile);
+    });
+  </script>
+  <script>if ('serviceWorker' in navigator) addEventListener('load', () => navigator.serviceWorker.register('sw.js').catch(() => {}));</script>
+</body>
+</html>

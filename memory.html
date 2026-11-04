@@ -68,6 +68,8 @@
     button:focus-visible { outline: 3px solid var(--cyan); outline-offset: 3px; }
     .new-game { display: block; width: 100%; padding: 12px; border: 3px solid #171717; border-radius: 10px; color: #FFFFFF; background: var(--purple); font-weight: 800; box-shadow: 4px 4px 0 #171717; }
      .new-game:hover { filter: brightness(1.1); }
+    .symbols-link { display: block; width: fit-content; margin: 12px auto 0; color: var(--text); font-size: .85rem; font-weight: 700; text-underline-offset: 3px; }
+    .symbols-link:focus-visible { outline: 3px solid var(--cyan); outline-offset: 3px; }
     .message { min-height: 27px; margin: 0 0 10px; color: var(--muted); text-align: center; font-size: .9rem; }
     .message b { color: var(--text); }
     @media (max-width: 400px) { .game { padding: 15px; } .board { gap: 5px; } .memory-card { border-radius: 8px; } .size { padding: 6px 7px; } }
@@ -107,39 +109,14 @@
       <p class="message" id="message" aria-live="polite"><b>Bereit?</b> Finde das erste Paar.</p>
       <div class="board" id="board" role="grid" aria-label="Memory-Spielfeld"></div>
       <button class="new-game" id="newGame" type="button">Neues Spiel</button>
+      <a class="symbols-link" href="memory-symbols.html">Alle Symbole ansehen&nbsp; →</a>
     </section>
-    <button class="version" data-version type="button" title="Klicken, um die Seite neu zu laden">Version 1.77</button>
+    <button class="version" data-version type="button" title="Klicken, um die Seite neu zu laden">Version 1.78</button>
     <script>const versionButton = document.querySelector('[data-version]'); versionButton.addEventListener('click', () => location.replace(`${location.pathname}?v=${Date.now()}`)); fetch(`VERSION?${Date.now()}`, { cache: 'no-store' }).then(response => response.text()).then(version => { versionButton.textContent = `Version ${version.trim()}`; }).catch(() => {});</script>
   </main>
+  <script src="memory-symbols.js"></script>
   <script>
-    const icons = [
-      { symbol: '🍕', color: '#FFD166' }, { symbol: '🚀', color: '#BDE0FE' }, { symbol: '🌈', color: '#FFC8DD' },
-      { symbol: '🎧', color: '#CDB4DB' }, { symbol: '🐙', color: '#FFAFCC' }, { symbol: '🌵', color: '#B7E4C7' },
-      { symbol: '🍩', color: '#F4A261' }, { symbol: '🦊', color: '#F6BD60' }, { symbol: '⚽', color: '#DDE7F0' },
-      { symbol: '🎸', color: '#E9C46A' }, { symbol: '🌙', color: '#CDE7F0' }, { symbol: '🍉', color: '#B7E4C7' },
-      { symbol: '🦄', color: '#E0C3FC' }, { symbol: '🎲', color: '#FFB4A2' }, { symbol: '🐳', color: '#A2D2FF' },
-      { symbol: '🌻', color: '#FFE69C' }, { symbol: '🍀', color: '#C7F9CC' }, { symbol: '👾', color: '#B8C0FF' },
-      { symbol: '🛸', color: '#D0F4DE' }, { symbol: '🦋', color: '#A9DEF9' }, { symbol: '🍓', color: '#FFADAD' },
-      { symbol: '🐼', color: '#E5E5E5' }, { symbol: '🌺', color: '#FEC5BB' }, { symbol: '🍦', color: '#FFF1E6' },
-      { symbol: '🎨', color: '#CFBAF0' }, { symbol: '🐸', color: '#BDE0A8' }, { symbol: '🍋', color: '#FFF3B0' },
-      { symbol: '🦁', color: '#F9C74F' }, { symbol: '🎈', color: '#F28482' }, { symbol: '🌍', color: '#90DBF4' },
-      { symbol: '🍎', color: '#FFB4A2' }, { symbol: '🍒', color: '#F28482' }, { symbol: '🍇', color: '#CDB4DB' },
-      { symbol: '🍌', color: '#FFE69C' }, { symbol: '🍍', color: '#F6BD60' }, { symbol: '🥑', color: '#B7E4C7' },
-      { symbol: '🥕', color: '#F4A261' }, { symbol: '🍔', color: '#E9C46A' }, { symbol: '🍪', color: '#DDB892' },
-      { symbol: '🍰', color: '#FFC8DD' }, { symbol: '🧁', color: '#CFBAF0' }, { symbol: '🍿', color: '#FFF1E6' },
-      { symbol: '🧸', color: '#DDB892' }, { symbol: '🐶', color: '#F6BD60' }, { symbol: '🐱', color: '#CFBAF0' },
-      { symbol: '🐨', color: '#DDE7F0' }, { symbol: '🐯', color: '#F4A261' }, { symbol: '🐢', color: '#B7E4C7' },
-      { symbol: '🐬', color: '#A2D2FF' }, { symbol: '🦉', color: '#CDB4DB' }, { symbol: '🦜', color: '#B7E4C7' },
-      { symbol: '🐝', color: '#FFE69C' }, { symbol: '🐞', color: '#FFADAD' }, { symbol: '🦖', color: '#BDE0A8' },
-      { symbol: '🐌', color: '#D0F4DE' }, { symbol: '🐧', color: '#DDE7F0' }, { symbol: '🦓', color: '#E5E5E5' },
-      { symbol: '🐴', color: '#F6BD60' }, { symbol: '🐑', color: '#FFF1E6' }, { symbol: '🐘', color: '#DDE7F0' },
-      { symbol: '🦒', color: '#FFE69C' }, { symbol: '🦔', color: '#DDB892' }, { symbol: '🦩', color: '#FFAFCC' },
-      { symbol: '🦀', color: '#FFADAD' }, { symbol: '🎁', color: '#FFC8DD' }, { symbol: '🎹', color: '#CDB4DB' },
-      { symbol: '📚', color: '#BDE0FE' }, { symbol: '🚲', color: '#B7E4C7' }, { symbol: '🚂', color: '#F28482' },
-      { symbol: '🏀', color: '#F4A261' }, { symbol: '🎯', color: '#FFB4A2' }, { symbol: '💎', color: '#A2D2FF' },
-      { symbol: '🔑', color: '#FFE69C' }, { symbol: '🪁', color: '#A9DEF9' }, { symbol: '⚓', color: '#BDE0FE' },
-      { symbol: '🌋', color: '#F28482' }, { symbol: '🪼', color: '#CDB4DB' }, { symbol: '🪇', color: '#CFBAF0' }
-    ];
+    const icons = window.MEMORY_SYMBOLS;
     const boardElement = document.getElementById('board'), appElement = document.querySelector('.app');
     const sizeButtons = [...document.querySelectorAll('.size')];
     const gamePanel = document.querySelector('.game');
