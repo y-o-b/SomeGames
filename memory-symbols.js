@@ -24,5 +24,13 @@ window.MEMORY_SYMBOLS = Object.freeze([
   { symbol: '📚', color: '#BDE0FE' }, { symbol: '🚲', color: '#B7E4C7' }, { symbol: '🚂', color: '#F28482' },
   { symbol: '🏀', color: '#F4A261' }, { symbol: '🎯', color: '#FFB4A2' }, { symbol: '💎', color: '#A2D2FF' },
   { symbol: '🔑', color: '#FFE69C' }, { symbol: '🪁', color: '#A9DEF9' }, { symbol: '⚓', color: '#BDE0FE' },
-  { symbol: '🌋', color: '#F28482' }, { symbol: '🪼', color: '#CDB4DB' }, { symbol: '🪇', color: '#CFBAF0' }
+  { symbol: '🌋', color: '#F28482' }, { symbol: '🪼', color: '#CDB4DB' }, { symbol: '🪇', color: '#CFBAF0' },
+  { symbol: '🌤️', color: '#FFE69C' }, { symbol: '🌧️', color: '#BDE0FE' }, { symbol: '❄️', color: '#DDE7F0' },
+  { symbol: '⭐', color: '#FFF3B0' }, { symbol: '⚡', color: '#F9C74F' }, { symbol: '🔥', color: '#F28482' },
+  { symbol: '🍄', color: '#FFADAD' }, { symbol: '🌲', color: '#B7E4C7' }, { symbol: '🌴', color: '#C7F9CC' },
+  { symbol: '🌷', color: '#FFC8DD' }, { symbol: '❤️', color: '#FFADAD' }, { symbol: '💜', color: '#CDB4DB' },
+  { symbol: '🎮', color: '#B8C0FF' }, { symbol: '📷', color: '#DDE7F0' }, { symbol: '🔔', color: '#FFE69C' },
+  { symbol: '🧭', color: '#BDE0FE' }, { symbol: '🚗', color: '#F28482' }, { symbol: '🚁', color: '#A9DEF9' },
+  { symbol: '🛶', color: '#D0F4DE' }, { symbol: '🚦', color: '#FFB4A2' }, { symbol: '🔭', color: '#CFBAF0' },
+  { symbol: '🧪', color: '#B7E4C7' }
 ]);
