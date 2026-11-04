@@ -18,7 +18,11 @@
     :root { --bg: #4B8ED8; --panel: #FFFFFF; --text: #171717; --muted: rgba(23,23,23,.7); --red: #EF4B3F; }
     * { box-sizing: border-box; }
     body { min-height: 100vh; margin: 0; padding: 24px 15px; display: grid; justify-items: center; align-content: start; color: var(--text); background: var(--bg); font: 16px/1.5 Arial, Helvetica, sans-serif; }
+    body.fullscreen-mode { position: fixed; z-index: 10000; inset: 0; width: 100%; height: 100vh; height: 100dvh; min-height: 0; overflow: auto; padding: 0; background: var(--bg); }
     .app { width: min(100%, 620px); }
+    body.fullscreen-mode .app, .app:fullscreen { width: min(100%, 720px); height: 100vh; height: 100dvh; min-height: 0; margin: 0 auto; overflow: auto; background: var(--bg); }
+    body.fullscreen-mode header, body.fullscreen-mode .version, .app:fullscreen header, .app:fullscreen > .version { display: none; }
+    body.fullscreen-mode .game, .app:fullscreen .game { width: 100%; min-height: 100%; display: flex; flex-direction: column; justify-content: center; padding: max(8px, env(safe-area-inset-top)) 12px max(8px, env(safe-area-inset-bottom)); border: 0; border-radius: 0; box-shadow: none; }
     .back-button { display: grid; place-items: center; width: 44px; height: 44px; position: absolute; left: 0; top: 50%; margin-top: -22px; border: 3px solid #171717; border-radius: 50%; color: #171717; background: #FFFFFF; box-shadow: 3px 3px 0 #171717; text-decoration: none; -webkit-tap-highlight-color: transparent; transition: transform .12s, box-shadow .12s; }
     .back-button svg { display: block; width: 24px; height: 24px; margin-right: 2px; fill: none; stroke: currentColor; stroke-width: 3.2; stroke-linecap: round; stroke-linejoin: round; }
     .back-button:active { transform: translate(2px, 2px); box-shadow: 1px 1px 0 #171717; }
@@ -61,6 +65,8 @@
     .board-tools { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 10px; }
     .hint-button { padding: 12px; border: 3px solid #171717; border-radius: 10px; font-weight: 800; box-shadow: 4px 4px 0 #171717; }
     .hint-button { background: #FFD166; white-space: nowrap; }
+    .fullscreen-button { grid-column: 1 / -1; padding: 8px 12px; border: 2px solid #171717; border-radius: 9px; color: var(--text); background: #FFFFFF; font-size: .85rem; font-weight: 800; }
+    .fullscreen-button:focus-visible { outline: 3px solid #EF4B3F; outline-offset: 2px; }
     .message { min-height: 27px; margin: 0 0 10px; color: var(--muted); text-align: center; font-size: .9rem; }
     .message b { color: var(--text); }
     .board { display: grid; gap: 2px; margin: 0 auto 18px; width: 100%; max-width: 540px; padding: 4px; border: 3px solid #171717; border-radius: 10px; background: #171717; touch-action: manipulation; -webkit-user-select: none; user-select: none; }
@@ -131,6 +137,7 @@
       <div class="board-tools">
         <button class="new-game" id="newGame" type="button">Neues Spiel</button>
         <button class="hint-button" id="hintButton" type="button">💡 Hinweis</button>
+        <button class="fullscreen-button" id="fullscreenToggle" type="button" aria-pressed="false">⛶ Vollbild</button>
       </div>
     </section>
     <dialog class="settings-dialog" id="settingsDialog" aria-labelledby="settingsTitle">
@@ -168,7 +175,7 @@
       </div>
       <button class="settings-done" id="settingsDone" type="button">Fertig</button>
     </dialog>
-    <button class="version" data-version type="button" title="Klicken, um die Seite neu zu laden">Version 1.79</button>
+    <button class="version" data-version type="button" title="Klicken, um die Seite neu zu laden">Version 1.80</button>
     <script>const versionButton = document.querySelector('[data-version]'); versionButton.addEventListener('click', () => location.replace(`${location.pathname}?v=${Date.now()}`)); fetch(`VERSION?${Date.now()}`, { cache: 'no-store' }).then(response => response.text()).then(version => { versionButton.textContent = `Version ${version.trim()}`; }).catch(() => {});</script>
   </main>
   <script>
@@ -179,7 +186,7 @@
     let wrapZoom = 1, zoomTimer = null, pinch = null, wrapViewRows = 18;
     const activePointers = new Map();
     const viewCols = () => WRAP_VIEW_COLS / wrapZoom, viewRows = () => wrapViewRows / wrapZoom;
-    const boardElement = document.getElementById('board'), message = document.getElementById('message'), gamePanel = document.querySelector('.game'), appElement = document.querySelector('.app'), detectorElement = document.getElementById('metalDetector');
+    const boardElement = document.getElementById('board'), message = document.getElementById('message'), gamePanel = document.querySelector('.game'), appElement = document.querySelector('.app'), detectorElement = document.getElementById('metalDetector'), fullscreenButton = document.getElementById('fullscreenToggle');
     const mineCountInput = document.getElementById('mineCount'), mineCountOutput = document.getElementById('mineCountValue'), wrapBoardSizeInput = document.getElementById('wrapBoardSize'), wrapBoardSizeOutput = document.getElementById('wrapBoardSizeValue'), wrapBoardSizeRow = document.getElementById('wrapBoardSizeRow'), sizeButtonsRow = document.getElementById('sizeButtonsRow');
     const SHAPE_STORAGE_KEY = 'y-o-b.minesweeper.shape.v1', WRAP_STORAGE_KEY = 'y-o-b.minesweeper.wrap.v1', WRAP_BOARD_SIZE_KEY = 'y-o-b.minesweeper.wrap-board-size.v1', SIZE_STORAGE_KEY = 'y-o-b.minesweeper.size.v1', MINE_COUNT_STORAGE_KEY = 'y-o-b.minesweeper.mine-count.v1', LEVEL_STORAGE_KEY = 'y-o-b.minesweeper.level.v1', GAME_STATE_KEY = 'y-o-b.minesweeper.game.v1';
     let boardShape = 'square', boardWrap = true, wrapBoardSize = 9, offsetX = 0, offsetY = 0, pan = null, panEndedAt = 0, panFrame = 0, ghosts = [], boardSize = '9x9', mineCount = 10, activeConfig = null, grid = [], over = false, placed = false, seconds = 0, timer = null, openCount = 0, flagCount = 0, pressTimer = null, longPressed = false, autoSafeTimer = null, revealTimers = [], revealing = false, detectorTimers = [], detectorRun = 0, shovelIndex = null, gameSaveTimer = null;
@@ -291,6 +298,23 @@
       const overflow = document.documentElement.scrollHeight - innerHeight;
       if (overflow > 0 && boardElement.clientHeight > boardElement.clientWidth * .75 + 1) { fitWrapWindow(overflow); layoutCells(); }
     }
+    function syncFullscreenButton() {
+      const active = document.fullscreenElement === appElement || document.body.classList.contains('fullscreen-mode');
+      fullscreenButton.textContent = active ? '⛶ Vollbild beenden' : '⛶ Vollbild';
+      fullscreenButton.setAttribute('aria-label', active ? 'Vollbild beenden' : 'Vollbild');
+      fullscreenButton.setAttribute('aria-pressed', String(active));
+    }
+    async function toggleFullscreen() {
+      if (document.fullscreenElement === appElement) {
+        try { await document.exitFullscreen(); } catch (error) { console.warn('Vollbild konnte nicht beendet werden.', error); }
+      } else if (document.body.classList.contains('fullscreen-mode')) document.body.classList.remove('fullscreen-mode');
+      else if (appElement.requestFullscreen) {
+        try { await appElement.requestFullscreen({ navigationUI: 'hide' }); }
+        catch (error) { document.body.classList.add('fullscreen-mode'); }
+      } else document.body.classList.add('fullscreen-mode');
+      syncFullscreenButton(); requestAnimationFrame(fitAndLayout);
+    }
+    document.addEventListener('fullscreenchange', () => { syncFullscreenButton(); requestAnimationFrame(fitAndLayout); });
     function layoutWrapped() {
       const { cols, rows, shape } = config(), hex = shape === 'hex', cellHeight = hex ? 2 / Math.sqrt(3) : 1, stepY = hex ? .75 * cellHeight : 1, viewWidth = viewCols(), viewHeight = viewRows() * stepY;
       boardElement.style.aspectRatio = `${viewWidth} / ${viewHeight}`;
@@ -574,6 +598,7 @@
     addEventListener('resize', () => { cancelAnimationFrame(fitFrame); fitFrame = requestAnimationFrame(fitAndLayout); });
     document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'hidden') flushGameState(); });
     addEventListener('pagehide', flushGameState);
+    fullscreenButton.addEventListener('click', toggleFullscreen);
     document.getElementById('newGame').addEventListener('click', () => start()); start(restoreGameState());
     // Beim ersten Aufbau stehen Schrift und Kopf noch nicht endgültig; nach dem Laden noch einmal einpassen.
     addEventListener('load', () => fitAndLayout());
