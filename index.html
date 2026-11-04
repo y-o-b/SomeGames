@@ -71,12 +71,12 @@
       <div class="card">
         <img class="game-icon" src="icons/minesweeper.svg" width="72" height="72" alt="" />
         <h2>Detektor</h2>
-        <p>Finde Minen auf Quadraten oder Sechsecken. Wähle 9–25 Felder und verschiebe oder zoome das Spielfeld.</p>
+        <p>Finde Minen auf Quadraten oder Sechsecken.</p>
         <a href="minesweeper.html">Detektor spielen&nbsp; →</a>
       </div>
     </div>
     <footer>Eine kleine Spielpause gefällig?</footer>
-      <button class="version" data-version type="button" title="Klicken, um die Seite neu zu laden">Version 1.68</button>
+      <button class="version" data-version type="button" title="Klicken, um die Seite neu zu laden">Version 1.69</button>
     <script>const versionButton = document.querySelector('[data-version]'); versionButton.addEventListener('click', () => location.replace(`${location.pathname}?v=${Date.now()}`)); fetch(`VERSION?${Date.now()}`, { cache: 'no-store' }).then(response => response.text()).then(version => { versionButton.textContent = `Version ${version.trim()}`; }).catch(() => {});</script>
   </main>
   <script>if ('serviceWorker' in navigator) addEventListener('load', () => navigator.serviceWorker.register('sw.js').catch(() => {}));</script>
