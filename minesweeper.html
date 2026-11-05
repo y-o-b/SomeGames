@@ -193,17 +193,24 @@
       </div>
       <button class="settings-done" id="settingsDone" type="button">Fertig</button>
     </dialog>
-    <button class="version" data-version type="button" title="Klicken, um die Seite neu zu laden">Version 1.82</button>
+    <button class="version" data-version type="button" title="Klicken, um die Seite neu zu laden">Version 1.83</button>
     <script>const versionButton = document.querySelector('[data-version]'); versionButton.addEventListener('click', () => location.replace(`${location.pathname}?v=${Date.now()}`)); fetch(`VERSION?${Date.now()}`, { cache: 'no-store' }).then(response => response.text()).then(version => { versionButton.textContent = `Version ${version.trim()}`; }).catch(() => {});</script>
   </main>
   <script>
     const boardSizes = { '9x9': { cols: 9, rows: 9 }, '12x12': { cols: 12, rows: 12 }, '12x21': { cols: 12, rows: 21 } };
     // Es gibt nur noch den Randlos-Modus. Das Fenster zeigt 12 Spalten; wie viele Zeilen, richtet sich nach dem Platz
     // auf dem Bildschirm (fitWrapWindow), höchstens WRAP_VIEW_ROWS_MAX.
-    const WRAP_BOARD_MIN = 9, WRAP_BOARD_MAX = 25, WRAP_VIEW_COLS = 12, WRAP_VIEW_ROWS_MAX = 30, ZOOM_MIN = .75, ZOOM_MAX = 2;
+    const WRAP_BOARD_MIN = 9, WRAP_BOARD_MAX = 25, WRAP_VIEW_COLS = 12, WRAP_VIEW_ROWS_MAX = 30, ZOOM_MIN = .1, ZOOM_PORTRAIT_MIN = .75, ZOOM_MAX = 2;
     let wrapZoom = 1, zoomTimer = null, pinch = null, wrapViewRows = 18;
     const activePointers = new Map();
+    let makeCellForGame = null;
     const viewCols = () => WRAP_VIEW_COLS / wrapZoom, viewRows = () => wrapViewRows / wrapZoom;
+    function minimumZoom() {
+      if (innerWidth <= innerHeight) return ZOOM_PORTRAIT_MIN;
+      const stepY = boardShape === 'hex' ? .75 * 2 / Math.sqrt(3) : 1;
+      const portraitRows = Math.min(WRAP_VIEW_ROWS_MAX, WRAP_VIEW_COLS * innerWidth / innerHeight / stepY);
+      return Math.max(ZOOM_MIN, Math.min(ZOOM_PORTRAIT_MIN, wrapViewRows / portraitRows));
+    }
     const boardElement = document.getElementById('board'), message = document.getElementById('message'), gamePanel = document.querySelector('.game'), appElement = document.querySelector('.app'), detectorElement = document.getElementById('metalDetector'), fullscreenButton = document.getElementById('fullscreenToggle'), hintButton = document.getElementById('hintButton');
     const mineCountInput = document.getElementById('mineCount'), mineCountOutput = document.getElementById('mineCountValue'), wrapBoardSizeInput = document.getElementById('wrapBoardSize'), wrapBoardSizeOutput = document.getElementById('wrapBoardSizeValue'), wrapBoardSizeRow = document.getElementById('wrapBoardSizeRow'), sizeButtonsRow = document.getElementById('sizeButtonsRow');
     const SHAPE_STORAGE_KEY = 'y-o-b.minesweeper.shape.v1', WRAP_STORAGE_KEY = 'y-o-b.minesweeper.wrap.v1', WRAP_BOARD_SIZE_KEY = 'y-o-b.minesweeper.wrap-board-size.v1', SIZE_STORAGE_KEY = 'y-o-b.minesweeper.size.v1', MINE_COUNT_STORAGE_KEY = 'y-o-b.minesweeper.mine-count.v1', LEVEL_STORAGE_KEY = 'y-o-b.minesweeper.level.v1', GAME_STATE_KEY = 'y-o-b.minesweeper.game.v1';
@@ -314,12 +321,25 @@
       const height = Math.max(width * .75, Math.min(width * 2, innerHeight - (board.top + scrollY) - below - extra));
       wrapViewRows = Math.min(WRAP_VIEW_ROWS_MAX, WRAP_VIEW_COLS * height / width / stepY);
     }
+    function ensureGhostCapacity() {
+      if (!config().wrap || !makeCellForGame || !grid.length) return;
+      const zoomFloor = minimumZoom(), maxViewCols = WRAP_VIEW_COLS / zoomFloor, maxViewRows = wrapViewRows / zoomFloor;
+      const required = Math.max(3, (Math.ceil(maxViewCols / config().cols) + 1) * (Math.ceil(maxViewRows / config().rows) + 1) - 1);
+      grid.forEach((cell, index) => {
+        if (!ghosts[index]) ghosts[index] = [];
+        let added = false;
+        while (ghosts[index].length < required) { ghosts[index].push(boardElement.appendChild(makeCellForGame(cell, index, true))); added = true; }
+        if (added) syncGhosts(index);
+      });
+    }
     // Einpassen und zeichnen; ragt die Seite danach noch über den Bildschirm (Schatten, Rundungen), einmal nachkorrigieren.
     function fitAndLayout() {
-      fitWrapWindow(); layoutCells();
+      fitWrapWindow();
+      if (wrapZoom < minimumZoom()) { wrapZoom = minimumZoom(); applyZoomStyles(); persistGameState(); }
+      ensureGhostCapacity(); layoutCells();
       if (fullscreenActive()) return;
       const overflow = document.documentElement.scrollHeight - innerHeight;
-      if (overflow > 0 && boardElement.clientHeight > boardElement.clientWidth * .75 + 1) { fitWrapWindow(overflow); layoutCells(); }
+      if (overflow > 0 && boardElement.clientHeight > boardElement.clientWidth * .75 + 1) { fitWrapWindow(overflow); if (wrapZoom < minimumZoom()) { wrapZoom = minimumZoom(); applyZoomStyles(); persistGameState(); } ensureGhostCapacity(); layoutCells(); }
     }
     function syncFullscreenButton() {
       const active = fullscreenActive();
@@ -408,8 +428,8 @@
       };
       // Erst alle Felder (children[index] bleibt das Feld selbst), dahinter die nötigen Wiederholungen fürs feste Fenster.
       grid.forEach((cell, index) => boardElement.appendChild(makeCell(cell, index, false)));
-      const wrapGhostCount = config().wrap ? Math.max(3, (Math.ceil(WRAP_VIEW_COLS / ZOOM_MIN / config().cols) + 1) * (Math.ceil(WRAP_VIEW_ROWS_MAX / ZOOM_MIN / config().rows) + 1) - 1) : 0;
-      ghosts = grid.map((cell, index) => Array.from({ length: wrapGhostCount }, () => boardElement.appendChild(makeCell(cell, index, true))));
+      makeCellForGame = makeCell;
+      ghosts = grid.map(() => []);
       if (savedState) grid.forEach((_, index) => draw(index));
       fitAndLayout();
       document.getElementById('time').textContent = `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, '0')}`;
@@ -577,7 +597,7 @@
       boardElement.style.setProperty('--zoom', wrapZoom);
     }
     function setZoom(value) {
-      const next = Math.round(Math.min(ZOOM_MAX, Math.max(ZOOM_MIN, value)) * 100) / 100;
+      const next = Math.round(Math.min(ZOOM_MAX, Math.max(minimumZoom(), value)) * 100) / 100;
       if (!config().wrap || next === wrapZoom) return;
       const oldCols = viewCols(), oldRows = viewRows(), stepY = config().shape === 'hex' ? .75 * 2 / Math.sqrt(3) : 1;
       wrapZoom = next; offsetX += (viewCols() - oldCols) / 2; offsetY += (viewRows() - oldRows) * stepY / 2;
