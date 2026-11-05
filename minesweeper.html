@@ -38,6 +38,32 @@
     body.fullscreen-mode .game.finished .new-game, .app:fullscreen .game.finished .new-game { top: 50%; bottom: auto; transform: translate(-50%, -50%); }
     body.fullscreen-mode .game.finished .fullscreen-hint, body.fullscreen-mode .game.finished .fullscreen-toast,
     .app:fullscreen .game.finished .fullscreen-hint, .app:fullscreen .game.finished .fullscreen-toast { display: none; }
+    /* Die Vollbild-Anordnung ist auch die normale Detektor-Ansicht; der Browser selbst bleibt dabei im Fenstermodus. */
+    body.board-view-mode:not(.fullscreen-mode) { height: 100vh; height: 100dvh; min-height: 0; overflow: hidden; padding: 0; display: block; }
+    body.board-view-mode:not(.fullscreen-mode) .app { width: 100%; height: 100vh; height: 100dvh; min-height: 0; margin: 0; overflow: hidden; background: var(--bg); }
+    body.board-view-mode:not(.fullscreen-mode) header { position: fixed; z-index: 3; top: max(8px, env(safe-area-inset-top)); left: 0; width: 100%; height: 48px; margin: 0; padding: 0 64px; pointer-events: none; }
+    body.board-view-mode:not(.fullscreen-mode) header h1 { font-size: clamp(1.65rem, 6vw, 2.4rem); }
+    body.board-view-mode:not(.fullscreen-mode) .back-button, body.board-view-mode:not(.fullscreen-mode) .settings-open { pointer-events: auto; }
+    body.board-view-mode:not(.fullscreen-mode) .back-button { left: max(10px, env(safe-area-inset-left)); }
+    body.board-view-mode:not(.fullscreen-mode) .settings-open { right: max(10px, env(safe-area-inset-right)); }
+    body.board-view-mode:not(.fullscreen-mode) .version { display: none; }
+    body.board-view-mode:not(.fullscreen-mode) .game { padding: 0; border: 0; border-radius: 0; box-shadow: none; background: transparent; }
+    body.board-view-mode:not(.fullscreen-mode) .game.wrap-mode .board.wrap { position: fixed; z-index: 1; inset: 0; width: 100%; height: 100%; max-width: none; margin: 0; border: 0; border-radius: 0; aspect-ratio: auto; }
+    body.board-view-mode:not(.fullscreen-mode) .game .stats { display: grid; position: fixed; z-index: 3; top: max(64px, calc(env(safe-area-inset-top) + 58px)); left: 50%; width: min(calc(100% - 136px), 460px); padding: 4px; margin: 0; border: 2px solid #171717; border-radius: 12px; background: rgba(255,255,255,.92); box-shadow: 3px 3px 0 #171717; transform: translateX(-50%); gap: 2px; }
+    body.board-view-mode:not(.fullscreen-mode) .game .stat { padding: 3px 2px; border: 0; background: transparent; }
+    body.board-view-mode:not(.fullscreen-mode) .game .stat strong { font-size: 1rem; }
+    body.board-view-mode:not(.fullscreen-mode) .game .stat span { font-size: .62rem; }
+    body.board-view-mode:not(.fullscreen-mode) .game .message { display: none; }
+    body.board-view-mode:not(.fullscreen-mode) .game .board-tools { display: block; }
+    body.board-view-mode:not(.fullscreen-mode) .game .new-game { display: block; position: fixed; z-index: 4; left: 50%; bottom: max(12px, env(safe-area-inset-bottom)); width: min(calc(100% - 32px), 240px); margin: 0; transform: translateX(-50%); }
+    body.board-view-mode:not(.fullscreen-mode) .game .hint-button { display: none; }
+    body.board-view-mode:not(.fullscreen-mode) .game .fullscreen-button { display: grid; place-items: center; position: fixed; z-index: 3; top: max(64px, calc(env(safe-area-inset-top) + 58px)); left: max(10px, env(safe-area-inset-left)); width: 48px; height: 48px; padding: 0; border: 3px solid #171717; border-radius: 50%; color: #171717; background: #FFFFFF; box-shadow: 3px 3px 0 #171717; font-size: 0; }
+    body.board-view-mode:not(.fullscreen-mode) .game .fullscreen-button::before { content: '⛶'; font-size: 1.35rem; }
+    body.board-view-mode:not(.fullscreen-mode) .fullscreen-hint { display: grid; top: max(64px, calc(env(safe-area-inset-top) + 58px)); }
+    body.board-view-mode:not(.fullscreen-mode) .fullscreen-toast { display: block; top: max(118px, calc(env(safe-area-inset-top) + 112px)); z-index: 4; }
+    body.board-view-mode:not(.fullscreen-mode) .game.finished .new-game { top: 50%; bottom: auto; transform: translate(-50%, -50%); }
+    body.board-view-mode:not(.fullscreen-mode) .game.finished .fullscreen-hint, body.board-view-mode:not(.fullscreen-mode) .game.finished .fullscreen-toast { display: none; }
+    .app:fullscreen .game .fullscreen-button { display: none; }
     .fullscreen-corner { display: none; place-items: center; position: fixed; z-index: 2; top: max(10px, env(safe-area-inset-top)); width: 48px; height: 48px; padding: 0; border: 3px solid #171717; border-radius: 50%; color: #171717; background: #FFFFFF; box-shadow: 3px 3px 0 #171717; font-size: 1.35rem; line-height: 1; -webkit-tap-highlight-color: transparent; transition: transform .12s, box-shadow .12s; }
     .fullscreen-corner:active { transform: translate(2px, 2px); box-shadow: 1px 1px 0 #171717; }
     .fullscreen-corner:focus-visible { outline: 3px solid #EF4B3F; outline-offset: 3px; }
@@ -143,7 +169,7 @@
     .new-game { display: block; width: 100%; padding: 12px; border: 3px solid #171717; border-radius: 10px; color: #FFFFFF; background: var(--red); font-weight: 800; box-shadow: 4px 4px 0 #171717; }
   </style>
 </head>
-<body>
+<body class="board-view-mode">
   <main class="app">
     <header>
       <a class="back-button" href="index.html" aria-label="Zur Startseite" title="Zur Startseite"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 4 7 12l8 8"/></svg></a>
@@ -203,7 +229,7 @@
       </div>
       <button class="settings-done" id="settingsDone" type="button">Fertig</button>
     </dialog>
-    <button class="version" data-version type="button" title="Klicken, um die Seite neu zu laden">Version 1.91</button>
+    <button class="version" data-version type="button" title="Klicken, um die Seite neu zu laden">Version 1.92</button>
     <script>const versionButton = document.querySelector('[data-version]'); versionButton.addEventListener('click', () => location.replace(`${location.pathname}?v=${Date.now()}`)); fetch(`VERSION?${Date.now()}`, { cache: 'no-store' }).then(response => response.text()).then(version => { versionButton.textContent = `Version ${version.trim()}`; }).catch(() => {});</script>
   </main>
   <script>
@@ -327,11 +353,12 @@
     // Fenstergröße: so hoch, wie der Bildschirm unter Kopf und Statistik und über den Knöpfen Platz lässt
     // (höchstens doppelt so hoch wie breit); daraus folgt die Zahl der sichtbaren Zeilen.
     const fullscreenActive = () => document.fullscreenElement === appElement || document.body.classList.contains('fullscreen-mode');
+    const boardViewActive = () => fullscreenActive() || document.body.classList.contains('board-view-mode');
     function fitWrapWindow(extra = 0) {
       const width = boardElement.clientWidth; if (!width) return;
       const stepY = config().shape === 'hex' ? .75 * 2 / Math.sqrt(3) : 1;
       // Im Vollbild ist das Brett so groß wie der Bildschirm; die Zeilenzahl folgt aus seiner Höhe.
-      if (fullscreenActive()) { wrapViewRows = Math.min(WRAP_VIEW_ROWS_MAX, WRAP_VIEW_COLS * boardElement.clientHeight / width / stepY); return; }
+      if (boardViewActive()) { wrapViewRows = Math.min(WRAP_VIEW_ROWS_MAX, WRAP_VIEW_COLS * boardElement.clientHeight / width / stepY); return; }
       const board = boardElement.getBoundingClientRect(), app = appElement.getBoundingClientRect();
       const below = app.bottom - board.bottom + parseFloat(getComputedStyle(document.body).paddingBottom) + 8;
       const height = Math.max(width * .75, Math.min(width * 2, innerHeight - (board.top + scrollY) - below - extra));
@@ -353,7 +380,7 @@
       fitWrapWindow();
       if (wrapZoom < minimumZoom()) { wrapZoom = minimumZoom(); persistGameState(); }
       ensureGhostCapacity(); layoutCells();
-      if (fullscreenActive()) return;
+      if (boardViewActive()) return;
       const overflow = document.documentElement.scrollHeight - innerHeight;
       if (overflow > 0 && boardElement.clientHeight > boardElement.clientWidth * .75 + 1) { fitWrapWindow(overflow); if (wrapZoom < minimumZoom()) { wrapZoom = minimumZoom(); persistGameState(); } ensureGhostCapacity(); layoutCells(); }
     }
@@ -374,6 +401,7 @@
       syncFullscreenButton(); requestAnimationFrame(fitAndLayout);
     }
     document.addEventListener('fullscreenchange', () => { syncFullscreenButton(); requestAnimationFrame(fitAndLayout); });
+    syncFullscreenButton();
     document.addEventListener('keydown', event => { if (event.key === 'Escape' && document.body.classList.contains('fullscreen-mode')) { event.preventDefault(); toggleFullscreen(); } });
     function layoutWrapped() {
       const { cols, rows, shape } = config(), hex = shape === 'hex', cellHeight = hex ? 2 / Math.sqrt(3) : 1, stepY = hex ? .75 * cellHeight : 1, viewWidth = viewCols(), viewHeight = viewRows() * stepY;
@@ -607,7 +635,7 @@
     // Im Vollbild ist die Meldungszeile ausgeblendet; neue Meldungen erscheinen dort kurz oben in der Mitte.
     const fullscreenToast = document.getElementById('fullscreenToast'); let toastTimer = null;
     new MutationObserver(() => {
-      if (!fullscreenActive() || !message.textContent.trim()) return;
+      if (!boardViewActive() || !message.textContent.trim()) return;
       fullscreenToast.innerHTML = message.innerHTML; fullscreenToast.classList.add('visible');
       clearTimeout(toastTimer); toastTimer = setTimeout(() => fullscreenToast.classList.remove('visible'), 3500);
     }).observe(message, { childList: true, characterData: true, subtree: true });
