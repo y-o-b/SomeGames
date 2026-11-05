@@ -24,9 +24,8 @@
     body.board-view-mode .app { width: 100%; height: 100vh; height: 100dvh; min-height: 0; margin: 0; overflow: hidden; background: var(--bg); }
     body.board-view-mode header { position: fixed; z-index: 3; top: max(8px, env(safe-area-inset-top)); left: 0; width: 100%; height: 48px; margin: 0; padding: 0 64px; pointer-events: none; }
     body.board-view-mode header h1 { font-size: clamp(1.65rem, 6vw, 2.4rem); }
-    body.board-view-mode .back-button, body.board-view-mode .settings-open { pointer-events: auto; }
+    body.board-view-mode .back-button { pointer-events: auto; }
     body.board-view-mode .back-button { left: max(10px, env(safe-area-inset-left)); }
-    body.board-view-mode .settings-open { right: max(10px, env(safe-area-inset-right)); }
     body.board-view-mode .version { display: none; }
     body.board-view-mode .game { padding: 0; border: 0; border-radius: 0; box-shadow: none; background: transparent; }
     body.board-view-mode .game.wrap-mode .board.wrap { position: fixed; z-index: 1; inset: 0; width: 100%; height: 100%; max-width: none; margin: 0; border: 0; border-radius: 0; aspect-ratio: auto; }
@@ -62,10 +61,6 @@
     button { border: 0; color: inherit; font: inherit; cursor: pointer; }
     .settings { display: grid; gap: 10px; margin-bottom: 16px; }
     /* Die Einstellungen werden über das Zahnrad oben rechts geöffnet. */
-    .settings-open { display: grid; place-items: center; width: 44px; height: 44px; position: absolute; right: 0; top: 50%; margin-top: -22px; padding: 0; border: 3px solid #171717; border-radius: 50%; color: #171717; background: #FFFFFF; box-shadow: 3px 3px 0 #171717; -webkit-tap-highlight-color: transparent; transition: transform .12s, box-shadow .12s; }
-    .settings-open svg { display: block; width: 24px; height: 24px; fill: none; stroke: currentColor; stroke-width: 2.4; stroke-linecap: round; stroke-linejoin: round; }
-    .settings-open:active { transform: translate(2px, 2px); box-shadow: 1px 1px 0 #171717; }
-    .settings-open:focus-visible { outline: 3px solid #EF4B3F; outline-offset: 3px; }
     .settings-dialog { width: min(100% - 32px, 440px); max-width: none; padding: clamp(16px, 4vw, 24px); border: 3px solid #171717; border-radius: 18px; color: var(--text); background: var(--panel); box-shadow: 7px 7px 0 #171717; }
     .settings-dialog::backdrop { background: rgba(23,23,23,.45); }
     .settings-dialog h2 { margin: 0 0 14px; font-size: 1.4rem; letter-spacing: -.03em; outline: none; }
@@ -156,7 +151,6 @@
     <header>
       <a class="back-button" href="index.html" aria-label="Zur Startseite" title="Zur Startseite"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 4 7 12l8 8"/></svg></a>
       <h1>Detektor</h1>
-      <button class="settings-open" id="settingsOpen" type="button" aria-label="Einstellungen" title="Einstellungen" aria-haspopup="dialog"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="3.2"/><path d="M12 2.8v2.4M12 18.8v2.4M2.8 12h2.4M18.8 12h2.4M5.5 5.5l1.7 1.7M16.8 16.8l1.7 1.7M5.5 18.5l1.7-1.7M16.8 7.2l1.7-1.7"/><circle cx="12" cy="12" r="6.6"/></svg></button>
     </header>
     <section class="game" aria-label="Detektor-Spiel">
       <div class="stats" aria-label="Spielstatistik">
@@ -175,7 +169,7 @@
       <div class="overlay-toast" id="overlayToast" aria-hidden="true"></div>
     </section>
     <dialog class="settings-dialog" id="settingsDialog" aria-labelledby="settingsTitle">
-      <h2 id="settingsTitle" tabindex="-1" autofocus>Einstellungen</h2>
+      <h2 id="settingsTitle" tabindex="-1" autofocus>Neues Spiel</h2>
       <div class="settings" aria-label="Spielfeldeinstellungen">
         <div class="setting-row shape-row">
           <span>Felder</span>
@@ -208,9 +202,9 @@
           </div>
         </div>
       </div>
-      <button class="settings-done" id="settingsDone" type="button">Fertig</button>
+      <button class="settings-done" id="settingsDone" type="button">Spiel starten</button>
     </dialog>
-    <button class="version" data-version type="button" title="Klicken, um die Seite neu zu laden">Version 1.94</button>
+    <button class="version" data-version type="button" title="Klicken, um die Seite neu zu laden">Version 1.96</button>
     <script>const versionButton = document.querySelector('[data-version]'); versionButton.addEventListener('click', () => location.replace(`${location.pathname}?v=${Date.now()}`)); fetch(`VERSION?${Date.now()}`, { cache: 'no-store' }).then(response => response.text()).then(version => { versionButton.textContent = `Version ${version.trim()}`; }).catch(() => {});</script>
   </main>
   <script>
@@ -272,14 +266,41 @@
     function updateWrapBoardSizeControl() { sizeButtonsRow.hidden = boardWrap; wrapBoardSizeRow.hidden = !boardWrap; const label = wrapBoardLabel(wrapBoardSize); wrapBoardSizeInput.value = wrapBoardSize; wrapBoardSizeOutput.value = label; wrapBoardSizeOutput.textContent = label; }
     updateSizeButtons();
     const settingsDialog = document.getElementById('settingsDialog');
-    const openSettings = () => { if (!settingsDialog.open) settingsDialog.showModal(); };
-    document.getElementById('settingsOpen').addEventListener('click', openSettings);
-    document.getElementById('settingsDone').addEventListener('click', () => settingsDialog.close());
-    // Ein Tipp neben das Popup schließt es ebenfalls.
-    settingsDialog.addEventListener('click', event => { if (event.target === settingsDialog) settingsDialog.close(); });
+    let settingsSnapshot = null, settingsTimerWasRunning = false;
+    function refreshSettingsControls() {
+      updateMineControl(); updateSizeButtons(); updateWrapBoardSizeControl();
+      document.querySelectorAll('[data-shape]').forEach(button => button.classList.toggle('active', button.dataset.shape === boardShape));
+      document.querySelectorAll('[data-wrap]').forEach(button => button.classList.toggle('active', (button.dataset.wrap === 'on') === boardWrap));
+      document.querySelectorAll('[data-size]').forEach(button => button.classList.toggle('active', button.dataset.size === boardSize));
+    }
+    function openSettings() {
+      if (settingsDialog.open) return;
+      settingsSnapshot = { boardShape, boardWrap, wrapBoardSize, boardSize, mineCount };
+      settingsTimerWasRunning = timer !== null;
+      if (settingsTimerWasRunning) { clearInterval(timer); timer = null; }
+      clearTimeout(autoSafeTimer); autoSafeTimer = null; stopDetector();
+      refreshSettingsControls(); settingsDialog.showModal();
+    }
+    function cancelSettings() {
+      if (!settingsSnapshot) return;
+      ({ boardShape, boardWrap, wrapBoardSize, boardSize, mineCount } = settingsSnapshot);
+      settingsSnapshot = null; refreshSettingsControls();
+      if (settingsTimerWasRunning && placed && !over) startTimer();
+      if (placed && !over) updateGuessMarks();
+      settingsTimerWasRunning = false;
+    }
+    function applySettingsAndStart() {
+      settingsDialog.close(); settingsSnapshot = null; settingsTimerWasRunning = false;
+      saveSettings(); start();
+    }
+    document.getElementById('newGame').addEventListener('click', openSettings);
+    document.getElementById('settingsDone').addEventListener('click', applySettingsAndStart);
+    settingsDialog.addEventListener('cancel', cancelSettings);
+    // Ein Tipp neben das Popup verwirft die Änderungen.
+    settingsDialog.addEventListener('click', event => { if (event.target === settingsDialog) { settingsDialog.close(); cancelSettings(); } });
     function saveSettings() { try { localStorage.setItem(SHAPE_STORAGE_KEY, boardShape); localStorage.setItem(WRAP_STORAGE_KEY, boardWrap ? 'on' : 'off'); localStorage.setItem(WRAP_BOARD_SIZE_KEY, String(wrapBoardSize)); localStorage.setItem(SIZE_STORAGE_KEY, boardSize); localStorage.setItem(MINE_COUNT_STORAGE_KEY, String(mineCount)); } catch (error) { console.warn('Detektor-Einstellungen konnten nicht gespeichert werden.', error); } }
     function persistGameStateNow() {
-      if (!grid.length || !activeConfig) return;
+      if (!grid.length || !activeConfig || settingsDialog.open) return;
       try {
         const { cols, rows, mines } = config();
         localStorage.setItem(GAME_STATE_KEY, JSON.stringify({ version: 1, boardShape, boardWrap, wrapBoardSize, boardSize, mineCount, cols, rows, mines, grid, over, placed, seconds, openCount, flagCount, offsetX, offsetY, wrapZoom }));
@@ -666,19 +687,19 @@
       if (pinch) { if (activePointers.size < 2) { pinch = null; pan = null; panEndedAt = Date.now(); boardElement.classList.remove('panning'); persistGameState(); } return; }
       if (!pan || event.pointerId !== pan.id) return; const wasPanning = pan.active; if (wasPanning) { panEndedAt = Date.now(); boardElement.classList.remove('panning'); persistGameState(); } pan = null; if (wasPanning && !over && !revealing) requestAnimationFrame(() => requestAnimationFrame(() => { if (!over && !revealing && !pan?.active) updateGuessMarks(); }));
     }));
-    document.querySelectorAll('[data-wrap]').forEach(button => button.addEventListener('click', () => { boardWrap = button.dataset.wrap === 'on'; updateMineControl(); saveSettings(); document.querySelectorAll('[data-wrap]').forEach(item => item.classList.toggle('active', item === button)); start(); }));
+    document.querySelectorAll('[data-wrap]').forEach(button => button.addEventListener('click', () => { boardWrap = button.dataset.wrap === 'on'; refreshSettingsControls(); }));
     wrapBoardSizeInput.addEventListener('input', () => { wrapBoardSizeOutput.value = wrapBoardLabel(Number(wrapBoardSizeInput.value)); wrapBoardSizeOutput.textContent = wrapBoardSizeOutput.value; });
-    wrapBoardSizeInput.addEventListener('change', () => { const size = Number(wrapBoardSizeInput.value); if (!Number.isInteger(size) || size < WRAP_BOARD_MIN || size > WRAP_BOARD_MAX || size === wrapBoardSize) return; wrapBoardSize = size; updateMineControl(); saveSettings(); start(); });
-    document.querySelectorAll('[data-shape]').forEach(button => button.addEventListener('click', () => { boardShape = button.dataset.shape; saveSettings(); document.querySelectorAll('[data-shape]').forEach(item => item.classList.toggle('active', item === button)); start(); }));
-    document.querySelectorAll('[data-size]').forEach(button => button.addEventListener('click', () => { boardSize = button.dataset.size; updateMineControl(); saveSettings(); document.querySelectorAll('[data-size]').forEach(item => item.classList.toggle('active', item === button)); start(); }));
+    wrapBoardSizeInput.addEventListener('change', () => { const size = Number(wrapBoardSizeInput.value); if (!Number.isInteger(size) || size < WRAP_BOARD_MIN || size > WRAP_BOARD_MAX || size === wrapBoardSize) return; wrapBoardSize = size; refreshSettingsControls(); });
+    document.querySelectorAll('[data-shape]').forEach(button => button.addEventListener('click', () => { boardShape = button.dataset.shape; refreshSettingsControls(); }));
+    document.querySelectorAll('[data-size]').forEach(button => button.addEventListener('click', () => { boardSize = button.dataset.size; refreshSettingsControls(); }));
     mineCountInput.addEventListener('input', () => { mineCountOutput.value = `${mineCountInput.value} / ${mineCountInput.max}`; mineCountOutput.textContent = mineCountOutput.value; });
-    mineCountInput.addEventListener('change', () => { mineCount = Number(mineCountInput.value); updateMineControl(); saveSettings(); start(); });
+    mineCountInput.addEventListener('change', () => { mineCount = Number(mineCountInput.value); refreshSettingsControls(); });
     // Drehen oder Fenstergröße ändern: Fenster neu einpassen, das Spiel läuft weiter.
     let fitFrame = 0;
     addEventListener('resize', () => { cancelAnimationFrame(fitFrame); fitFrame = requestAnimationFrame(fitAndLayout); });
     document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'hidden') flushGameState(); });
     addEventListener('pagehide', flushGameState);
-    document.getElementById('newGame').addEventListener('click', () => start()); start(restoreGameState());
+    start(restoreGameState());
     // Beim ersten Aufbau stehen Schrift und Kopf noch nicht endgültig; nach dem Laden noch einmal einpassen.
     addEventListener('load', () => fitAndLayout());
   </script>
