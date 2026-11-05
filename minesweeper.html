@@ -92,7 +92,7 @@
     .board { display: grid; gap: 2px; margin: 0 auto 18px; width: 100%; max-width: 540px; padding: 4px; border: 3px solid #171717; border-radius: 10px; background: #171717; touch-action: manipulation; -webkit-user-select: none; user-select: none; }
     /* Sechsecke: Spitze oben, ungerade Zeilen versetzt; Lage per JS in Prozent. Der leicht eingerückte Umriss lässt dunkle Fugen frei. */
     .board.hex { display: block; position: relative; padding: 0; }
-    .board.hex .cell { position: absolute; aspect-ratio: auto; border-radius: 0; font-size: clamp(.9rem, 4.4vw, 1.4rem); clip-path: polygon(50% 1.5%, 96.5% 25.8%, 96.5% 74.2%, 50% 98.5%, 3.5% 74.2%, 3.5% 25.8%); }
+    .board.hex .cell { position: absolute; aspect-ratio: auto; border-radius: 0; font-size: var(--cell-font-size, clamp(.9rem, 4.4vw, 1.4rem)); clip-path: polygon(50% 1.5%, 96.5% 25.8%, 96.5% 74.2%, 50% 98.5%, 3.5% 74.2%, 3.5% 25.8%); }
     .board.hex .cell.wrong-flag { background: #FFD166; color: #EF4B3F; }
     .board.hex .cell:focus-visible { background: #FFD166; }
     /* Randlos: gestrichelter Rahmen, das Brett lässt sich ziehen statt die Seite zu scrollen. */
@@ -104,19 +104,19 @@
     .board.wrap:not(.hex) .cell { border-radius: 0; clip-path: inset(0 1px 1px 0); }
     .board.wrap .cell.wrong-flag { background: #FFD166; color: #EF4B3F; }
     .board.wrap.panning { cursor: grabbing; }
-    .board.wrap .cell, .board.wrap.hex .cell { font-size: var(--wrap-cell-font-size, 1rem); }
-    .board.wrap .cell.flag { font-size: var(--wrap-flag-font-size, 1.2rem); }
+    .board.wrap .cell, .board.wrap.hex .cell { font-size: var(--cell-font-size, 1rem); }
+    .board.wrap .cell.flag { font-size: var(--flag-font-size, 1.2rem); }
     /* Sechsecke: um 0,5 px senkrecht zu jeder Kante eingerückt, zusammen mit dem Nachbarn eine 1-px-Fuge.
        Bei einem regelmäßigen Sechseck mit Spitze oben liegen die Seiten bei 0,5 px, die Spitzen 0,5/cos 30° = 0,577 px
        und die Schrägecken 0,289 px weiter innen. */
     .board.wrap.hex .cell { clip-path: polygon(50% .577px, calc(100% - .5px) calc(25% + .289px), calc(100% - .5px) calc(75% - .289px), 50% calc(100% - .577px), .5px calc(75% - .289px), .5px calc(25% + .289px)); }
-    .cell { position: relative; aspect-ratio: 1; min-width: 0; min-height: 0; overflow: hidden; padding: 0; border-radius: 3px; color: #171717; background: #4B8ED8; font-weight: 900; font-size: clamp(1rem, 5vw, 1.5rem); line-height: 1; -webkit-tap-highlight-color: transparent; }
+    .cell { position: relative; aspect-ratio: 1; min-width: 0; min-height: 0; overflow: hidden; padding: 0; border-radius: 3px; color: #171717; background: #4B8ED8; font-weight: 900; font-size: var(--cell-font-size, clamp(1rem, 5vw, 1.5rem)); line-height: 1; -webkit-tap-highlight-color: transparent; }
     .shovel-action { position: absolute; z-index: 2; top: 50%; left: 50%; display: grid; place-items: center; width: 84%; aspect-ratio: 1; background: transparent; transform: translate(-50%, -50%); }
     .shovel-action svg { display: block; width: 100%; height: 100%; }
     .cell.open { background: #FFFFFF; cursor: default; }
     @keyframes revealCell { from { opacity: .45; transform: scale(.72); } to { opacity: 1; transform: scale(1); } }
     .cell.opening { animation: revealCell .18s ease-out; }
-    .cell.flag { background: #4B8ED8; font-size: clamp(1.2rem, 6vw, 1.7rem); }
+    .cell.flag { background: #4B8ED8; font-size: var(--flag-font-size, clamp(1.2rem, 6vw, 1.7rem)); }
     .cell.mine { background: #EF4B3F; }
     .cell.wrong { background: #FFD166; }
     .cell.hint-safe, .cell.hint-mine { color: #FFFFFF; background: var(--bg); }
@@ -197,7 +197,7 @@
       </div>
       <button class="settings-done" id="settingsDone" type="button">Fertig</button>
     </dialog>
-    <button class="version" data-version type="button" title="Klicken, um die Seite neu zu laden">Version 1.86</button>
+    <button class="version" data-version type="button" title="Klicken, um die Seite neu zu laden">Version 1.87</button>
     <script>const versionButton = document.querySelector('[data-version]'); versionButton.addEventListener('click', () => location.replace(`${location.pathname}?v=${Date.now()}`)); fetch(`VERSION?${Date.now()}`, { cache: 'no-store' }).then(response => response.text()).then(version => { versionButton.textContent = `Version ${version.trim()}`; }).catch(() => {});</script>
   </main>
   <script>
@@ -305,10 +305,15 @@
     // Randlos: Was links hinausgeht, kommt rechts wieder herein, ebenso oben und unten.
     const mod = (value, size) => ((value % size) + size) % size;
     const neighbors = (index) => { const { cols, rows, shape, wrap } = config(), x = index % cols, y = Math.floor(index / cols), list = []; (shape === 'hex' ? HEX_OFFSETS[y % 2] : SQUARE_OFFSETS).forEach(([dx, dy]) => { let nx = x + dx, ny = y + dy; if (wrap) { nx = mod(nx, cols); ny = mod(ny, rows); } if (nx >= 0 && ny >= 0 && nx < cols && ny < rows) list.push(ny * cols + nx); }); return list; };
+    function setCellTextSize(width) {
+      boardElement.style.setProperty('--cell-font-size', `${Math.min(26, Math.max(1, width * .82))}px`);
+      boardElement.style.setProperty('--flag-font-size', `${Math.min(28, Math.max(1, width * .9))}px`);
+    }
     function layoutCells() {
       if (config().wrap) return layoutWrapped();
       if (config().shape === 'hex') return layoutHexes();
       grid.forEach((_, index) => { const button = boardElement.children[index]; button.style.gridColumn = index % config().cols + 1; button.style.gridRow = Math.floor(index / config().cols) + 1; });
+      if (boardElement.children.length) setCellTextSize(boardElement.children[0].getBoundingClientRect().width);
     }
     // Randlos: Das Fenster bleibt fest 12×24 (Spalten × Zeilen); je nach Spielfeldgröße werden Felder wiederholt oder
     // beim Ziehen verschoben. Kopien liegen in ghosts[index].
@@ -374,9 +379,7 @@
       const unit = boardElement.clientWidth / viewWidth;
       const W = hex ? Math.max(4, 2 * Math.round(unit / 2)) : Math.max(2, Math.round(unit));
       const H = hex ? Math.max(4, 2 * Math.round(cellHeight * W / 2)) : W, S = hex ? H * 3 / 4 : W;
-      const landscape = innerWidth > innerHeight;
-      boardElement.style.setProperty('--wrap-cell-font-size', `${Math.max(7, Math.min(24, W * (landscape ? .86 : .72)))}px`);
-      boardElement.style.setProperty('--wrap-flag-font-size', `${Math.max(8, Math.min(28, W * (landscape ? .82 : .88)))}px`);
+      setCellTextSize(W);
       const totalW = cols * W, totalH = rows * S, areaW = boardElement.clientWidth, areaH = boardElement.clientHeight;
       const originX = Math.round(offsetX * W), originY = Math.round(offsetY / stepY * S);
       grid.forEach((_, index) => {
@@ -399,6 +402,7 @@
     function layoutHexes() {
       const { cols, rows } = config(), hexHeight = 2 / Math.sqrt(3), width = cols + .5, height = hexHeight * (1 + .75 * (rows - 1));
       boardElement.style.aspectRatio = `${width} / ${height}`;
+      setCellTextSize(boardElement.clientWidth / width);
       grid.forEach((_, index) => {
         const button = boardElement.children[index], x = index % cols, y = Math.floor(index / cols);
         button.style.left = `${(x + (y % 2) * .5) / width * 100}%`; button.style.top = `${y * .75 * hexHeight / height * 100}%`;
