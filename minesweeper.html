@@ -99,9 +99,8 @@
     .board.wrap:not(.hex) .cell { border-radius: 0; clip-path: inset(0 1px 1px 0); }
     .board.wrap .cell.wrong-flag { background: #FFD166; color: #EF4B3F; }
     .board.wrap.panning { cursor: grabbing; }
-    .board.wrap .cell { font-size: calc(clamp(1rem, 5vw, 1.5rem) * var(--zoom, 1)); }
-    .board.wrap .cell.flag { font-size: calc(clamp(1.2rem, 6vw, 1.7rem) * var(--zoom, 1)); }
-    .board.wrap.hex .cell { font-size: calc(clamp(.9rem, 4.4vw, 1.4rem) * var(--zoom, 1)); }
+    .board.wrap .cell, .board.wrap.hex .cell { font-size: var(--wrap-cell-font-size, 1rem); }
+    .board.wrap .cell.flag { font-size: var(--wrap-flag-font-size, 1.2rem); }
     /* Sechsecke: um 0,5 px senkrecht zu jeder Kante eingerückt, zusammen mit dem Nachbarn eine 1-px-Fuge.
        Bei einem regelmäßigen Sechseck mit Spitze oben liegen die Seiten bei 0,5 px, die Spitzen 0,5/cos 30° = 0,577 px
        und die Schrägecken 0,289 px weiter innen. */
@@ -193,7 +192,7 @@
       </div>
       <button class="settings-done" id="settingsDone" type="button">Fertig</button>
     </dialog>
-    <button class="version" data-version type="button" title="Klicken, um die Seite neu zu laden">Version 1.83</button>
+    <button class="version" data-version type="button" title="Klicken, um die Seite neu zu laden">Version 1.84</button>
     <script>const versionButton = document.querySelector('[data-version]'); versionButton.addEventListener('click', () => location.replace(`${location.pathname}?v=${Date.now()}`)); fetch(`VERSION?${Date.now()}`, { cache: 'no-store' }).then(response => response.text()).then(version => { versionButton.textContent = `Version ${version.trim()}`; }).catch(() => {});</script>
   </main>
   <script>
@@ -335,11 +334,11 @@
     // Einpassen und zeichnen; ragt die Seite danach noch über den Bildschirm (Schatten, Rundungen), einmal nachkorrigieren.
     function fitAndLayout() {
       fitWrapWindow();
-      if (wrapZoom < minimumZoom()) { wrapZoom = minimumZoom(); applyZoomStyles(); persistGameState(); }
+      if (wrapZoom < minimumZoom()) { wrapZoom = minimumZoom(); persistGameState(); }
       ensureGhostCapacity(); layoutCells();
       if (fullscreenActive()) return;
       const overflow = document.documentElement.scrollHeight - innerHeight;
-      if (overflow > 0 && boardElement.clientHeight > boardElement.clientWidth * .75 + 1) { fitWrapWindow(overflow); if (wrapZoom < minimumZoom()) { wrapZoom = minimumZoom(); applyZoomStyles(); persistGameState(); } ensureGhostCapacity(); layoutCells(); }
+      if (overflow > 0 && boardElement.clientHeight > boardElement.clientWidth * .75 + 1) { fitWrapWindow(overflow); if (wrapZoom < minimumZoom()) { wrapZoom = minimumZoom(); persistGameState(); } ensureGhostCapacity(); layoutCells(); }
     }
     function syncFullscreenButton() {
       const active = fullscreenActive();
@@ -370,6 +369,9 @@
       const unit = boardElement.clientWidth / viewWidth;
       const W = hex ? Math.max(4, 2 * Math.round(unit / 2)) : Math.max(2, Math.round(unit));
       const H = hex ? Math.max(4, 2 * Math.round(cellHeight * W / 2)) : W, S = hex ? H * 3 / 4 : W;
+      const landscape = innerWidth > innerHeight;
+      boardElement.style.setProperty('--wrap-cell-font-size', `${Math.max(7, Math.min(24, W * (landscape ? .86 : .72)))}px`);
+      boardElement.style.setProperty('--wrap-flag-font-size', `${Math.max(8, Math.min(28, W * (landscape ? .82 : .88)))}px`);
       const totalW = cols * W, totalH = rows * S, areaW = boardElement.clientWidth, areaH = boardElement.clientHeight;
       const originX = Math.round(offsetX * W), originY = Math.round(offsetY / stepY * S);
       grid.forEach((_, index) => {
@@ -408,7 +410,7 @@
       grid = savedState ? savedState.grid : Array.from({ length: cols * rows }, () => ({ mine: false, open: false, opening: false, flag: false, wrongFlag: false, hint: '', guess: false, count: 0 }));
       over = savedState?.over ?? false; placed = savedState?.placed ?? false; seconds = savedState?.seconds ?? 0; openCount = savedState?.openCount ?? 0; flagCount = savedState?.flagCount ?? 0;
       if (savedState) { offsetX = savedState.offsetX; offsetY = savedState.offsetY; wrapZoom = savedState.wrapZoom; } else { offsetX = offsetY = 0; }
-      const hex = config().shape === 'hex'; boardElement.classList.toggle('hex', hex); boardElement.style.gridTemplateColumns = hex || config().wrap ? '' : `repeat(${cols}, 1fr)`; boardElement.style.aspectRatio = ''; applyZoomStyles(); boardElement.classList.toggle('wrap', config().wrap); pan = null; pinch = null; activePointers.clear(); boardElement.classList.remove('panning'); boardElement.innerHTML = '';
+      const hex = config().shape === 'hex'; boardElement.classList.toggle('hex', hex); boardElement.style.gridTemplateColumns = hex || config().wrap ? '' : `repeat(${cols}, 1fr)`; boardElement.style.aspectRatio = ''; boardElement.classList.toggle('wrap', config().wrap); pan = null; pinch = null; activePointers.clear(); boardElement.classList.remove('panning'); boardElement.innerHTML = '';
       const makeCell = (cell, index, ghost) => {
         const button = document.createElement('button'); button.type = 'button'; button.className = 'cell'; button.dataset.index = index;
         if (ghost) { button.tabIndex = -1; button.setAttribute('aria-hidden', 'true'); } else { button.setAttribute('role', 'gridcell'); button.setAttribute('aria-label', 'Verdecktes Feld'); }
@@ -593,15 +595,12 @@
       clearTimeout(toastTimer); toastTimer = setTimeout(() => fullscreenToast.classList.remove('visible'), 3500);
     }).observe(message, { childList: true, characterData: true, subtree: true });
     // Zoom (nur randlos): Das Fenster bleibt 12×24, sichtbar sind 12/Zoom × 24/Zoom Felder; die Mitte bleibt stehen.
-    function applyZoomStyles() {
-      boardElement.style.setProperty('--zoom', wrapZoom);
-    }
     function setZoom(value) {
       const next = Math.round(Math.min(ZOOM_MAX, Math.max(minimumZoom(), value)) * 100) / 100;
       if (!config().wrap || next === wrapZoom) return;
       const oldCols = viewCols(), oldRows = viewRows(), stepY = config().shape === 'hex' ? .75 * 2 / Math.sqrt(3) : 1;
       wrapZoom = next; offsetX += (viewCols() - oldCols) / 2; offsetY += (viewRows() - oldRows) * stepY / 2;
-      applyZoomStyles(); layoutCells();
+      layoutCells();
       persistGameState();
       clearTimeout(autoSafeTimer); autoSafeTimer = null; stopDetector(); clearShovel();
       clearTimeout(zoomTimer); zoomTimer = setTimeout(() => { zoomTimer = null; if (!over && !revealing) updateGuessMarks(); }, 300);
