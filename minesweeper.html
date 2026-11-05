@@ -24,6 +24,11 @@
     body.fullscreen-mode header, body.fullscreen-mode .version, .app:fullscreen header, .app:fullscreen > .version { display: none; }
     body.fullscreen-mode .stats, body.fullscreen-mode .message, body.fullscreen-mode .new-game, body.fullscreen-mode .fullscreen-button,
     .app:fullscreen .stats, .app:fullscreen .message, .app:fullscreen .new-game, .app:fullscreen .fullscreen-button { display: none; }
+    body.fullscreen-mode .game.finished .board-tools, .app:fullscreen .game.finished .board-tools { display: flex; position: fixed; z-index: 5; top: 50%; left: 50%; width: min(calc(100% - 32px), 300px); margin: 0; transform: translate(-50%, -50%); }
+    body.fullscreen-mode .game.finished .new-game, .app:fullscreen .game.finished .new-game { display: block; width: 100%; }
+    body.fullscreen-mode .game.finished .hint-button, .app:fullscreen .game.finished .hint-button { display: none; }
+    body.fullscreen-mode .game.finished .fullscreen-hint, body.fullscreen-mode .game.finished .fullscreen-toast,
+    .app:fullscreen .game.finished .fullscreen-hint, .app:fullscreen .game.finished .fullscreen-toast { display: none; }
     body.fullscreen-mode .game, .app:fullscreen .game { padding: 0; border: 0; border-radius: 0; box-shadow: none; background: transparent; }
     body.fullscreen-mode .board-tools, .app:fullscreen .board-tools { display: none; }
     /* Vollbild: Das Spielfeld füllt den ganzen Bildschirm, oben in den Ecken liegen Beenden und Hinweis. */
@@ -192,7 +197,7 @@
       </div>
       <button class="settings-done" id="settingsDone" type="button">Fertig</button>
     </dialog>
-    <button class="version" data-version type="button" title="Klicken, um die Seite neu zu laden">Version 1.84</button>
+    <button class="version" data-version type="button" title="Klicken, um die Seite neu zu laden">Version 1.86</button>
     <script>const versionButton = document.querySelector('[data-version]'); versionButton.addEventListener('click', () => location.replace(`${location.pathname}?v=${Date.now()}`)); fetch(`VERSION?${Date.now()}`, { cache: 'no-store' }).then(response => response.text()).then(version => { versionButton.textContent = `Version ${version.trim()}`; }).catch(() => {});</script>
   </main>
   <script>
@@ -408,7 +413,7 @@
       gamePanel.classList.toggle('medium-mode', boardSize === '12x12'); gamePanel.classList.toggle('hard-mode', boardSize === '12x21'); gamePanel.classList.toggle('wrap-mode', config().wrap);
       clearInterval(timer); timer = null; clearTimeout(pressTimer); clearTimeout(autoSafeTimer); revealTimers.forEach(clearTimeout); revealTimers = []; revealing = false; autoSafeTimer = null; const { cols, rows } = config();
       grid = savedState ? savedState.grid : Array.from({ length: cols * rows }, () => ({ mine: false, open: false, opening: false, flag: false, wrongFlag: false, hint: '', guess: false, count: 0 }));
-      over = savedState?.over ?? false; placed = savedState?.placed ?? false; seconds = savedState?.seconds ?? 0; openCount = savedState?.openCount ?? 0; flagCount = savedState?.flagCount ?? 0;
+      over = savedState?.over ?? false; placed = savedState?.placed ?? false; seconds = savedState?.seconds ?? 0; openCount = savedState?.openCount ?? 0; flagCount = savedState?.flagCount ?? 0; gamePanel.classList.toggle('finished', over);
       if (savedState) { offsetX = savedState.offsetX; offsetY = savedState.offsetY; wrapZoom = savedState.wrapZoom; } else { offsetX = offsetY = 0; }
       const hex = config().shape === 'hex'; boardElement.classList.toggle('hex', hex); boardElement.style.gridTemplateColumns = hex || config().wrap ? '' : `repeat(${cols}, 1fr)`; boardElement.style.aspectRatio = ''; boardElement.classList.toggle('wrap', config().wrap); pan = null; pinch = null; activePointers.clear(); boardElement.classList.remove('panning'); boardElement.innerHTML = '';
       const makeCell = (cell, index, ghost) => {
@@ -581,7 +586,7 @@
         if (step === sequence.length - 1) { revealTimers = []; revealing = false; updateGuessMarks(); updateStats(); if (openCount === grid.length - config().mines) win(); }
       }, step * delay)));
     }
-    function finish() { over = true; revealing = false; revealTimers.forEach(clearTimeout); revealTimers = []; clearInterval(timer); grid.forEach((_, index) => draw(index)); persistGameState(); }
+    function finish() { over = true; gamePanel.classList.add('finished'); revealing = false; revealTimers.forEach(clearTimeout); revealTimers = []; clearInterval(timer); grid.forEach((_, index) => draw(index)); persistGameState(); }
     function lose(index) { finish(); boardElement.children[index].classList.add('mine'); syncGhosts(index); message.innerHTML = '<b>Boom!</b> Eine Mine wurde ausgelöst. Versuche es noch einmal.'; }
     function win() { grid.forEach(cell => { if (cell.mine) cell.flag = true; }); flagCount = config().mines; finish(); updateStats(); boardElement.querySelectorAll('.cell.flag').forEach((cell, index) => { cell.style.animationDelay = `${index * 35}ms`; cell.classList.add('wave'); }); message.innerHTML = `<b>Gewonnen!</b> Alle Minen gefunden in ${document.getElementById('time').textContent}.`; }
     hintButton.addEventListener('click', showHint);
