@@ -197,7 +197,7 @@
       </div>
       <button class="settings-done" id="settingsDone" type="button">Fertig</button>
     </dialog>
-    <button class="version" data-version type="button" title="Klicken, um die Seite neu zu laden">Version 1.88</button>
+    <button class="version" data-version type="button" title="Klicken, um die Seite neu zu laden">Version 1.89</button>
     <script>const versionButton = document.querySelector('[data-version]'); versionButton.addEventListener('click', () => location.replace(`${location.pathname}?v=${Date.now()}`)); fetch(`VERSION?${Date.now()}`, { cache: 'no-store' }).then(response => response.text()).then(version => { versionButton.textContent = `Version ${version.trim()}`; }).catch(() => {});</script>
   </main>
   <script>
@@ -305,9 +305,10 @@
     // Randlos: Was links hinausgeht, kommt rechts wieder herein, ebenso oben und unten.
     const mod = (value, size) => ((value % size) + size) % size;
     const neighbors = (index) => { const { cols, rows, shape, wrap } = config(), x = index % cols, y = Math.floor(index / cols), list = []; (shape === 'hex' ? HEX_OFFSETS[y % 2] : SQUARE_OFFSETS).forEach(([dx, dy]) => { let nx = x + dx, ny = y + dy; if (wrap) { nx = mod(nx, cols); ny = mod(ny, rows); } if (nx >= 0 && ny >= 0 && nx < cols && ny < rows) list.push(ny * cols + nx); }); return list; };
-    function setCellTextSize(width) {
-      boardElement.style.setProperty('--cell-font-size', `${Math.min(26, Math.max(1, width * .82))}px`);
-      boardElement.style.setProperty('--flag-font-size', `${Math.min(28, Math.max(1, width * .9))}px`);
+    function setCellTextSize(width, zoom = 1) {
+      const zoomedWidth = width * zoom;
+      boardElement.style.setProperty('--cell-font-size', `${Math.min(26, Math.max(1, zoomedWidth * .82))}px`);
+      boardElement.style.setProperty('--flag-font-size', `${Math.min(28, Math.max(1, zoomedWidth * .9))}px`);
     }
     function layoutCells() {
       if (config().wrap) return layoutWrapped();
@@ -380,7 +381,7 @@
       const W = hex ? Math.max(4, 2 * Math.round(unit / 2)) : Math.max(2, Math.round(unit));
       const H = hex ? Math.max(4, 2 * Math.round(cellHeight * W / 2)) : W, S = hex ? H * 3 / 4 : W;
       // Die Schrift folgt der exakten, nicht auf Pixel gerundeten Feldbreite und zoomt dadurch stufenlos mit.
-      setCellTextSize(unit);
+      setCellTextSize(boardElement.clientWidth / WRAP_VIEW_COLS, wrapZoom);
       const totalW = cols * W, totalH = rows * S, areaW = boardElement.clientWidth, areaH = boardElement.clientHeight;
       const originX = Math.round(offsetX * W), originY = Math.round(offsetY / stepY * S);
       grid.forEach((_, index) => {
