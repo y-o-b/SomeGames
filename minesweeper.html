@@ -29,27 +29,23 @@
     body.board-view-mode .version { display: none; }
     body.board-view-mode .game { padding: 0; border: 0; border-radius: 0; box-shadow: none; background: transparent; }
     body.board-view-mode .game.wrap-mode .board.wrap { position: fixed; z-index: 1; inset: 0; width: 100%; height: 100%; max-width: none; margin: 0; border: 0; border-radius: 0; aspect-ratio: auto; }
-    body.board-view-mode .game .stats { display: grid; position: fixed; z-index: 3; top: max(64px, calc(env(safe-area-inset-top) + 58px)); left: 50%; width: min(calc(100% - 136px), 460px); padding: 4px; margin: 0; border: 2px solid #171717; border-radius: 12px; background: rgba(255,255,255,.92); box-shadow: 3px 3px 0 #171717; transform: translateX(-50%); gap: 2px; }
+    body.board-view-mode .game .stats { display: grid; position: fixed; z-index: 3; top: max(64px, calc(env(safe-area-inset-top) + 58px)); left: 50%; width: min(calc(100% - 24px), 460px); padding: 4px; margin: 0; border: 2px solid #171717; border-radius: 12px; background: rgba(255,255,255,.92); box-shadow: 3px 3px 0 #171717; transform: translateX(-50%); gap: 2px; }
     body.board-view-mode .game .stat { padding: 3px 2px; border: 0; background: transparent; }
     body.board-view-mode .game .stat strong { font-size: 1rem; }
     body.board-view-mode .game .stat span { font-size: .62rem; }
-    body.board-view-mode .game .message { display: none; }
+    body.board-view-mode .game .stats .message { display: block; grid-column: 1 / -1; min-height: 0; margin: 2px 4px 0; padding-top: 4px; border-top: 1px solid rgba(23,23,23,.2); font-size: .72rem; line-height: 1.25; }
     body.board-view-mode .game .board-tools { display: block; }
-    body.board-view-mode .game .new-game { display: block; position: fixed; z-index: 4; left: 50%; bottom: max(12px, env(safe-area-inset-bottom)); width: min(calc(100% - 32px), 240px); margin: 0; transform: translateX(-50%); }
+    body.board-view-mode .game .new-game { display: block; position: fixed; z-index: 4; left: 50%; bottom: max(12px, env(safe-area-inset-bottom)); width: min(calc(100% - 136px), 240px); margin: 0; transform: translateX(-50%); }
     body.board-view-mode .game .hint-button { display: none; }
-    body.board-view-mode .overlay-hint { display: grid; }
-    body.board-view-mode .overlay-toast { display: block; }
-    body.board-view-mode .game.finished .new-game { top: 50%; bottom: auto; transform: translate(-50%, -50%); }
-    body.board-view-mode .game.finished .overlay-hint, body.board-view-mode .game.finished .overlay-toast { display: none; }
+    body.board-view-mode .overlay-hint { display: grid; top: auto; bottom: max(12px, env(safe-area-inset-bottom)); }
+    body.board-view-mode .game.finished .new-game { top: 50%; bottom: auto; width: min(calc(100% - 32px), 300px); transform: translate(-50%, -50%); }
+    body.board-view-mode .game.finished .overlay-hint { display: none; }
     .overlay-corner { display: none; place-items: center; position: fixed; z-index: 2; top: max(64px, calc(env(safe-area-inset-top) + 58px)); width: 48px; height: 48px; padding: 0; border: 3px solid #171717; border-radius: 50%; color: #171717; background: #FFFFFF; box-shadow: 3px 3px 0 #171717; font-size: 1.35rem; line-height: 1; -webkit-tap-highlight-color: transparent; transition: transform .12s, box-shadow .12s; }
     .overlay-corner:active { transform: translate(2px, 2px); box-shadow: 1px 1px 0 #171717; }
     .overlay-corner:focus-visible { outline: 3px solid #EF4B3F; outline-offset: 3px; }
     .overlay-corner svg { display: block; width: 24px; height: 24px; fill: none; stroke: currentColor; stroke-width: 3; stroke-linecap: round; stroke-linejoin: round; }
     .overlay-hint { right: max(10px, env(safe-area-inset-right)); background: #FFD166; }
     body.board-view-mode .overlay-corner { display: grid; }
-    .overlay-toast { display: none; position: fixed; z-index: 4; top: max(118px, calc(env(safe-area-inset-top) + 112px)); left: 50%; width: max-content; max-width: calc(100% - 140px); transform: translateX(-50%); padding: 7px 12px; border: 3px solid #171717; border-radius: 12px; background: #FFFFFF; box-shadow: 3px 3px 0 #171717; font-size: .85rem; line-height: 1.3; text-align: center; opacity: 0; transition: opacity .25s; pointer-events: none; }
-    .overlay-toast.visible { opacity: 1; }
-    body.board-view-mode .overlay-toast { display: block; }
     .back-button { display: grid; place-items: center; width: 44px; height: 44px; position: absolute; left: 0; top: 50%; margin-top: -22px; border: 3px solid #171717; border-radius: 50%; color: #171717; background: #FFFFFF; box-shadow: 3px 3px 0 #171717; text-decoration: none; -webkit-tap-highlight-color: transparent; transition: transform .12s, box-shadow .12s; }
     .back-button svg { display: block; width: 24px; height: 24px; margin-right: 2px; fill: none; stroke: currentColor; stroke-width: 3.2; stroke-linecap: round; stroke-linejoin: round; }
     .back-button:active { transform: translate(2px, 2px); box-shadow: 1px 1px 0 #171717; }
@@ -157,8 +153,8 @@
         <div class="stat"><strong id="mines">0</strong><span>Minen übrig</span></div>
         <div class="stat"><strong id="moves">0</strong><span>Felder offen</span></div>
         <div class="stat"><strong id="time">0:00</strong><span>Zeit</span></div>
+        <p class="message" id="message" aria-live="polite"><b>Bereit?</b> Der erste Zug ist immer sicher.</p>
       </div>
-      <p class="message" id="message" aria-live="polite"><b>Bereit?</b> Der erste Zug ist immer sicher.</p>
       <div class="board" id="board" role="grid" aria-label="Minenfeld"></div>
       <div class="metal-detector" id="metalDetector" aria-hidden="true"><svg viewBox="0 0 64 64"><rect x="7" y="5" width="29" height="13" rx="4" fill="#EF4B3F" stroke="#171717" stroke-width="3"/><rect x="12" y="8" width="9" height="5" rx="1" fill="#FFFFFF"/><path d="M30 17 48 47" fill="none" stroke="#171717" stroke-width="6" stroke-linecap="round"/><path d="M31 19 46 44" fill="none" stroke="#4B8ED8" stroke-width="2"/><ellipse cx="49" cy="53" rx="12" ry="6" transform="rotate(-28 49 53)" fill="none" stroke="#171717" stroke-width="4"/></svg></div>
       <div class="board-tools">
@@ -166,7 +162,6 @@
         <button class="hint-button" id="hintButton" type="button">💡 Hinweis</button>
       </div>
       <button class="overlay-corner overlay-hint" id="overlayHint" type="button" aria-label="Hinweis anzeigen" title="Hinweis anzeigen">💡</button>
-      <div class="overlay-toast" id="overlayToast" aria-hidden="true"></div>
     </section>
     <dialog class="settings-dialog" id="settingsDialog" aria-labelledby="settingsTitle">
       <h2 id="settingsTitle" tabindex="-1" autofocus>Neues Spiel</h2>
@@ -204,7 +199,7 @@
       </div>
       <button class="settings-done" id="settingsDone" type="button">Spiel starten</button>
     </dialog>
-    <button class="version" data-version type="button" title="Klicken, um die Seite neu zu laden">Version 1.96</button>
+    <button class="version" data-version type="button" title="Klicken, um die Seite neu zu laden">Version 1.97</button>
     <script>const versionButton = document.querySelector('[data-version]'); versionButton.addEventListener('click', () => location.replace(`${location.pathname}?v=${Date.now()}`)); fetch(`VERSION?${Date.now()}`, { cache: 'no-store' }).then(response => response.text()).then(version => { versionButton.textContent = `Version ${version.trim()}`; }).catch(() => {});</script>
   </main>
   <script>
@@ -636,13 +631,6 @@
     function win() { grid.forEach(cell => { if (cell.mine) cell.flag = true; }); flagCount = config().mines; finish(); updateStats(); boardElement.querySelectorAll('.cell.flag').forEach((cell, index) => { cell.style.animationDelay = `${index * 35}ms`; cell.classList.add('wave'); }); message.innerHTML = `<b>Gewonnen!</b> Alle Minen gefunden in ${document.getElementById('time').textContent}.`; }
     hintButton.addEventListener('click', showHint);
     document.getElementById('overlayHint').addEventListener('click', showHint);
-    // Im Vollbild ist die Meldungszeile ausgeblendet; neue Meldungen erscheinen dort kurz oben in der Mitte.
-    const overlayToast = document.getElementById('overlayToast'); let toastTimer = null;
-    new MutationObserver(() => {
-      if (!boardViewActive() || !message.textContent.trim()) return;
-      overlayToast.innerHTML = message.innerHTML; overlayToast.classList.add('visible');
-      clearTimeout(toastTimer); toastTimer = setTimeout(() => overlayToast.classList.remove('visible'), 3500);
-    }).observe(message, { childList: true, characterData: true, subtree: true });
     // Zoom (nur randlos): Das Fenster bleibt 12×24, sichtbar sind 12/Zoom × 24/Zoom Felder; die Mitte bleibt stehen.
     function setZoom(value) {
       const next = Math.round(Math.min(ZOOM_MAX, Math.max(minimumZoom(), value)) * 100) / 100;
