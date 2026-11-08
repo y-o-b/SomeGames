@@ -200,7 +200,7 @@
       </div>
       <button class="settings-done" id="settingsDone" type="button">Spiel starten</button>
     </dialog>
-    <button class="version" data-version type="button" title="Klicken, um die Seite neu zu laden">Version 2.00</button>
+    <button class="version" data-version type="button" title="Klicken, um die Seite neu zu laden">Version 2.01</button>
     <script>const versionButton = document.querySelector('[data-version]'); versionButton.addEventListener('click', () => location.replace(`${location.pathname}?v=${Date.now()}`)); fetch(`VERSION?${Date.now()}`, { cache: 'no-store' }).then(response => response.text()).then(version => { versionButton.textContent = `Version ${version.trim()}`; }).catch(() => {});</script>
   </main>
   <script>
@@ -630,11 +630,10 @@
     function finish() { over = true; gamePanel.classList.add('finished'); revealing = false; revealTimers.forEach(clearTimeout); revealTimers = []; clearInterval(timer); grid.forEach((_, index) => draw(index)); persistGameState(); }
     function lose(index) { finish(); boardElement.children[index].classList.add('mine'); syncGhosts(index); message.innerHTML = '<b>Boom!</b> Eine Mine wurde ausgelöst. Versuche es noch einmal.'; }
     function win() { grid.forEach(cell => { if (cell.mine) cell.flag = true; }); flagCount = config().mines; finish(); updateStats(); boardElement.querySelectorAll('.cell.flag').forEach((cell, index) => { cell.style.animationDelay = `${index * 35}ms`; cell.classList.add('wave'); }); message.innerHTML = `<b>Gewonnen!</b> Alle Minen gefunden in ${document.getElementById('time').textContent}.`; }
-    let hintActive = false;
-    const hintClick = () => { showHint(); hintActive = true; };
-    hintButton.addEventListener('click', hintClick);
-    document.getElementById('overlayHint').addEventListener('click', hintClick);
-    boardElement.addEventListener('pointerdown', () => { if (hintActive) { hintActive = false; message.innerHTML = ''; } }, true);
+    const clearMessageOnAction = () => { message.innerHTML = ''; };
+    hintButton.addEventListener('click', showHint);
+    document.getElementById('overlayHint').addEventListener('click', showHint);
+    boardElement.addEventListener('pointerdown', clearMessageOnAction, true);
     // Zoom (nur randlos): Das Fenster bleibt 12×24, sichtbar sind 12/Zoom × 24/Zoom Felder; die Mitte bleibt stehen.
     function setZoom(value) {
       const next = Math.round(Math.min(ZOOM_MAX, Math.max(minimumZoom(), value)) * 100) / 100;
