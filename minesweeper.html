@@ -200,7 +200,7 @@
       </div>
       <button class="settings-done" id="settingsDone" type="button">Spiel starten</button>
     </dialog>
-    <button class="version" data-version type="button" title="Klicken, um die Seite neu zu laden">Version 2.01</button>
+    <button class="version" data-version type="button" title="Klicken, um die Seite neu zu laden">Version 2.02</button>
     <script>const versionButton = document.querySelector('[data-version]'); versionButton.addEventListener('click', () => location.replace(`${location.pathname}?v=${Date.now()}`)); fetch(`VERSION?${Date.now()}`, { cache: 'no-store' }).then(response => response.text()).then(version => { versionButton.textContent = `Version ${version.trim()}`; }).catch(() => {});</script>
   </main>
   <script>
@@ -463,6 +463,7 @@
         button.addEventListener('animationend', event => { if (event.animationName === 'revealCell') { cell.opening = false; button.classList.remove('opening'); } });
         button.addEventListener('click', event => {
           if (Date.now() - panEndedAt < 350) return;
+          message.innerHTML = '';
           if (longPressed) { longPressed = false; return; }
           if (shovelIndex === index && (event.target.closest?.('.shovel-action') || event.detail === 0)) { clearShovel(); reveal(index); return; }
           selectShovel(index);
@@ -604,7 +605,7 @@
       message.innerHTML = total ? `<b>Hinweis:</b> ${certainSafe.size} sichere Felder und ${certainMines.size} sichere Minen markiert.` : '<b>Keine falschen Flaggen.</b> Aktuell ist kein weiteres Feld logisch entscheidbar.';
       persistGameState();
     }
-    function toggleFlag(index) { if (over || revealing) return; const cell = grid[index]; if (cell.open) return; clearShovel(); clearHints(); cell.flag = !cell.flag; flagCount += cell.flag ? 1 : -1; updateGuessMarks(); updateStats(); }
+    function toggleFlag(index) { if (over || revealing) return; const cell = grid[index]; if (cell.open) return; message.innerHTML = ''; clearShovel(); clearHints(); cell.flag = !cell.flag; flagCount += cell.flag ? 1 : -1; updateGuessMarks(); updateStats(); }
     function reveal(index) {
       if (over || revealing || grid[index].flag || grid[index].open) return;
       stopDetector(); clearShovel();
@@ -630,10 +631,8 @@
     function finish() { over = true; gamePanel.classList.add('finished'); revealing = false; revealTimers.forEach(clearTimeout); revealTimers = []; clearInterval(timer); grid.forEach((_, index) => draw(index)); persistGameState(); }
     function lose(index) { finish(); boardElement.children[index].classList.add('mine'); syncGhosts(index); message.innerHTML = '<b>Boom!</b> Eine Mine wurde ausgelöst. Versuche es noch einmal.'; }
     function win() { grid.forEach(cell => { if (cell.mine) cell.flag = true; }); flagCount = config().mines; finish(); updateStats(); boardElement.querySelectorAll('.cell.flag').forEach((cell, index) => { cell.style.animationDelay = `${index * 35}ms`; cell.classList.add('wave'); }); message.innerHTML = `<b>Gewonnen!</b> Alle Minen gefunden in ${document.getElementById('time').textContent}.`; }
-    const clearMessageOnAction = () => { message.innerHTML = ''; };
     hintButton.addEventListener('click', showHint);
     document.getElementById('overlayHint').addEventListener('click', showHint);
-    boardElement.addEventListener('pointerdown', clearMessageOnAction, true);
     // Zoom (nur randlos): Das Fenster bleibt 12×24, sichtbar sind 12/Zoom × 24/Zoom Felder; die Mitte bleibt stehen.
     function setZoom(value) {
       const next = Math.round(Math.min(ZOOM_MAX, Math.max(minimumZoom(), value)) * 100) / 100;
