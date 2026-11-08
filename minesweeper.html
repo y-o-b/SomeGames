@@ -33,6 +33,7 @@
     body.board-view-mode .game .stat { padding: 3px 2px; border: 0; background: transparent; }
     body.board-view-mode .game .stat strong { font-size: 1rem; }
     body.board-view-mode .game .stat span { font-size: .62rem; }
+    body.board-view-mode .game .stats .message:empty { display: none; }
     body.board-view-mode .game .stats .message { display: block; grid-column: 1 / -1; min-height: 0; margin: 2px 4px 0; padding-top: 4px; border-top: 1px solid rgba(23,23,23,.2); font-size: .72rem; line-height: 1.25; }
     body.board-view-mode .game .board-tools { display: block; }
     body.board-view-mode .game .new-game { display: block; position: fixed; z-index: 4; left: 50%; bottom: max(12px, env(safe-area-inset-bottom)); width: min(calc(100% - 32px), 240px); margin: 0; transform: translateX(-50%); }
@@ -199,7 +200,7 @@
       </div>
       <button class="settings-done" id="settingsDone" type="button">Spiel starten</button>
     </dialog>
-    <button class="version" data-version type="button" title="Klicken, um die Seite neu zu laden">Version 1.99</button>
+    <button class="version" data-version type="button" title="Klicken, um die Seite neu zu laden">Version 2.00</button>
     <script>const versionButton = document.querySelector('[data-version]'); versionButton.addEventListener('click', () => location.replace(`${location.pathname}?v=${Date.now()}`)); fetch(`VERSION?${Date.now()}`, { cache: 'no-store' }).then(response => response.text()).then(version => { versionButton.textContent = `Version ${version.trim()}`; }).catch(() => {});</script>
   </main>
   <script>
@@ -629,8 +630,11 @@
     function finish() { over = true; gamePanel.classList.add('finished'); revealing = false; revealTimers.forEach(clearTimeout); revealTimers = []; clearInterval(timer); grid.forEach((_, index) => draw(index)); persistGameState(); }
     function lose(index) { finish(); boardElement.children[index].classList.add('mine'); syncGhosts(index); message.innerHTML = '<b>Boom!</b> Eine Mine wurde ausgelöst. Versuche es noch einmal.'; }
     function win() { grid.forEach(cell => { if (cell.mine) cell.flag = true; }); flagCount = config().mines; finish(); updateStats(); boardElement.querySelectorAll('.cell.flag').forEach((cell, index) => { cell.style.animationDelay = `${index * 35}ms`; cell.classList.add('wave'); }); message.innerHTML = `<b>Gewonnen!</b> Alle Minen gefunden in ${document.getElementById('time').textContent}.`; }
-    hintButton.addEventListener('click', showHint);
-    document.getElementById('overlayHint').addEventListener('click', showHint);
+    let hintActive = false;
+    const hintClick = () => { showHint(); hintActive = true; };
+    hintButton.addEventListener('click', hintClick);
+    document.getElementById('overlayHint').addEventListener('click', hintClick);
+    boardElement.addEventListener('pointerdown', () => { if (hintActive) { hintActive = false; message.innerHTML = ''; } }, true);
     // Zoom (nur randlos): Das Fenster bleibt 12×24, sichtbar sind 12/Zoom × 24/Zoom Felder; die Mitte bleibt stehen.
     function setZoom(value) {
       const next = Math.round(Math.min(ZOOM_MAX, Math.max(minimumZoom(), value)) * 100) / 100;
