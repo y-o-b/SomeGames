@@ -29,15 +29,15 @@
     body.board-view-mode .version { display: none; }
     body.board-view-mode .game { padding: 0; border: 0; border-radius: 0; box-shadow: none; background: transparent; }
     body.board-view-mode .game.wrap-mode .board.wrap { position: fixed; z-index: 1; inset: 0; width: 100%; height: 100%; max-width: none; margin: 0; border: 0; border-radius: 0; aspect-ratio: auto; }
-    body.board-view-mode .game .stats { display: grid; position: fixed; z-index: 3; top: max(64px, calc(env(safe-area-inset-top) + 58px)); left: 50%; width: min(calc(100% - 24px), 460px); padding: 4px; margin: 0; border: 2px solid #171717; border-radius: 12px; background: rgba(255,255,255,.92); box-shadow: 3px 3px 0 #171717; transform: translateX(-50%); gap: 2px; }
+    body.board-view-mode .game .stats { display: grid; position: fixed; z-index: 3; top: max(64px, calc(env(safe-area-inset-top) + 58px)); left: 50%; width: min(calc(100% - 116px), 460px); padding: 4px; margin: 0; border: 2px solid #171717; border-radius: 12px; background: rgba(255,255,255,.92); box-shadow: 3px 3px 0 #171717; transform: translateX(-50%); gap: 2px; }
     body.board-view-mode .game .stat { padding: 3px 2px; border: 0; background: transparent; }
     body.board-view-mode .game .stat strong { font-size: 1rem; }
     body.board-view-mode .game .stat span { font-size: .62rem; }
     body.board-view-mode .game .stats .message { display: block; grid-column: 1 / -1; min-height: 0; margin: 2px 4px 0; padding-top: 4px; border-top: 1px solid rgba(23,23,23,.2); font-size: .72rem; line-height: 1.25; }
     body.board-view-mode .game .board-tools { display: block; }
-    body.board-view-mode .game .new-game { display: block; position: fixed; z-index: 4; left: 50%; bottom: max(12px, env(safe-area-inset-bottom)); width: min(calc(100% - 136px), 240px); margin: 0; transform: translateX(-50%); }
+    body.board-view-mode .game .new-game { display: block; position: fixed; z-index: 4; left: 50%; bottom: max(12px, env(safe-area-inset-bottom)); width: min(calc(100% - 32px), 240px); margin: 0; transform: translateX(-50%); }
     body.board-view-mode .game .hint-button { display: none; }
-    body.board-view-mode .overlay-hint { display: grid; top: auto; bottom: max(12px, env(safe-area-inset-bottom)); }
+    body.board-view-mode .overlay-hint { display: grid; top: max(64px, calc(env(safe-area-inset-top) + 58px)); bottom: auto; }
     body.board-view-mode .game.finished .new-game { top: 50%; bottom: auto; width: min(calc(100% - 32px), 300px); transform: translate(-50%, -50%); }
     body.board-view-mode .game.finished .overlay-hint { display: none; }
     .overlay-corner { display: none; place-items: center; position: fixed; z-index: 2; top: max(64px, calc(env(safe-area-inset-top) + 58px)); width: 48px; height: 48px; padding: 0; border: 3px solid #171717; border-radius: 50%; color: #171717; background: #FFFFFF; box-shadow: 3px 3px 0 #171717; font-size: 1.35rem; line-height: 1; -webkit-tap-highlight-color: transparent; transition: transform .12s, box-shadow .12s; }
@@ -199,7 +199,7 @@
       </div>
       <button class="settings-done" id="settingsDone" type="button">Spiel starten</button>
     </dialog>
-    <button class="version" data-version type="button" title="Klicken, um die Seite neu zu laden">Version 1.97</button>
+    <button class="version" data-version type="button" title="Klicken, um die Seite neu zu laden">Version 1.98</button>
     <script>const versionButton = document.querySelector('[data-version]'); versionButton.addEventListener('click', () => location.replace(`${location.pathname}?v=${Date.now()}`)); fetch(`VERSION?${Date.now()}`, { cache: 'no-store' }).then(response => response.text()).then(version => { versionButton.textContent = `Version ${version.trim()}`; }).catch(() => {});</script>
   </main>
   <script>
