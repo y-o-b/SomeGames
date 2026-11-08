@@ -96,8 +96,8 @@
     .board.hex .cell { position: absolute; aspect-ratio: auto; border-radius: 0; font-size: var(--cell-font-size, clamp(.9rem, 4.4vw, 1.4rem)); clip-path: polygon(50% 1.5%, 96.5% 25.8%, 96.5% 74.2%, 50% 98.5%, 3.5% 74.2%, 3.5% 25.8%); }
     .board.octagon { display: block; position: relative; padding: 0; }
     .board.octagon .cell { position: absolute; aspect-ratio: auto; border-radius: 0; }
-    .board.octagon .cell.octagon { clip-path: polygon(29.289% .5px, 70.711% .5px, calc(100% - .5px) 29.289%, calc(100% - .5px) 70.711%, 70.711% calc(100% - .5px), 29.289% calc(100% - .5px), .5px 70.711%, .5px 29.289%); }
-    .board.octagon .cell:not(.octagon) { clip-path: inset(0 1px 1px 0); }
+    .board.octagon .cell.octagon { clip-path: polygon(calc(var(--cut, 29.289%) + .207px) .5px, calc(100% - var(--cut, 29.289%) - .207px) .5px, calc(100% - .5px) calc(var(--cut, 29.289%) + .207px), calc(100% - .5px) calc(100% - var(--cut, 29.289%) - .207px), calc(100% - var(--cut, 29.289%) - .207px) calc(100% - .5px), calc(var(--cut, 29.289%) + .207px) calc(100% - .5px), .5px calc(100% - var(--cut, 29.289%) - .207px), .5px calc(var(--cut, 29.289%) + .207px)); }
+    .board.octagon .cell:not(.octagon) { clip-path: inset(.5px); }
     .board.hex .cell.wrong-flag { background: #FFD166; color: #EF4B3F; }
     .board.hex .cell:focus-visible { background: #FFD166; }
     /* Randlos: gestrichelter Rahmen, das Brett lässt sich ziehen statt die Seite zu scrollen. */
@@ -107,7 +107,9 @@
        in dem der dunkle Hintergrund des Bretts zu sehen ist; gleich breit bei jedem Zoom. Ohne Eckenrundung,
        sonst entstehen an den Kreuzungen dunkle Punkte. */
     .board.wrap:not(.hex) .cell { border-radius: 0; clip-path: inset(0 1px 1px 0); }
-    .board.wrap.octagon .cell.octagon { clip-path: polygon(29.289% .5px, 70.711% .5px, calc(100% - .5px) 29.289%, calc(100% - .5px) 70.711%, 70.711% calc(100% - .5px), 29.289% calc(100% - .5px), .5px 70.711%, .5px 29.289%); }
+    /* Quadrate zwischen Achtecken: ringsum 0,5 px, mit den 0,5 px der Achtecke überall 1 px Fuge. */
+    .board.wrap.octagon .cell:not(.octagon) { clip-path: inset(.5px); }
+    .board.wrap.octagon .cell.octagon { clip-path: polygon(calc(var(--cut, 29.289%) + .207px) .5px, calc(100% - var(--cut, 29.289%) - .207px) .5px, calc(100% - .5px) calc(var(--cut, 29.289%) + .207px), calc(100% - .5px) calc(100% - var(--cut, 29.289%) - .207px), calc(100% - var(--cut, 29.289%) - .207px) calc(100% - .5px), calc(var(--cut, 29.289%) + .207px) calc(100% - .5px), .5px calc(100% - var(--cut, 29.289%) - .207px), .5px calc(var(--cut, 29.289%) + .207px)); }
     .board.wrap .cell.wrong-flag { background: #FFD166; color: #EF4B3F; }
     .board.wrap.panning { cursor: grabbing; }
     .board.wrap .cell, .board.wrap.hex .cell { font-size: var(--cell-font-size, 1rem); }
@@ -200,7 +202,7 @@
       </div>
       <button class="settings-done" id="settingsDone" type="button">Spiel starten</button>
     </dialog>
-    <button class="version" data-version type="button" title="Klicken, um die Seite neu zu laden">Version 2.03</button>
+    <button class="version" data-version type="button" title="Klicken, um die Seite neu zu laden">Version 2.04</button>
     <script>const versionButton = document.querySelector('[data-version]'); versionButton.addEventListener('click', () => location.replace(`${location.pathname}?v=${Date.now()}`)); fetch(`VERSION?${Date.now()}`, { cache: 'no-store' }).then(response => response.text()).then(version => { versionButton.textContent = `Version ${version.trim()}`; }).catch(() => {});</script>
   </main>
   <script>
@@ -392,6 +394,9 @@
       const overflow = document.documentElement.scrollHeight - innerHeight;
       if (overflow > 0 && boardElement.clientHeight > boardElement.clientWidth * .75 + 1) { fitWrapWindow(overflow); if (wrapZoom < minimumZoom()) { wrapZoom = minimumZoom(); persistGameState(); } ensureGhostCapacity(); layoutCells(); }
     }
+    // Acht- und Vierecke auf ganzen Pixeln: Rasterabstand W gerade, Quadratseite q gerade (≈ W·(2−√2)), Achteckbreite
+    // 2W − q; der Eckschnitt (Achteck − q) / 2 wird je Feld als --cut gesetzt, damit die Achtecke lückenlos anschließen.
+    const octagonSizes = W => { const square = Math.max(2, 2 * Math.round(W * (2 - Math.SQRT2) / 2)); return { square, octagon: 2 * W - square }; };
     function layoutWrapped() {
       const { cols, rows, shape } = config(), hex = shape === 'hex', octagon = shape === 'octagon', cellHeight = hex ? 2 / Math.sqrt(3) : 1, stepY = hex ? .75 * cellHeight : 1, viewWidth = viewCols(), viewHeight = viewRows() * stepY;
       boardElement.style.aspectRatio = `${viewWidth} / ${viewHeight}`;
@@ -401,7 +406,7 @@
       // Sechsecke: W gerade (Versatz W/2 ganzzahlig, senkrechte Kanten auf ganzen Pixeln), H gerade, S = 3/4 H
       // (höchstens ein halbes Pixel, für alle Reihen gleich).
       const unit = boardElement.clientWidth / viewWidth;
-      const W = hex ? Math.max(4, 2 * Math.round(unit / 2)) : Math.max(2, Math.round(unit));
+      const W = hex || octagon ? Math.max(4, 2 * Math.round(unit / 2)) : Math.max(2, Math.round(unit)), tiles = octagon ? octagonSizes(W) : null;
       const H = hex ? Math.max(4, 2 * Math.round(cellHeight * W / 2)) : W, S = hex ? H * 3 / 4 : W;
       // Die Schrift folgt der exakten, nicht auf Pixel gerundeten Feldbreite und zoomt dadurch stufenlos mit.
       if (!octagon) setCellTextSize(boardElement.clientWidth / WRAP_VIEW_COLS, wrapZoom);
@@ -409,7 +414,7 @@
       const originX = Math.round(offsetX * W), originY = Math.round(offsetY / stepY * S);
       grid.forEach((_, index) => {
         const column = index % cols, row = Math.floor(index / cols), copies = [], isOct = octagon && (column + row) % 2 === 0;
-        const tileWidth = octagon ? W * (isOct ? Math.SQRT2 : 2 / (2 + Math.SQRT2)) : W, tileHeight = octagon ? tileWidth : H;
+        const tileWidth = octagon ? (isOct ? tiles.octagon : tiles.square) : W, tileHeight = octagon ? tileWidth : H;
         const x = mod(column * W + (hex && row % 2 ? W / 2 : 0) + originX, totalW), y = mod(row * S + originY, totalH);
         const leftBase = octagon ? x + (W - tileWidth) / 2 : x, topBase = octagon ? y + (S - tileHeight) / 2 : y;
         for (let top = topBase - totalH; top < areaH; top += totalH) {
@@ -417,7 +422,7 @@
           for (let left = leftBase - totalW; left < areaW; left += totalW) if (left + tileWidth > 0) copies.push([left, top]);
         }
         const elements = [boardElement.children[index], ...ghosts[index]];
-        copies.forEach(([left, top], copyIndex) => { const element = elements[copyIndex]; if (!element) return; element.classList.toggle('octagon', isOct); element.style.display = ''; element.style.left = `${left}px`; element.style.top = `${top}px`; element.style.width = `${tileWidth}px`; element.style.height = `${tileHeight}px`; if (octagon) setCellTextSize(tileWidth, 1, element); });
+        copies.forEach(([left, top], copyIndex) => { const element = elements[copyIndex]; if (!element) return; element.classList.toggle('octagon', isOct); element.style.display = ''; element.style.left = `${left}px`; element.style.top = `${top}px`; element.style.width = `${tileWidth}px`; element.style.height = `${tileHeight}px`; if (octagon) { element.style.setProperty('--cut', isOct ? `${(tiles.octagon - tiles.square) / 2}px` : ''); setCellTextSize(tileWidth, 1, element); } });
         elements.slice(copies.length).forEach(element => { element.style.display = 'none'; });
       });
     }
@@ -439,11 +444,11 @@
     function layoutOctagons() {
       const { cols, rows } = config();
       boardElement.style.aspectRatio = `${cols + 1} / ${rows + 1}`;
-      const pitch = Math.min(boardElement.clientWidth / (cols + 1), boardElement.clientHeight / (rows + 1));
+      const pitch = Math.max(4, 2 * Math.floor(Math.min(boardElement.clientWidth / (cols + 1), boardElement.clientHeight / (rows + 1)) / 2)), tiles = octagonSizes(pitch);
       grid.forEach((_, index) => {
         const column = index % cols, row = Math.floor(index / cols), octagon = (column + row) % 2 === 0;
-        const tileWidth = pitch * (octagon ? Math.SQRT2 : 2 / (2 + Math.SQRT2)), centerX = pitch * (column + 1), centerY = pitch * (row + 1), button = boardElement.children[index];
-        button.classList.toggle('octagon', octagon); button.style.left = `${centerX - tileWidth / 2}px`; button.style.top = `${centerY - tileWidth / 2}px`; button.style.width = `${tileWidth}px`; button.style.height = `${tileWidth}px`; setCellTextSize(tileWidth, 1, button);
+        const tileWidth = octagon ? tiles.octagon : tiles.square, centerX = pitch * (column + 1), centerY = pitch * (row + 1), button = boardElement.children[index];
+        button.classList.toggle('octagon', octagon); button.style.left = `${centerX - tileWidth / 2}px`; button.style.top = `${centerY - tileWidth / 2}px`; button.style.width = `${tileWidth}px`; button.style.height = `${tileWidth}px`; button.style.setProperty('--cut', octagon ? `${(tiles.octagon - tiles.square) / 2}px` : ''); setCellTextSize(tileWidth, 1, button);
       });
     }
     function start(savedState = null) {
