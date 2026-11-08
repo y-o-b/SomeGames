@@ -44,6 +44,11 @@
       .card p { margin: 0 0 10px; max-width: none; font-size: .82rem; line-height: 1.35; }
       .card a { justify-self: start; padding: 8px 16px; font-size: .9rem; box-shadow: 3px 3px 0 #171717; }
       footer { margin-top: 12px; }
+      /* Die Karten teilen sich die ganze Bildschirmhöhe; reicht sie nicht, scrollt die Seite wie zuvor. */
+      body { min-height: 100vh; min-height: 100dvh; display: flex; flex-direction: column; align-items: center; padding-bottom: 20px; }
+      .hero { flex: 1; display: flex; flex-direction: column; }
+      .games { flex: 1; grid-auto-rows: 1fr; }
+      .card { align-content: center; }
     }
   </style>
 </head>
@@ -76,7 +81,7 @@
       </div>
     </div>
     <footer>Eine kleine Spielpause gefällig?</footer>
-      <button class="version" data-version type="button" title="Klicken, um die Seite neu zu laden">Version 2.02</button>
+      <button class="version" data-version type="button" title="Klicken, um die Seite neu zu laden">Version 2.03</button>
     <script>const versionButton = document.querySelector('[data-version]'); versionButton.addEventListener('click', () => location.replace(`${location.pathname}?v=${Date.now()}`)); fetch(`VERSION?${Date.now()}`, { cache: 'no-store' }).then(response => response.text()).then(version => { versionButton.textContent = `Version ${version.trim()}`; }).catch(() => {});</script>
   </main>
   <script>if ('serviceWorker' in navigator) addEventListener('load', () => navigator.serviceWorker.register('sw.js').catch(() => {}));</script>
