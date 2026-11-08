@@ -205,7 +205,7 @@
       </div>
       <button class="settings-done" id="settingsDone" type="button">Spiel starten</button>
     </dialog>
-    <button class="version" data-version type="button" title="Klicken, um die Seite neu zu laden">Version 2.09</button>
+    <button class="version" data-version type="button" title="Klicken, um die Seite neu zu laden">Version 2.10</button>
     <script>const versionButton = document.querySelector('[data-version]'); versionButton.addEventListener('click', () => location.replace(`${location.pathname}?v=${Date.now()}`)); fetch(`VERSION?${Date.now()}`, { cache: 'no-store' }).then(response => response.text()).then(version => { versionButton.textContent = `Version ${version.trim()}`; }).catch(() => {});</script>
   </main>
   <script>
@@ -692,11 +692,14 @@
     hintButton.addEventListener('click', showHint);
     document.getElementById('overlayHint').addEventListener('click', showHint);
     // Zoom (nur randlos): Das Fenster bleibt 12×24, sichtbar sind 12/Zoom × 24/Zoom Felder; die Mitte bleibt stehen.
-    function setZoom(value) {
+    // anchor: Bildschirmpunkt (clientX/clientY), der beim Zoomen stehen bleibt; ohne Angabe die Mitte der Ansicht.
+    function setZoom(value, anchor = null) {
       const next = Math.round(Math.min(ZOOM_MAX, Math.max(minimumZoom(), value)) * 100) / 100;
       if (!config().wrap || next === wrapZoom) return;
+      const board = boardElement.getBoundingClientRect();
+      const fx = anchor ? Math.min(1, Math.max(0, (anchor.x - board.left) / board.width)) : .5, fy = anchor ? Math.min(1, Math.max(0, (anchor.y - board.top) / board.height)) : .5;
       const oldCols = viewCols(), oldRows = viewRows(), stepY = config().shape === 'hex' ? .75 * 2 / Math.sqrt(3) : 1;
-      wrapZoom = next; offsetX += (viewCols() - oldCols) / 2; offsetY += (viewRows() - oldRows) * stepY / 2;
+      wrapZoom = next; offsetX += (viewCols() - oldCols) * fx; offsetY += (viewRows() - oldRows) * stepY * fy;
       layoutCells();
       persistGameState();
       clearTimeout(autoSafeTimer); autoSafeTimer = null; stopDetector(); clearShovel();
@@ -736,6 +739,31 @@
       if (pinch) { if (activePointers.size < 2) { pinch = null; pan = null; panEndedAt = Date.now(); boardElement.classList.remove('panning'); persistGameState(); } return; }
       if (!pan || event.pointerId !== pan.id) return; const wasPanning = pan.active; if (wasPanning) { panEndedAt = Date.now(); boardElement.classList.remove('panning'); persistGameState(); } pan = null; if (wasPanning && !over && !revealing) requestAnimationFrame(() => requestAnimationFrame(() => { if (!over && !revealing && !pan?.active) updateGuessMarks(); }));
     }));
+    // Desktop: Mausrad und Trackpad-Pinch (Chrome, Firefox, Edge melden Pinch als Rad mit Ctrl) zoomen um den Mauszeiger.
+    // Kleine Radschritte sammeln sich in wheelZoom, weil setZoom auf Hundertstel rundet.
+    let wheelZoom = null, wheelIdle = 0;
+    boardElement.addEventListener('wheel', event => {
+      if (!config().wrap || settingsDialog.open) return;
+      event.preventDefault();
+      const pixels = event.deltaY * (event.deltaMode === 1 ? 16 : event.deltaMode === 2 ? innerHeight : 1);
+      if (wheelZoom === null) wheelZoom = wrapZoom;
+      wheelZoom = Math.min(ZOOM_MAX, Math.max(minimumZoom(), wheelZoom * Math.exp(-pixels * (event.ctrlKey ? .01 : .0025))));
+      clearTimeout(wheelIdle); wheelIdle = setTimeout(() => { wheelZoom = null; }, 250);
+      setZoom(wheelZoom, { x: event.clientX, y: event.clientY });
+    }, { passive: false });
+    // Safari auf dem Mac meldet Trackpad-Pinch als eigene Geste; auf Touch-Geräten übernimmt das der Zwei-Finger-Zoom oben.
+    if (navigator.maxTouchPoints === 0) {
+      let gestureZoom = 1;
+      boardElement.addEventListener('gesturestart', event => { event.preventDefault(); gestureZoom = wrapZoom; });
+      boardElement.addEventListener('gesturechange', event => { event.preventDefault(); if (config().wrap && !settingsDialog.open) setZoom(gestureZoom * event.scale, { x: event.clientX, y: event.clientY }); });
+      boardElement.addEventListener('gestureend', event => event.preventDefault());
+    }
+    // Tasten + und − zoomen um die Mitte.
+    document.addEventListener('keydown', event => {
+      if (!config().wrap || settingsDialog.open || event.metaKey || event.ctrlKey || event.altKey || event.target.closest?.('input, textarea')) return;
+      if (event.key === '+' || event.key === '=') { event.preventDefault(); setZoom(wrapZoom * 1.25); }
+      else if (event.key === '-' || event.key === '_') { event.preventDefault(); setZoom(wrapZoom / 1.25); }
+    });
     document.querySelectorAll('[data-wrap]').forEach(button => button.addEventListener('click', () => { boardWrap = button.dataset.wrap === 'on'; refreshSettingsControls(); }));
     wrapBoardSizeInput.addEventListener('input', () => { wrapBoardSizeOutput.value = wrapBoardLabel(Number(wrapBoardSizeInput.value)); wrapBoardSizeOutput.textContent = wrapBoardSizeOutput.value; });
     wrapBoardSizeInput.addEventListener('change', () => { const size = Number(wrapBoardSizeInput.value); if (!Number.isInteger(size) || size < WRAP_BOARD_MIN || size > WRAP_BOARD_MAX || size === wrapBoardSize) return; wrapBoardSize = size; refreshSettingsControls(); });
