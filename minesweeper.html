@@ -205,7 +205,7 @@
       </div>
       <button class="settings-done" id="settingsDone" type="button">Spiel starten</button>
     </dialog>
-    <button class="version" data-version type="button" title="Klicken, um die Seite neu zu laden">Version 2.06</button>
+    <button class="version" data-version type="button" title="Klicken, um die Seite neu zu laden">Version 2.07</button>
     <script>const versionButton = document.querySelector('[data-version]'); versionButton.addEventListener('click', () => location.replace(`${location.pathname}?v=${Date.now()}`)); fetch(`VERSION?${Date.now()}`, { cache: 'no-store' }).then(response => response.text()).then(version => { versionButton.textContent = `Version ${version.trim()}`; }).catch(() => {});</script>
   </main>
   <script>
@@ -539,6 +539,30 @@
       }) || null;
     }
     const isVisibleCell = index => Boolean(visibleElement(index));
+    // Randlos: Verschiebung (in Feldbreiten bzw. Zeilen), die die Mitte des Felds in die Mitte der Ansicht bringt; über den
+    // Rand hinweg jeweils der kürzere Weg.
+    function offsetToCenter(index) {
+      const { cols, rows, shape } = config(), column = index % cols, row = Math.floor(index / cols), hex = shape === 'hex';
+      const stepY = hex ? .75 * 2 / Math.sqrt(3) : 1, centerRow = hex ? 2 / 3 : .5;
+      const shortest = (value, size) => mod(value + size / 2, size) - size / 2;
+      const dx = shortest(viewCols() / 2 - (column + .5 + (hex && row % 2 ? .5 : 0)) - offsetX, cols);
+      const visibleRows = boardElement.clientHeight / (stepY * boardElement.clientWidth / viewCols());
+      const dyRows = shortest(visibleRows / 2 - (row + centerRow) - offsetY / stepY, rows);
+      return { dx, dy: dyRows * stepY, distance: Math.hypot(dx, dyRows) };
+    }
+    let panAnimation = 0;
+    function panToNearest(indices) {
+      if (!config().wrap || !indices.length) return;
+      const target = indices.map(offsetToCenter).sort((a, b) => a.distance - b.distance)[0];
+      const startX = offsetX, startY = offsetY, duration = reduceMotion() ? 0 : 400, started = performance.now();
+      cancelAnimationFrame(panAnimation);
+      const step = now => {
+        const t = duration ? Math.min(1, (now - started) / duration) : 1, ease = 1 - Math.pow(1 - t, 3);
+        offsetX = startX + target.dx * ease; offsetY = startY + target.dy * ease; layoutCells();
+        if (t < 1) panAnimation = requestAnimationFrame(step); else { panAnimation = 0; persistGameState(); }
+      };
+      panAnimation = requestAnimationFrame(step);
+    }
     function moveDetector(index) { const cell = visibleElement(index); if (!cell) return; const rect = cell.getBoundingClientRect(); detectorElement.style.left = `${rect.left + rect.width / 2}px`; detectorElement.style.top = `${rect.top + rect.height / 2}px`; }
     function sweepDetector(marked, target) {
       stopDetector(); if (!isVisibleCell(target)) return;
@@ -610,6 +634,9 @@
       certainSafe.forEach(index => { grid[index].hint = 'safe'; });
       grid.forEach((_, index) => draw(index));
       const total = certainMines.size + certainSafe.size;
+      // Liegt kein Fragezeichen in der Ansicht, das Spielfeld zum nächstgelegenen schieben.
+      const marked = [...certainMines, ...certainSafe];
+      if (marked.length && !marked.some(isVisibleCell)) panToNearest(marked);
       message.innerHTML = total ? `<b>Hinweis:</b> ${certainSafe.size} sichere Felder und ${certainMines.size} sichere Minen markiert.` : '<b>Keine falschen Flaggen.</b> Aktuell ist kein weiteres Feld logisch entscheidbar.';
       persistGameState();
     }
@@ -629,11 +656,16 @@
       }
       if (!sequence.length) return;
       revealing = true;
-      const delay = reduceMotion() ? 15 : 30;
-      sequence.forEach((current, step) => revealTimers.push(setTimeout(() => {
-        const cell = grid[current]; if (over || !cell || cell.open) return;
-        cell.open = true; cell.opening = true; openCount++; draw(current); updateStats();
-        if (step === sequence.length - 1) { revealTimers = []; revealing = false; updateGuessMarks(); updateStats(); if (openCount === grid.length - config().mines) win(); }
+      // Felder außerhalb der Ansicht sofort aufdecken; nur die sichtbaren nacheinander, im Takt ohne Lücken.
+      const delay = reduceMotion() ? 15 : 30, visible = sequence.filter(isVisibleCell);
+      const done = () => { revealTimers = []; revealing = false; updateGuessMarks(); updateStats(); if (openCount === grid.length - config().mines) win(); };
+      sequence.forEach(current => { const cell = grid[current]; if (isVisibleCell(current) || cell.open) return; cell.open = true; openCount++; draw(current); });
+      updateStats();
+      if (!visible.length) return done();
+      visible.forEach((current, step) => revealTimers.push(setTimeout(() => {
+        const cell = grid[current]; if (over || !cell) return;
+        if (!cell.open) { cell.open = true; cell.opening = true; openCount++; draw(current); updateStats(); }
+        if (step === visible.length - 1) done();
       }, step * delay)));
     }
     function finish() { over = true; gamePanel.classList.add('finished'); revealing = false; revealTimers.forEach(clearTimeout); revealTimers = []; clearInterval(timer); grid.forEach((_, index) => draw(index)); persistGameState(); }
@@ -655,6 +687,7 @@
     // Verschieben im Randlos-Modus: erst ab 12 px Bewegung, stufenlos; mit zwei Fingern wird gezoomt.
     boardElement.addEventListener('pointerdown', event => {
       if (!config().wrap || event.button > 0) return;
+      cancelAnimationFrame(panAnimation); panAnimation = 0;
       activePointers.set(event.pointerId, { x: event.clientX, y: event.clientY });
       if (activePointers.size === 2) {
         const [a, b] = [...activePointers.values()];
