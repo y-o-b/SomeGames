@@ -16,6 +16,9 @@
   <link rel="apple-touch-icon" href="apple-touch-icon.png" />
   <title>LittleGames</title>
   <style>
+    /* Spiele: kein Markieren von Text, auch kein Lupen- oder Kopiermenü beim langen Drücken; Eingabefelder ausgenommen. */
+    html { -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; }
+    input, textarea { -webkit-user-select: text; user-select: text; }
     :root { --bg: #4B8ED8; --panel: #FFFFFF; --text: #171717; --muted: rgba(23,23,23,.7); --purple: #EF4B3F; --cyan: #171717; }
     * { box-sizing: border-box; }
     body { min-height: 100vh; margin: 0; padding: 30px 16px; display: grid; place-items: center; color: var(--text); background: var(--bg); font: 16px/1.5 Arial, Helvetica, sans-serif; }
@@ -81,7 +84,7 @@
       </div>
     </div>
     <footer>Eine kleine Spielpause gefällig?</footer>
-      <button class="version" data-version type="button" title="Klicken, um die Seite neu zu laden">Version 2.04</button>
+      <button class="version" data-version type="button" title="Klicken, um die Seite neu zu laden">Version 2.05</button>
     <script>const versionButton = document.querySelector('[data-version]'); versionButton.addEventListener('click', () => location.replace(`${location.pathname}?v=${Date.now()}`)); fetch(`VERSION?${Date.now()}`, { cache: 'no-store' }).then(response => response.text()).then(version => { versionButton.textContent = `Version ${version.trim()}`; }).catch(() => {});</script>
   </main>
   <script>if ('serviceWorker' in navigator) addEventListener('load', () => navigator.serviceWorker.register('sw.js').catch(() => {}));</script>

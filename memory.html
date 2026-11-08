@@ -16,6 +16,9 @@
   <link rel="apple-touch-icon" href="icons/memory-180.png" />
   <title>Memory</title>
   <style>
+    /* Spiele: kein Markieren von Text, auch kein Lupen- oder Kopiermenü beim langen Drücken; Eingabefelder ausgenommen. */
+    html { -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; }
+    input, textarea { -webkit-user-select: text; user-select: text; }
     :root { --bg: #4B8ED8; --panel: #FFFFFF; --card: #FFFFFF; --text: #171717; --muted: rgba(23,23,23,.7); --purple: #EF4B3F; --cyan: #171717; --pink: #EF4B3F; }
     * { box-sizing: border-box; }
     body { min-height: 100vh; margin: 0; padding: 24px 15px; display: grid; justify-items: center; align-content: start; color: var(--text); background: var(--bg); font: 16px/1.5 Arial, Helvetica, sans-serif; }
@@ -111,7 +114,7 @@
       <button class="new-game" id="newGame" type="button">Neues Spiel</button>
       <a class="symbols-link" href="memory-symbols.html">Alle Symbole ansehen&nbsp; →</a>
     </section>
-    <button class="version" data-version type="button" title="Klicken, um die Seite neu zu laden">Version 2.04</button>
+    <button class="version" data-version type="button" title="Klicken, um die Seite neu zu laden">Version 2.05</button>
     <script>const versionButton = document.querySelector('[data-version]'); versionButton.addEventListener('click', () => location.replace(`${location.pathname}?v=${Date.now()}`)); fetch(`VERSION?${Date.now()}`, { cache: 'no-store' }).then(response => response.text()).then(version => { versionButton.textContent = `Version ${version.trim()}`; }).catch(() => {});</script>
   </main>
   <script src="memory-symbols.js"></script>
