@@ -117,7 +117,7 @@
       <button class="new-game" id="newGame" type="button">Neues Spiel</button>
       <a class="symbols-link" href="memory-symbols.html">Alle Symbole ansehen&nbsp; →</a>
     </section>
-    <button class="version" data-version type="button" title="Klicken, um die Seite neu zu laden">Version 2.26</button>
+    <button class="version" data-version type="button" title="Klicken, um die Seite neu zu laden">Version 2.27</button>
     <script>const versionButton = document.querySelector('[data-version]'); versionButton.addEventListener('click', () => location.replace(`${location.pathname}?v=${Date.now()}`)); fetch(`VERSION?${Date.now()}`, { cache: 'no-store' }).then(response => response.text()).then(version => { versionButton.textContent = `Version ${version.trim()}`; }).catch(() => {});</script>
   </main>
   <script src="memory-symbols.js"></script>
@@ -198,7 +198,7 @@
     function build(stacked) {
       clearInterval(timer); gamePanel.classList.remove('victory'); const pairCount = size === 24 ? 12 : size; const chosen = shuffle(icons).slice(0, pairCount); cards = shuffle(chosen.flatMap(icon => [icon, icon])); first = second = null; locked = stacked; currentPlayer = 1; playerScores = [0, 0]; moves = pairs = seconds = 0;
       boardElement.dataset.size = size; applyBoardLayout(); updateSizeLabels(); boardElement.innerHTML = '';
-      const totalCells = size === 24 ? 25 : size;
+      const totalCells = size === 24 ? 25 : cards.length;
       let cardIndex = 0;
       for (let cell = 0; cell < totalCells; cell++) {
         if (size === 24 && cell === 12) { const hole = document.createElement('div'); hole.className = 'memory-hole'; boardElement.appendChild(hole); continue; }
