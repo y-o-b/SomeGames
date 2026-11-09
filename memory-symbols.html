@@ -50,15 +50,18 @@
       <div class="symbols" id="symbols" role="list" aria-label="Symbole"></div>
       <a class="play-link" href="memory.html">Memory spielen&nbsp; →</a>
     </section>
-    <button class="version" data-version type="button" title="Klicken, um die Seite neu zu laden">Version 2.34</button>
+    <button class="version" data-version type="button" title="Klicken, um die Seite neu zu laden">Version 2.35</button>
     <script>const versionButton = document.querySelector('[data-version]'); versionButton.addEventListener('click', () => location.replace(`${location.pathname}?v=${Date.now()}`)); fetch(`VERSION?${Date.now()}`, { cache: 'no-store' }).then(response => response.text()).then(version => { versionButton.textContent = `Version ${version.trim()}`; }).catch(() => {});</script>
   </main>
   <script src="memory-symbols.js"></script>
   <script>
     const symbolGrid = document.getElementById('symbols');
     document.getElementById('symbolCount').textContent = `${MEMORY_SYMBOLS.length} Symbole`;
-    MEMORY_SYMBOLS.forEach(({ symbol, name, color }) => {
-      const tile = document.createElement('div'); tile.className = 'symbol'; tile.setAttribute('role', 'listitem'); tile.setAttribute('aria-label', name); tile.title = name; tile.style.setProperty('--symbol-bg', color); const icon = document.createElement('span'); icon.textContent = symbol; const label = document.createElement('span'); label.className = 'symbol-name'; label.textContent = name; tile.append(icon, label); symbolGrid.appendChild(tile);
+    const groups = new Map();
+    MEMORY_SYMBOLS.forEach(item => { if (!groups.has(item.category)) groups.set(item.category, []); groups.get(item.category).push(item); });
+    groups.forEach((items, category) => {
+      const section = document.createElement('section'); section.className = 'symbol-group'; section.setAttribute('aria-label', category); const heading = document.createElement('h2'); heading.textContent = category; const grid = document.createElement('div'); grid.className = 'symbols'; grid.setAttribute('role', 'list'); section.append(heading, grid); symbolGrid.appendChild(section);
+      items.forEach(({ symbol, name, color }) => { const tile = document.createElement('div'); tile.className = 'symbol'; tile.setAttribute('role', 'listitem'); tile.setAttribute('aria-label', name); tile.title = name; tile.style.setProperty('--symbol-bg', color); const icon = document.createElement('span'); icon.textContent = symbol; const label = document.createElement('span'); label.className = 'symbol-name'; label.textContent = name; tile.append(icon, label); grid.appendChild(tile); });
     });
   </script>
   <script>if ('serviceWorker' in navigator) addEventListener('load', () => navigator.serviceWorker.register('sw.js').catch(() => {}));</script>
