@@ -128,7 +128,7 @@
       <div class="controls"><button class="undo" id="undo" type="button" disabled>↶ Rückgängig</button><button id="sameGame" class="undo" type="button">↻ Gleiches Deck</button><button id="solution" type="button">Musterlösung: Aus</button><button id="autoFinish" type="button" hidden>▶ Fertigspielen</button><button id="newGame" type="button">Neues Spiel</button></div>
       <div class="heap" id="heap" aria-hidden="true"></div>
     </section>
-    <button class="version" data-version type="button" title="Klicken, um die Seite neu zu laden">Version 2.12</button>
+    <button class="version" data-version type="button" title="Klicken, um die Seite neu zu laden">Version 2.13</button>
     <script>const versionButton = document.querySelector('[data-version]'); versionButton.addEventListener('click', () => location.replace(`${location.pathname}?v=${Date.now()}`)); fetch(`VERSION?${Date.now()}`, { cache: 'no-store' }).then(response => response.text()).then(version => { versionButton.textContent = `Version ${version.trim()}`; }).catch(() => {});</script>
   </main>
   <script>
@@ -222,7 +222,7 @@ const gamePanel = document.querySelector('.game');
       // Grundstapel-Züge haben Vorrang.
       if (waste.length) {
         const card = waste.at(-1);
-        for (let pileIndex = 0; pileIndex < 4; pileIndex++) if (canPlaceOnFoundation(card, foundations[pileIndex])) return { source: 'waste', index: 0, cardIndex: waste.length - 1 };
+        for (let pileIndex = 0; pileIndex < 4; pileIndex++) if (canPlaceOnFoundation(card, foundations[pileIndex])) return { source: 'waste', index: 0, cardIndex: 0 };
       }
       for (let column = 0; column < 7; column++) {
         const cards = tableau[column];
@@ -236,7 +236,7 @@ const gamePanel = document.querySelector('.game');
         const card = waste.at(-1);
         for (let destination = 0; destination < 7; destination++) {
           const target = tableau[destination].at(-1);
-          if ((!target && card.rank === 12) || (target && target.red !== card.red && target.rank === card.rank + 1)) return { source: 'waste', index: 0, cardIndex: waste.length - 1 };
+          if ((!target && card.rank === 12) || (target && target.red !== card.red && target.rank === card.rank + 1)) return { source: 'waste', index: 0, cardIndex: 0 };
         }
       }
       for (let column = 0; column < 7; column++) {
@@ -541,7 +541,7 @@ const gamePanel = document.querySelector('.game');
     }
     onTap(document.getElementById('newGame'), () => startNewGame()); onTap(document.getElementById('sameGame'), () => startNewGame(currentDeck)); onTap(autoFinishButton, autoFinishGame);
     onTap(document.getElementById('undo'), undo);
-    onTap(solutionButton, () => { solutionMode = !solutionMode; solutionButton.textContent = `Musterlösung: ${solutionMode ? 'An' : 'Aus'}`; solutionButton.classList.toggle('active', solutionMode); applySolutionMark(); });
+    onTap(solutionButton, () => { solutionMode = !solutionMode; solutionButton.textContent = `Musterlösung: ${solutionMode ? 'An' : 'Aus'}`; solutionButton.classList.toggle('active', solutionMode); if (solutionMode) message.innerHTML = '<b>Musterlösung aktiv.</b> Der nächste Zug ist markiert.'; applySolutionMark(); });
     // Gespeichert wird bei jeder Zustandsänderung (updateStatus) sowie beim Verlassen oder Verbergen der Seite, nicht mehr im Sekundentakt.
     document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'hidden') persistGame(); });
     window.addEventListener('pagehide', persistGame);
