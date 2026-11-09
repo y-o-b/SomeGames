@@ -65,6 +65,8 @@
     .card-face .suit { position: absolute; left: 50%; line-height: 1; transform: translateX(-50%); }
     .card-face .center-suit { top: 60%; font-size: calc(46.4 * var(--u)); transform: translate(-50%, -50%); }
     .playing-card.selected .card-face { outline: calc(4 * var(--u)) solid var(--red); }
+   #stock.solution-target { outline: calc(4 * var(--u)) solid var(--red); outline-offset: calc(2 * var(--u)); }
+   #solution.active { background: var(--red); color: #FFFFFF; }
     .playing-card.revealed { perspective: 700px; }
     .flip-inner { position: absolute; inset: 0; transform-style: preserve-3d; animation: revealFlip .6s ease both; }
     .flip-side { position: absolute; inset: 0; backface-visibility: hidden; }
@@ -123,16 +125,17 @@
       <div class="tableau" id="tableau" aria-label="Spielfeld"></div>
       <p class="message" id="message" aria-live="polite"><b>Los geht's!</b> Lege Karten in absteigender Reihenfolge und wechselnden Farben.</p>
       <div class="status"><span>Züge: <strong id="moves">0</strong></span><span>Zeit: <strong id="time">0:00</strong></span></div>
-      <div class="controls"><button class="undo" id="undo" type="button" disabled>↶ Rückgängig</button><button id="sameGame" class="undo" type="button">↻ Gleiches Deck</button><button id="autoFinish" type="button" hidden>▶ Fertigspielen</button><button id="newGame" type="button">Neues Spiel</button></div>
+      <div class="controls"><button class="undo" id="undo" type="button" disabled>↶ Rückgängig</button><button id="sameGame" class="undo" type="button">↻ Gleiches Deck</button><button id="solution" type="button">Musterlösung: Aus</button><button id="autoFinish" type="button" hidden>▶ Fertigspielen</button><button id="newGame" type="button">Neues Spiel</button></div>
       <div class="heap" id="heap" aria-hidden="true"></div>
     </section>
-    <button class="version" data-version type="button" title="Klicken, um die Seite neu zu laden">Version 2.11</button>
+    <button class="version" data-version type="button" title="Klicken, um die Seite neu zu laden">Version 2.12</button>
     <script>const versionButton = document.querySelector('[data-version]'); versionButton.addEventListener('click', () => location.replace(`${location.pathname}?v=${Date.now()}`)); fetch(`VERSION?${Date.now()}`, { cache: 'no-store' }).then(response => response.text()).then(version => { versionButton.textContent = `Version ${version.trim()}`; }).catch(() => {});</script>
   </main>
   <script>
     const suits = ['♠', '♥', '♦', '♣'], names = ['A','2','3','4','5','6','7','8','9','10','J','Q','K'];
     const stockElement = document.getElementById('stock'), wasteElement = document.getElementById('waste'), tableauElement = document.getElementById('tableau'), foundationsElement = document.getElementById('foundations'), message = document.getElementById('message'), autoFinishButton = document.getElementById('autoFinish');
-    const gamePanel = document.querySelector('.game');
+    const solutionButton = document.getElementById('solution');
+const gamePanel = document.querySelector('.game');
     let tableau, stock, waste, foundations, selected = null, history = [], moves = 0, seconds = 0, timer, cardDrag = null, suppressClick = false, suppressClickUntil = 0, dragClickGuard = null, revealedCards = [], lastCardTap = null, lastStockTapAt = 0, revealTimer = null, revealClearTimer = null, animationToken = 0;
     let solvableDeals = [], dealCursor = 0, currentDeck = [], heapMode = false;
     const STORAGE_KEY = 'y-o-b.solitaire.save.v2';
@@ -162,7 +165,7 @@
         console.info('Keine JSON-Decksammlung geladen.', error);
       }
     }
-    function start(deckToUse = null) { const dealt = deckToUse || solvableDeck(); if (!dealt) { message.innerHTML = '<b>Kartendecks konnten nicht geladen werden.</b> „Neues Spiel" versucht es erneut.'; return false; } clearInterval(timer); timer = null; clearHeap(); flyingIds.clear(); finishRun++; autoFinishing = false; lockBoard(false); document.querySelectorAll('.card-flight').forEach(flight => flight.remove()); message.innerHTML = `<b>Los geht's!</b> Lege Karten in absteigender Reihenfolge und wechselnden Farben.`; gamePanel.classList.remove('victory'); let cards = dealt.map(item => { const id = typeof item === 'string' ? item : item.id; const [suitIndex, rank] = id.split('-').map(Number); return card(suitIndex, rank); }); currentDeck = cards.map(item => item.id); tableau = Array.from({ length: 7 }, (_, column) => { const pile = cards.splice(0, column + 1); pile.forEach((card, index) => { card.faceUp = index === pile.length - 1; }); return pile; }); stock = cards; waste = []; foundations = suits.map(() => []); selected = null; history = []; moves = seconds = 0; render(); updateStatus(); return true; }
+    function start(deckToUse = null) { const dealt = deckToUse || solvableDeck(); if (!dealt) { message.innerHTML = '<b>Kartendecks konnten nicht geladen werden.</b> „Neues Spiel" versucht es erneut.'; return false; } clearInterval(timer); timer = null; clearHeap(); flyingIds.clear(); finishRun++; autoFinishing = false; lockBoard(false); document.querySelectorAll('.card-flight').forEach(flight => flight.remove()); message.innerHTML = `<b>Los geht's!</b> Lege Karten in absteigender Reihenfolge und wechselnden Farben.`; gamePanel.classList.remove('victory'); let cards = dealt.map(item => { const id = typeof item === 'string' ? item : item.id; const [suitIndex, rank] = id.split('-').map(Number); return card(suitIndex, rank); }); currentDeck = cards.map(item => item.id); tableau = Array.from({ length: 7 }, (_, column) => { const pile = cards.splice(0, column + 1); pile.forEach((card, index) => { card.faceUp = index === pile.length - 1; }); return pile; }); stock = cards; waste = []; foundations = suits.map(() => []); selected = null; history = []; moves = seconds = 0; render(); if (solutionMode) applySolutionMark(); updateStatus(); return true; }
     function copyState() { return { tableau: tableau.map(column => column.map(card => ({ ...card }))), stock: stock.map(card => ({ ...card })), waste: waste.map(card => ({ ...card })), foundations: foundations.map(pile => pile.map(card => ({ ...card }))) }; }
     function sameStateWithoutFaceUp(first, second) { return JSON.stringify(first, (key, value) => key === 'faceUp' ? undefined : value) === JSON.stringify(second, (key, value) => key === 'faceUp' ? undefined : value); }
     function allCards() { return [...tableau.flat(), ...stock, ...waste, ...foundations.flat()]; }
@@ -186,7 +189,7 @@
         tableau = saved.tableau; stock = saved.stock; waste = saved.waste; foundations = saved.foundations; history = Array.isArray(saved.history) ? saved.history : []; moves = Number(saved.moves) || 0; seconds = Number(saved.seconds) || 0; currentDeck = saved.currentDeck; showTopCards(); selected = null;
         if (saved.won) { clearInterval(timer); gamePanel.classList.add('victory'); message.innerHTML = '<b>Spielstand geladen.</b> Partie bereits abgeschlossen.'; }
         else { gamePanel.classList.remove('victory'); message.innerHTML = '<b>Spielstand geladen.</b> Du kannst weiterspielen.'; }
-        render(); updateStatus(); if (saved.won) startHeap(false); return true;
+        render(); if (solutionMode) applySolutionMark(); updateStatus(); if (saved.won) startHeap(false); return true;
       } catch (error) { console.warn('Solitär-Spielstand konnte nicht geladen werden.', error); return false; }
     }
     function showStatus() { document.getElementById('moves').textContent = moves; document.getElementById('time').textContent = `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, '0')}`; }
@@ -203,7 +206,7 @@
     function hasHiddenCards() { return tableau.some(column => column.some(card => !card.faceUp)); }
     function showTopCards() { tableau.forEach(column => { if (column.length) column.at(-1).faceUp = true; }); }
     function cancelPendingReveal() { animationToken++; clearTimeout(revealTimer); clearTimeout(revealClearTimer); revealTimer = revealClearTimer = null; revealedCards = []; }
-    function undo() { if (gamePanel.classList.contains('victory')) return; let previous = history.pop(); if (!previous) return; cancelPendingReveal(); const current = copyState(); while (previous && sameStateWithoutFaceUp(previous, current) && history.length) previous = history.pop(); if (!previous) return; const origins = captureCardPositions(allCards()); tableau = previous.tableau; stock = previous.stock; waste = previous.waste; foundations = previous.foundations; showTopCards(); selected = null; moves++; document.getElementById('undo').disabled = !history.length; message.innerHTML = '<b>Rückgängig.</b> Das zählt als Zug.'; const restored = allCards(); render(); animateCardMoves(restored, origins); updateStatus(); }
+    function undo() { if (gamePanel.classList.contains('victory')) return; let previous = history.pop(); if (!previous) return; cancelPendingReveal(); const current = copyState(); while (previous && sameStateWithoutFaceUp(previous, current) && history.length) previous = history.pop(); if (!previous) return; const origins = captureCardPositions(allCards()); tableau = previous.tableau; stock = previous.stock; waste = previous.waste; foundations = previous.foundations; showTopCards(); selected = null; moves++; document.getElementById('undo').disabled = !history.length; message.innerHTML = '<b>Rückgängig.</b> Das zählt als Zug.'; const restored = allCards(); render(); if (solutionMode) applySolutionMark(); animateCardMoves(restored, origins); updateStatus(); }
     function captureCardPositions(cards, override) { return new Map(cards.map(item => { const element = document.querySelector(`[data-card-id="${item.id}"]`); return [item.id, override?.get(item.id) || element?.getBoundingClientRect()]; })); }
     const flyingIds = new Set();
     function animateCardMoves(cards, origins) { return new Promise(resolve => requestAnimationFrame(() => { const animations = cards.map(item => { const element = document.querySelector(`[data-card-id="${item.id}"]`); const origin = origins.get(item.id); if (!element || !origin) return Promise.resolve(); const target = element.getBoundingClientRect(); const flight = element.cloneNode(true); flight.classList.add('card-flight'); flight.style.width = `${target.width}px`; flight.style.height = `${target.height}px`; flight.style.left = `${origin.left}px`; flight.style.top = `${origin.top}px`; element.style.visibility = 'hidden'; flyingIds.add(item.id); document.body.appendChild(flight); const animation = flight.animate([{ transform: 'translate(0, 0)' }, { transform: `translate(${target.left - origin.left}px, ${target.top - origin.top}px)` }], { duration: reduceMotion() ? 1 : 600, easing: 'ease-in-out' }); return animation.finished.catch(() => {}).then(() => { flight.remove(); flyingIds.delete(item.id); element.style.visibility = ''; const current = document.querySelector(`[data-card-id="${item.id}"]`); if (current) current.style.visibility = ''; }); }); Promise.all(animations).then(resolve); })); }
@@ -214,6 +217,51 @@
       // Markieren per Einzelklick ist deaktiviert; nur Ziehen und Doppelklick (Automatikzug) bleiben.
       if (lastCardTap?.id === card.id && now - lastCardTap.time < 500) { lastCardTap = null; selected = { source, index, cardIndex }; autoMove(); return; }
       lastCardTap = { id: card.id, time: now };
+    }
+    function findSolutionMove() {
+      // Grundstapel-Züge haben Vorrang.
+      if (waste.length) {
+        const card = waste.at(-1);
+        for (let pileIndex = 0; pileIndex < 4; pileIndex++) if (canPlaceOnFoundation(card, foundations[pileIndex])) return { source: 'waste', index: 0, cardIndex: waste.length - 1 };
+      }
+      for (let column = 0; column < 7; column++) {
+        const cards = tableau[column];
+        if (!cards.length) continue;
+        const card = cards.at(-1);
+        if (!card.faceUp) continue;
+        for (let pileIndex = 0; pileIndex < 4; pileIndex++) if (canPlaceOnFoundation(card, foundations[pileIndex])) return { source: 'tableau', index: column, cardIndex: cards.length - 1 };
+      }
+      // Ablage-Züge.
+      if (waste.length) {
+        const card = waste.at(-1);
+        for (let destination = 0; destination < 7; destination++) {
+          const target = tableau[destination].at(-1);
+          if ((!target && card.rank === 12) || (target && target.red !== card.red && target.rank === card.rank + 1)) return { source: 'waste', index: 0, cardIndex: waste.length - 1 };
+        }
+      }
+      for (let column = 0; column < 7; column++) {
+        const cards = tableau[column];
+        for (let cardIndex = 0; cardIndex < cards.length; cardIndex++) {
+          if (!cards[cardIndex].faceUp) continue;
+          const sequence = cards.slice(cardIndex);
+          if (!validSequence(sequence)) continue;
+          const card = sequence[0];
+          for (let destination = 0; destination < 7; destination++) {
+            if (destination === column) continue;
+            const target = tableau[destination].at(-1);
+            if ((target && target.red !== card.red && target.rank === card.rank + 1) || (!target && card.rank === 12)) return { source: 'tableau', index: column, cardIndex };
+          }
+        }
+      }
+      return null;
+    }
+    function applySolutionMark() {
+      stockElement.classList.remove('solution-target');
+      if (!solutionMode) { selected = null; render(); return; }
+      const move = findSolutionMove();
+      if (move) { selected = move; }
+      else { selected = null; if (stock.length) stockElement.classList.add('solution-target'); }
+      render();
     }
     function finishRevealForDrag(card) {
       if (!revealedCards.includes(card)) return;
@@ -277,7 +325,7 @@
           const column = target?.closest('.column'); const foundation = target?.closest('.foundation');
           if (column) moveToTableau(Number(column.dataset.column), origins);
           else if (foundation) moveToFoundation(Number(foundation.dataset.foundation), origins);
-          else { selected = null; render(); }
+          else { selected = null; render(); if (solutionMode) applySolutionMark(); }
           event.preventDefault(); suppressClick = true; suppressClickUntil = performance.now() + (touch ? 600 : 250); dragClickGuard = { x: event.clientX, y: event.clientY, until: performance.now() + (touch ? 1200 : 250) };
         }
         cardDrag = null;
@@ -326,8 +374,8 @@
     function validSequence(cards) { return cards.every((card, index) => index === 0 || (card.rank === cards[index - 1].rank - 1 && card.red !== cards[index - 1].red)); }
     function canPlaceOnFoundation(card, pile) { const top = pile.at(-1); return top ? top.suit === card.suit && card.rank === top.rank + 1 : card.rank === 0; }
     function autoMove() { const moving = picked(); const card = moving[0]; if (!card) return false; if (moving.length === 1) { for (let pileIndex = 0; pileIndex < foundations.length; pileIndex++) if (canPlaceOnFoundation(card, foundations[pileIndex])) return moveToFoundation(pileIndex); } for (let destination = 0; destination < tableau.length; destination++) { if (selected.source === 'tableau' && selected.index === destination) continue; const target = tableau[destination].at(-1); if ((!target && card.rank === 12) || (target && target.red !== card.red && target.rank === card.rank + 1)) return moveToTableau(destination); } return false; }
-    function moveToTableau(destination, originsOverride = null) { const moving = picked(); const card = moving[0]; if (!card || !validSequence(moving) || (selected.source === 'tableau' && selected.index === destination)) return false; const sourceColumn = selected.source === 'tableau' ? selected.index : null; const revealCard = sourceColumn === null ? null : tableau[sourceColumn][selected.cardIndex - 1]; const origins = captureCardPositions(moving, originsOverride); const target = tableau[destination].at(-1); if ((!target && card.rank === 12) || (target && target.red !== card.red && target.rank === card.rank + 1)) { const token = animationToken; saveState(); removeSelected(false); tableau[destination].push(...moving); moves++; message.innerHTML = '<b>Guter Zug!</b> Wähle die nächste Karte.'; render(); animateCardMoves(moving, origins).then(() => revealAfterMove(revealCard, token)); updateStatus(); return true; } return false; }
-    function moveToFoundation(pileIndex, originsOverride = null) { const moving = picked(); const card = moving[0]; if (!card || moving.length !== 1 || !canPlaceOnFoundation(card, foundations[pileIndex])) return false; const sourceColumn = selected.source === 'tableau' ? selected.index : null; const revealCard = sourceColumn === null ? null : tableau[sourceColumn][selected.cardIndex - 1]; const origins = captureCardPositions(moving, originsOverride); const token = animationToken; saveState(); removeSelected(false); foundations[pileIndex].push(card); moves++; const won = foundations.every(pile => pile.length === 13); if (won) { clearInterval(timer); gamePanel.classList.add('victory'); } message.innerHTML = won ? '<b>Gewonnen!</b> Alle Karten liegen auf den Grundstapeln.' : '<b>Passt!</b> Baue weiter auf.'; render(); animateCardMoves(moving, origins).then(() => { revealAfterMove(revealCard, token); if (won) later(startHeap, 300); }); updateStatus(); return true; }
+    function moveToTableau(destination, originsOverride = null) { const moving = picked(); const card = moving[0]; if (!card || !validSequence(moving) || (selected.source === 'tableau' && selected.index === destination)) return false; const sourceColumn = selected.source === 'tableau' ? selected.index : null; const revealCard = sourceColumn === null ? null : tableau[sourceColumn][selected.cardIndex - 1]; const origins = captureCardPositions(moving, originsOverride); const target = tableau[destination].at(-1); if ((!target && card.rank === 12) || (target && target.red !== card.red && target.rank === card.rank + 1)) { const token = animationToken; saveState(); removeSelected(false); tableau[destination].push(...moving); moves++; message.innerHTML = '<b>Guter Zug!</b> Wähle die nächste Karte.'; render(); if (solutionMode) applySolutionMark(); animateCardMoves(moving, origins).then(() => revealAfterMove(revealCard, token)); updateStatus(); return true; } return false; }
+    function moveToFoundation(pileIndex, originsOverride = null) { const moving = picked(); const card = moving[0]; if (!card || moving.length !== 1 || !canPlaceOnFoundation(card, foundations[pileIndex])) return false; const sourceColumn = selected.source === 'tableau' ? selected.index : null; const revealCard = sourceColumn === null ? null : tableau[sourceColumn][selected.cardIndex - 1]; const origins = captureCardPositions(moving, originsOverride); const token = animationToken; saveState(); removeSelected(false); foundations[pileIndex].push(card); moves++; const won = foundations.every(pile => pile.length === 13); if (won) { clearInterval(timer); gamePanel.classList.add('victory'); } message.innerHTML = won ? '<b>Gewonnen!</b> Alle Karten liegen auf den Grundstapeln.' : '<b>Passt!</b> Baue weiter auf.'; render(); if (solutionMode) applySolutionMark(); animateCardMoves(moving, origins).then(() => { revealAfterMove(revealCard, token); if (won) later(startHeap, 300); }); updateStatus(); return true; }
     function animateStockDraw(card, origin) {
       const target = document.querySelector(`[data-card-id="${card.id}"]`); if (!target) return;
       const destination = target.getBoundingClientRect(), flight = document.createElement('div'); flight.className = 'playing-card card-flight';
@@ -336,7 +384,7 @@
       const duration = reduceMotion() ? 1 : 600, animation = flight.animate([{ transform: 'translate(0, 0) rotateY(0)' }, { transform: `translate(${destination.left - origin.left}px, ${destination.top - origin.top}px) rotateY(90deg)`, offset: .5 }, { transform: `translate(${destination.left - origin.left}px, ${destination.top - origin.top}px) rotateY(0)` }], { duration, easing: 'ease-in-out', fill: 'forwards' });
       setTimeout(() => { flight.replaceChildren(face(card)); }, duration / 2); animation.finished.catch(() => {}).then(() => { flight.remove(); target.style.visibility = ''; });
     }
-    function drawStock() { const origin = stockElement.getBoundingClientRect(), drawn = stock.length ? stock.at(-1) : null; saveState(); if (stock.length) { const card = stock.pop(); card.faceUp = true; waste.push(card); } else { stock = waste.reverse(); waste = []; } moves++; selected = null; render(); updateStatus(); if (drawn) animateStockDraw(drawn, origin); }
+    function drawStock() { const origin = stockElement.getBoundingClientRect(), drawn = stock.length ? stock.at(-1) : null; saveState(); if (stock.length) { const card = stock.pop(); card.faceUp = true; waste.push(card); } else { stock = waste.reverse(); waste = []; } moves++; selected = null; render(); if (solutionMode) applySolutionMark(); updateStatus(); if (drawn) animateStockDraw(drawn, origin); }
     // Nach einem Touch-Drag verschluckt Safari den nächsten Klick; Buttons reagieren daher direkt auf das Touch-pointerup.
     function onTap(button, action) {
       button.addEventListener('pointerup', event => {
@@ -493,6 +541,7 @@
     }
     onTap(document.getElementById('newGame'), () => startNewGame()); onTap(document.getElementById('sameGame'), () => startNewGame(currentDeck)); onTap(autoFinishButton, autoFinishGame);
     onTap(document.getElementById('undo'), undo);
+    onTap(solutionButton, () => { solutionMode = !solutionMode; solutionButton.textContent = `Musterlösung: ${solutionMode ? 'An' : 'Aus'}`; solutionButton.classList.toggle('active', solutionMode); applySolutionMark(); });
     // Gespeichert wird bei jeder Zustandsänderung (updateStatus) sowie beim Verlassen oder Verbergen der Seite, nicht mehr im Sekundentakt.
     document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'hidden') persistGame(); });
     window.addEventListener('pagehide', persistGame);
