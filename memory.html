@@ -66,6 +66,7 @@
     .pile-count { position: absolute; z-index: 5000; padding: 3px 7px; border: 2px solid #171717; border-radius: 7px; color: #171717; background: #FFFFFF; box-shadow: 2px 2px 0 #171717; font-size: .72rem; font-weight: 800; line-height: 1.2; white-space: nowrap; transform: translateX(-50%); pointer-events: none; }
     .empty-pile { position: absolute; z-index: 5; border: 3px dashed rgba(23,23,23,.45); border-radius: 10px; background: rgba(255,255,255,.45); transform: rotate(-3deg); pointer-events: none; }
     .memory-card.flipped, .memory-card.matched { transform: rotateY(180deg); }
+    .memory-hole { pointer-events: none; }
     .memory-card.flipped::after, .memory-card.matched::after { background: var(--symbol-bg, #FFFFFF); }
     .memory-card.matched { color: var(--cyan); background: #DDEEFF; box-shadow: 3px 3px 0 #171717; animation: matchedPop .65s ease; }
     .memory-card:disabled { cursor: default; }
@@ -99,6 +100,7 @@
           <button class="size active" data-size="8" type="button">4 × 4</button>
           <button class="size" data-size="12" type="button">4 × 6</button>
           <button class="size" data-size="18" type="button">6 × 6</button>
+          <button class="size" data-size="24" type="button">5 × 5</button>
         </div>
       </div>
       <div class="stats" aria-label="Spielstatistik">
@@ -115,7 +117,7 @@
       <button class="new-game" id="newGame" type="button">Neues Spiel</button>
       <a class="symbols-link" href="memory-symbols.html">Alle Symbole ansehen&nbsp; →</a>
     </section>
-    <button class="version" data-version type="button" title="Klicken, um die Seite neu zu laden">Version 2.24</button>
+    <button class="version" data-version type="button" title="Klicken, um die Seite neu zu laden">Version 2.25</button>
     <script>const versionButton = document.querySelector('[data-version]'); versionButton.addEventListener('click', () => location.replace(`${location.pathname}?v=${Date.now()}`)); fetch(`VERSION?${Date.now()}`, { cache: 'no-store' }).then(response => response.text()).then(version => { versionButton.textContent = `Version ${version.trim()}`; }).catch(() => {});</script>
   </main>
   <script src="memory-symbols.js"></script>
@@ -203,7 +205,7 @@
         const icon = cards[cardIndex++];
         const card = document.createElement('button'); card.className = 'memory-card'; card.type = 'button'; card.dataset.index = cardIndex - 1; card.dataset.icon = icon.symbol; card.style.setProperty('--symbol-bg', icon.color); card.setAttribute('role', 'gridcell'); card.setAttribute('aria-label', `Karte ${cardIndex}, verdeckt`); card.addEventListener('click', () => flip(card)); boardElement.appendChild(card);
       }
-      if (stacked) [...boardElement.children].forEach((card, index) => { const center = centerOffset(card); card.style.zIndex = cards.length - index; setPose(card, pose(center.x + jitter(3), center.y + jitter(3), jitter(8), 0)); });
+      if (stacked) [...boardElement.querySelectorAll('.memory-card')].forEach((card, index) => { const center = centerOffset(card); card.style.zIndex = cards.length - index; setPose(card, pose(center.x + jitter(3), center.y + jitter(3), jitter(8), 0)); });
       document.getElementById('time').textContent = '0:00'; updateStats(); document.getElementById('message').innerHTML = mode === 'two' ? '<b>Spieler 1 ist dran.</b> Finde ein Paar.' : '<b>Bereit?</b> Finde das erste Paar.';
     }
     function beginTimer() { clearInterval(timer); timer = setInterval(() => { seconds++; document.getElementById('time').textContent = `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, '0')}`; }, 1000); }
