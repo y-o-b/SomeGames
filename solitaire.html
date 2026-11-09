@@ -126,7 +126,7 @@
       <div class="controls"><button class="undo" id="undo" type="button" disabled>↶ Rückgängig</button><button id="sameGame" class="undo" type="button">↻ Gleiches Deck</button><button id="autoFinish" type="button" hidden>▶ Fertigspielen</button><button id="newGame" type="button">Neues Spiel</button></div>
       <div class="heap" id="heap" aria-hidden="true"></div>
     </section>
-    <button class="version" data-version type="button" title="Klicken, um die Seite neu zu laden">Version 2.10</button>
+    <button class="version" data-version type="button" title="Klicken, um die Seite neu zu laden">Version 2.11</button>
     <script>const versionButton = document.querySelector('[data-version]'); versionButton.addEventListener('click', () => location.replace(`${location.pathname}?v=${Date.now()}`)); fetch(`VERSION?${Date.now()}`, { cache: 'no-store' }).then(response => response.text()).then(version => { versionButton.textContent = `Version ${version.trim()}`; }).catch(() => {});</script>
   </main>
   <script>
@@ -210,11 +210,10 @@
     function face(card, extra = '') { const element = document.createElement('div'); element.className = `card-face${card.red ? ' red' : ''} ${extra}`; [['corner top-left', card.name], ['corner top-right suit-top', card.suit + '\uFE0E'], ['suit center-suit', card.suit + '\uFE0E']].forEach(([className, text]) => { const span = document.createElement('span'); span.className = className; span.textContent = text; element.appendChild(span); }); return element; }
     // Einheitliche Tap-Logik für Maus und Touch: zweiter Tap innerhalb von 500 ms = Automatikzug, sonst auswählen, verschieben oder abwählen.
     function tapCard(card, source, index, cardIndex) {
-      const now = performance.now(), isSelected = selected && selected.source === source && selected.index === index && selected.cardIndex === cardIndex;
+      const now = performance.now();
+      // Markieren per Einzelklick ist deaktiviert; nur Ziehen und Doppelklick (Automatikzug) bleiben.
       if (lastCardTap?.id === card.id && now - lastCardTap.time < 500) { lastCardTap = null; selected = { source, index, cardIndex }; autoMove(); return; }
-      if (selected && !isSelected && (source === 'tableau' || source === 'foundation')) { lastCardTap = null; if (source === 'tableau') moveToTableau(index); else moveToFoundation(index); return; }
-      if (isSelected) { selected = null; lastCardTap = null; render(); return; }
-      selected = { source, index, cardIndex }; lastCardTap = { id: card.id, time: now }; render();
+      lastCardTap = { id: card.id, time: now };
     }
     function finishRevealForDrag(card) {
       if (!revealedCards.includes(card)) return;
