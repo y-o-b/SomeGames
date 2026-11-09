@@ -56,6 +56,7 @@
     .board { position: relative; display: grid; gap: 8px; margin: 0 auto 21px; max-width: 540px; }
     .memory-card { position: relative; aspect-ratio: 1; min-width: 0; border-radius: 10px; background: var(--bg); color: transparent; font-size: clamp(1.8rem, 9vw, 3.4rem); border: 3px solid #171717; box-shadow: 3px 3px 0 #171717; transform-style: preserve-3d; transition: transform .25s ease; }
     .board[data-size="8"] .memory-card { font-size: clamp(2rem, 9vw, 4rem); }
+    .board[data-size="10"] .memory-card { font-size: clamp(1.9rem, 8.5vw, 3.6rem); }
     .board[data-size="12"] .memory-card { font-size: clamp(1.8rem, 8vw, 3.2rem); }
     .board[data-size="18"] .memory-card { font-size: clamp(1.5rem, 7vw, 2.8rem); }
     .board[data-size="24"] .memory-card { font-size: clamp(1.5rem, 6vw, 2.6rem); }
@@ -98,6 +99,7 @@
         <span>Größe</span>
         <div class="size-buttons" role="group" aria-label="Spielfeldgröße">
           <button class="size active" data-size="8" type="button">4 × 4</button>
+          <button class="size" data-size="10" type="button">4 × 5</button>
           <button class="size" data-size="12" type="button">4 × 6</button>
           <button class="size" data-size="18" type="button">6 × 6</button>
           <button class="size" data-size="24" type="button">5 × 5</button>
@@ -117,7 +119,7 @@
       <button class="new-game" id="newGame" type="button">Neues Spiel</button>
       <a class="symbols-link" href="memory-symbols.html">Alle Symbole ansehen&nbsp; →</a>
     </section>
-    <button class="version" data-version type="button" title="Klicken, um die Seite neu zu laden">Version 2.27</button>
+    <button class="version" data-version type="button" title="Klicken, um die Seite neu zu laden">Version 2.28</button>
     <script>const versionButton = document.querySelector('[data-version]'); versionButton.addEventListener('click', () => location.replace(`${location.pathname}?v=${Date.now()}`)); fetch(`VERSION?${Date.now()}`, { cache: 'no-store' }).then(response => response.text()).then(version => { versionButton.textContent = `Version ${version.trim()}`; }).catch(() => {});</script>
   </main>
   <script src="memory-symbols.js"></script>
@@ -136,7 +138,7 @@
     const tabletLandscape = () => matchMedia('(min-width: 768px) and (max-width: 1366px) and (orientation: landscape)').matches;
     const boardColumns = () => size === 24 ? 5 : (size === 18 || (size === 12 && tabletLandscape()) ? 6 : 4);
     function applyBoardLayout() { boardElement.style.gridTemplateColumns = `repeat(${boardColumns()}, 1fr)`; appElement.classList.toggle('tablet-wide', size === 12 && tabletLandscape()); }
-    function updateSizeLabels() { sizeButtons.forEach(button => { button.textContent = button.dataset.size === '12' && tabletLandscape() ? '6 × 4' : button.dataset.size === '12' ? '4 × 6' : button.dataset.size === '18' ? '6 × 6' : button.dataset.size === '24' ? '5 × 5' : '4 × 4'; }); }
+    function updateSizeLabels() { sizeButtons.forEach(button => { button.textContent = button.dataset.size === '12' && tabletLandscape() ? '6 × 4' : button.dataset.size === '12' ? '4 × 6' : button.dataset.size === '10' ? '4 × 5' : button.dataset.size === '18' ? '6 × 6' : button.dataset.size === '24' ? '5 × 5' : '4 × 4'; }); }
     window.addEventListener('resize', () => { if (!gamePanel.classList.contains('victory')) { applyBoardLayout(); updateSizeLabels(); } });
     const pose = (dx = 0, dy = 0, rot = 0, flip = 0) => ({ dx, dy, rot, flip });
     const transformOf = p => `translate(${p.dx}px, ${p.dy}px) rotate(${p.rot}deg) rotateY(${p.flip}deg)`;
