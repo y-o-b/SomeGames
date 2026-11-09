@@ -174,7 +174,6 @@
       <h2 id="settingsTitle" tabindex="-1" autofocus>Neues Spiel</h2>
       <div class="settings" aria-label="Spielfeldeinstellungen">
         <div class="setting-row shape-row">
-          <span>Felder</span>
           <div class="setting-buttons shape-buttons" role="group" aria-label="Form der Felder">
             <button class="setting-button" data-shape="square" type="button">◼ Quadrate</button>
             <button class="setting-button" data-shape="hex" type="button">⬢ Sechsecke</button>
@@ -205,9 +204,9 @@
         </div>
       </div>
       <button class="settings-done" id="settingsDone" type="button">Spiel starten</button>
-      <button class="version" data-version type="button" title="Klicken, um die Seite neu zu laden">Version 2.21</button>
+      <button class="version" data-version type="button" title="Klicken, um die Seite neu zu laden">Version 2.22</button>
     </dialog>
-    <button class="version" data-version type="button" title="Klicken, um die Seite neu zu laden">Version 2.21</button>
+    <button class="version" data-version type="button" title="Klicken, um die Seite neu zu laden">Version 2.22</button>
     <script>document.querySelectorAll('[data-version]').forEach(versionButton => { versionButton.addEventListener('click', () => location.replace(`${location.pathname}?v=${Date.now()}`)); fetch(`VERSION?${Date.now()}`, { cache: 'no-store' }).then(response => response.text()).then(version => { versionButton.textContent = `Version ${version.trim()}`; }).catch(() => {}); });</script>
   </main>
   <script>
