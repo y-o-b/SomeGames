@@ -198,14 +198,14 @@
         <div class="setting-row">
           <label for="mineCount">Minen</label>
           <div class="mine-setting">
-            <input id="mineCount" type="range" min="5" max="50" step="1" value="15" aria-label="Anteil der Minen in Prozent" />
+            <input id="mineCount" type="range" min="5" max="50" step="5" value="15" aria-label="Anteil der Minen in Prozent" />
             <output id="mineCountValue" for="mineCount">15 %</output>
           </div>
         </div>
       </div>
       <button class="settings-done" id="settingsDone" type="button">Spiel starten</button>
     </dialog>
-    <button class="version" data-version type="button" title="Klicken, um die Seite neu zu laden">Version 2.14</button>
+    <button class="version" data-version type="button" title="Klicken, um die Seite neu zu laden">Version 2.15</button>
     <script>const versionButton = document.querySelector('[data-version]'); versionButton.addEventListener('click', () => location.replace(`${location.pathname}?v=${Date.now()}`)); fetch(`VERSION?${Date.now()}`, { cache: 'no-store' }).then(response => response.text()).then(version => { versionButton.textContent = `Version ${version.trim()}`; }).catch(() => {});</script>
   </main>
   <script>
@@ -237,7 +237,7 @@
     const clamp = (value, min, max) => Math.min(max, Math.max(min, value));
     const settingsCells = () => { const { cols, rows } = boardWrap ? wrappedDimensions(wrapBoardSize, boardShape) : boardSizes[boardSize]; return cols * rows; };
     const minesForPercent = (cells, percent) => Math.max(1, Math.round(cells * percent / 100));
-    const percentForMines = (cells, mines) => clamp(Math.round(mines / cells * 100), MINE_PERCENT_MIN, MINE_PERCENT_MAX);
+    const percentForMines = (cells, mines) => clamp(Math.round(mines / cells * 100 / 5) * 5, MINE_PERCENT_MIN, MINE_PERCENT_MAX);
     try {
       const savedSize = localStorage.getItem(SIZE_STORAGE_KEY), savedMineCount = localStorage.getItem(MINE_COUNT_STORAGE_KEY), savedMinePercent = Number(localStorage.getItem(MINE_PERCENT_STORAGE_KEY)), savedWrapBoardSize = Number(localStorage.getItem(WRAP_BOARD_SIZE_KEY));
       const validSavedMineCount = Number.isInteger(Number(savedMineCount)) && Number(savedMineCount) > 0;
@@ -249,7 +249,8 @@
       const preset = boardSizes[boardSize], presetWrapSize = Math.max(preset.cols, preset.rows);
       wrapBoardSize = clamp(Number.isInteger(savedWrapBoardSize) && savedWrapBoardSize > 0 ? savedWrapBoardSize : presetWrapSize, WRAP_BOARD_MIN, WRAP_BOARD_MAX);
       // Früher war eine feste Minenzahl gespeichert; sie wird einmalig in einen Anteil umgerechnet.
-      minePercent = Number.isInteger(savedMinePercent) && savedMinePercent >= MINE_PERCENT_MIN && savedMinePercent <= MINE_PERCENT_MAX ? savedMinePercent : validSavedMineCount || legacy ? percentForMines(settingsCells(), mineCount) : 15;
+      const roundedSavedPercent = Number.isFinite(savedMinePercent) ? Math.round(savedMinePercent / 5) * 5 : savedMinePercent;
+      minePercent = Number.isInteger(roundedSavedPercent) && roundedSavedPercent >= MINE_PERCENT_MIN && roundedSavedPercent <= MINE_PERCENT_MAX ? roundedSavedPercent : validSavedMineCount || legacy ? percentForMines(settingsCells(), mineCount) : 15;
     } catch (error) { console.warn('Detektor-Einstellungen konnten nicht geladen werden.', error); }
     mineCount = minesForPercent(settingsCells(), minePercent);
     document.querySelectorAll('[data-size]').forEach(button => button.classList.toggle('active', button.dataset.size === boardSize));
@@ -770,7 +771,7 @@
     document.querySelectorAll('[data-shape]').forEach(button => button.addEventListener('click', () => { boardShape = button.dataset.shape; refreshSettingsControls(); }));
     document.querySelectorAll('[data-size]').forEach(button => button.addEventListener('click', () => { boardSize = button.dataset.size; refreshSettingsControls(); }));
     mineCountInput.addEventListener('input', () => { mineCountOutput.value = `${mineCountInput.value} %`; mineCountOutput.textContent = mineCountOutput.value; });
-    mineCountInput.addEventListener('change', () => { minePercent = clamp(Number(mineCountInput.value), MINE_PERCENT_MIN, MINE_PERCENT_MAX); refreshSettingsControls(); });
+    mineCountInput.addEventListener('change', () => { minePercent = clamp(Math.round(Number(mineCountInput.value) / 5) * 5, MINE_PERCENT_MIN, MINE_PERCENT_MAX); refreshSettingsControls(); });
     // Drehen oder Fenstergröße ändern: Fenster neu einpassen, das Spiel läuft weiter.
     let fitFrame = 0;
     addEventListener('resize', () => { cancelAnimationFrame(fitFrame); fitFrame = requestAnimationFrame(fitAndLayout); });
