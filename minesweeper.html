@@ -191,7 +191,7 @@
         <div class="setting-row" id="wrapBoardSizeRow" hidden>
           <label for="wrapBoardSize">Spielfeldgröße</label>
           <div class="mine-setting">
-            <input id="wrapBoardSize" type="range" min="14" max="30" step="1" value="14" aria-label="Spielfeldgröße auswählen" />
+            <input id="wrapBoardSize" type="range" min="14" max="30" step="4" value="14" aria-label="Spielfeldgröße auswählen" />
             <output id="wrapBoardSizeValue" for="wrapBoardSize">14×14</output>
           </div>
         </div>
@@ -205,7 +205,7 @@
       </div>
       <button class="settings-done" id="settingsDone" type="button">Spiel starten</button>
     </dialog>
-    <button class="version" data-version type="button" title="Klicken, um die Seite neu zu laden">Version 2.15</button>
+    <button class="version" data-version type="button" title="Klicken, um die Seite neu zu laden">Version 2.16</button>
     <script>const versionButton = document.querySelector('[data-version]'); versionButton.addEventListener('click', () => location.replace(`${location.pathname}?v=${Date.now()}`)); fetch(`VERSION?${Date.now()}`, { cache: 'no-store' }).then(response => response.text()).then(version => { versionButton.textContent = `Version ${version.trim()}`; }).catch(() => {});</script>
   </main>
   <script>
@@ -247,7 +247,7 @@
       const legacyPresets = { easy: ['9x9', 10], medium: ['12x12', 25], hard: ['12x21', 40] }, legacy = legacyPresets[localStorage.getItem(LEVEL_STORAGE_KEY)];
       if (legacy) { if (!boardSizes[savedSize]) boardSize = legacy[0]; if (!validSavedMineCount) mineCount = legacy[1]; }
       const preset = boardSizes[boardSize], presetWrapSize = Math.max(preset.cols, preset.rows);
-      wrapBoardSize = clamp(Number.isInteger(savedWrapBoardSize) && savedWrapBoardSize > 0 ? savedWrapBoardSize : presetWrapSize, WRAP_BOARD_MIN, WRAP_BOARD_MAX);
+      wrapBoardSize = clamp(Number.isInteger(savedWrapBoardSize) && savedWrapBoardSize > 0 ? Math.round(savedWrapBoardSize / 4) * 4 : Math.round(presetWrapSize / 4) * 4, WRAP_BOARD_MIN, WRAP_BOARD_MAX);
       // Früher war eine feste Minenzahl gespeichert; sie wird einmalig in einen Anteil umgerechnet.
       const roundedSavedPercent = Number.isFinite(savedMinePercent) ? Math.round(savedMinePercent / 5) * 5 : savedMinePercent;
       minePercent = Number.isInteger(roundedSavedPercent) && roundedSavedPercent >= MINE_PERCENT_MIN && roundedSavedPercent <= MINE_PERCENT_MAX ? roundedSavedPercent : validSavedMineCount || legacy ? percentForMines(settingsCells(), mineCount) : 15;
@@ -767,7 +767,7 @@
     });
     document.querySelectorAll('[data-wrap]').forEach(button => button.addEventListener('click', () => { boardWrap = button.dataset.wrap === 'on'; refreshSettingsControls(); }));
     wrapBoardSizeInput.addEventListener('input', () => { wrapBoardSizeOutput.value = wrapBoardLabel(Number(wrapBoardSizeInput.value)); wrapBoardSizeOutput.textContent = wrapBoardSizeOutput.value; });
-    wrapBoardSizeInput.addEventListener('change', () => { const size = Number(wrapBoardSizeInput.value); if (!Number.isInteger(size) || size < WRAP_BOARD_MIN || size > WRAP_BOARD_MAX || size === wrapBoardSize) return; wrapBoardSize = size; refreshSettingsControls(); });
+    wrapBoardSizeInput.addEventListener('change', () => { const raw = Number(wrapBoardSizeInput.value); const size = Math.round(raw / 4) * 4; if (!Number.isInteger(size) || size < WRAP_BOARD_MIN || size > WRAP_BOARD_MAX || size === wrapBoardSize) return; wrapBoardSize = size; refreshSettingsControls(); });
     document.querySelectorAll('[data-shape]').forEach(button => button.addEventListener('click', () => { boardShape = button.dataset.shape; refreshSettingsControls(); }));
     document.querySelectorAll('[data-size]').forEach(button => button.addEventListener('click', () => { boardSize = button.dataset.size; refreshSettingsControls(); }));
     mineCountInput.addEventListener('input', () => { mineCountOutput.value = `${mineCountInput.value} %`; mineCountOutput.textContent = mineCountOutput.value; });
