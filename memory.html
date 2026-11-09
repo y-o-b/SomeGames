@@ -119,7 +119,7 @@
       <button class="new-game" id="newGame" type="button">Neues Spiel</button>
       <a class="symbols-link" href="memory-symbols.html">Alle Symbole ansehen&nbsp; →</a>
     </section>
-    <button class="version" data-version type="button" title="Klicken, um die Seite neu zu laden">Version 2.28</button>
+    <button class="version" data-version type="button" title="Klicken, um die Seite neu zu laden">Version 2.29</button>
     <script>const versionButton = document.querySelector('[data-version]'); versionButton.addEventListener('click', () => location.replace(`${location.pathname}?v=${Date.now()}`)); fetch(`VERSION?${Date.now()}`, { cache: 'no-store' }).then(response => response.text()).then(version => { versionButton.textContent = `Version ${version.trim()}`; }).catch(() => {});</script>
   </main>
   <script src="memory-symbols.js"></script>
@@ -198,15 +198,10 @@
       });
     }
     function build(stacked) {
-      clearInterval(timer); gamePanel.classList.remove('victory'); const pairCount = size === 24 ? 12 : size; const chosen = shuffle(icons).slice(0, pairCount); cards = shuffle(chosen.flatMap(icon => [icon, icon])); first = second = null; locked = stacked; currentPlayer = 1; playerScores = [0, 0]; moves = pairs = seconds = 0;
+      clearInterval(timer); gamePanel.classList.remove('victory'); const pairCount = size === 24 ? 12 : size; const chosen = shuffle(icons).slice(0, size === 24 ? pairCount + 1 : pairCount); cards = shuffle(size === 24 ? chosen.slice(0, pairCount).flatMap(icon => [icon, icon]).concat([chosen[pairCount]]) : chosen.flatMap(icon => [icon, icon])); first = second = null; locked = stacked; currentPlayer = 1; playerScores = [0, 0]; moves = pairs = seconds = 0;
       boardElement.dataset.size = size; applyBoardLayout(); updateSizeLabels(); boardElement.innerHTML = '';
-      const totalCells = size === 24 ? 25 : cards.length;
-      let cardIndex = 0;
-      for (let cell = 0; cell < totalCells; cell++) {
-        if (size === 24 && cell === 12) { const hole = document.createElement('div'); hole.className = 'memory-hole'; boardElement.appendChild(hole); continue; }
-        const icon = cards[cardIndex++];
-        const card = document.createElement('button'); card.className = 'memory-card'; card.type = 'button'; card.dataset.index = cardIndex - 1; card.dataset.icon = icon.symbol; card.style.setProperty('--symbol-bg', icon.color); card.setAttribute('role', 'gridcell'); card.setAttribute('aria-label', `Karte ${cardIndex}, verdeckt`); card.addEventListener('click', () => flip(card)); boardElement.appendChild(card);
-      }
+      const totalCells = cards.length;
+      cards.forEach((icon, index) => { const card = document.createElement('button'); card.className = 'memory-card'; card.type = 'button'; card.dataset.index = index; card.dataset.icon = icon.symbol; card.style.setProperty('--symbol-bg', icon.color); card.setAttribute('role', 'gridcell'); card.setAttribute('aria-label', `Karte ${index + 1}, verdeckt`); card.addEventListener('click', () => flip(card)); boardElement.appendChild(card); });
       if (stacked) [...boardElement.querySelectorAll('.memory-card')].forEach((card, index) => { const center = centerOffset(card); card.style.zIndex = cards.length - index; setPose(card, pose(center.x + jitter(3), center.y + jitter(3), jitter(8), 0)); });
       document.getElementById('time').textContent = '0:00'; updateStats(); document.getElementById('message').innerHTML = mode === 'two' ? '<b>Spieler 1 ist dran.</b> Finde ein Paar.' : '<b>Bereit?</b> Finde das erste Paar.';
     }
@@ -239,7 +234,7 @@
       count.textContent = reveals; card.classList.add('flipped'); card.setAttribute('aria-label', `Karte ${Number(card.dataset.index) + 1}: ${card.dataset.icon}, ${reveals}× aufgedeckt`);
       if (!first) { first = card; return; }
       second = card; moves++; updateStats(); locked = true;
-      if (first.dataset.icon === second.dataset.icon) { first.classList.add('matched'); second.classList.add('matched'); pairs++; if (mode === 'two') { first.dataset.owner = second.dataset.owner = String(currentPlayer); playerScores[currentPlayer - 1]++; } first = second = null; locked = false; updateStats(); if (pairs === cards.length / 2) { clearInterval(timer); const result = mode === 'two' ? (playerScores[0] === playerScores[1] ? 'Unentschieden!' : `Spieler ${playerScores[0] > playerScores[1] ? 1 : 2} gewinnt!`) : 'Gewonnen!'; gamePanel.classList.add('victory'); heapTimer = setTimeout(startHeap, 800); document.getElementById('message').innerHTML = `<b>${result}</b> ${moves} Züge in ${document.getElementById('time').textContent}.`; } else if (mode === 'two') document.getElementById('message').innerHTML = `<b>Spieler ${currentPlayer} bleibt dran.</b> Noch ein Versuch!`; }
+      if (first.dataset.icon === second.dataset.icon) { first.classList.add('matched'); second.classList.add('matched'); pairs++; if (mode === 'two') { first.dataset.owner = second.dataset.owner = String(currentPlayer); playerScores[currentPlayer - 1]++; } first = second = null; locked = false; updateStats(); if (pairs === Math.floor(cards.length / 2)) { clearInterval(timer); const result = mode === 'two' ? (playerScores[0] === playerScores[1] ? 'Unentschieden!' : `Spieler ${playerScores[0] > playerScores[1] ? 1 : 2} gewinnt!`) : 'Gewonnen!'; gamePanel.classList.add('victory'); heapTimer = setTimeout(startHeap, 800); document.getElementById('message').innerHTML = `<b>${result}</b> ${moves} Züge in ${document.getElementById('time').textContent}.`; } else if (mode === 'two') document.getElementById('message').innerHTML = `<b>Spieler ${currentPlayer} bleibt dran.</b> Noch ein Versuch!`; }
       else { const flipRun = run; setTimeout(() => { if (flipRun !== run) return; [first, second].forEach(item => { item.classList.remove('flipped'); item.setAttribute('aria-label', `Karte ${Number(item.dataset.index) + 1}, verdeckt`); }); first = second = null; if (mode === 'two') { currentPlayer = currentPlayer === 1 ? 2 : 1; document.getElementById('message').innerHTML = `<b>Spieler ${currentPlayer} ist dran.</b> Finde ein Paar.`; } locked = false; updateStats(); }, 1400); }
     }
     document.querySelectorAll('.mode').forEach(button => button.addEventListener('click', () => { mode = button.dataset.mode; document.querySelectorAll('.mode').forEach(item => item.classList.toggle('active', item === button)); document.getElementById('players').hidden = mode !== 'two'; start(); }));
