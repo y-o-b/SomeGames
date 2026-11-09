@@ -58,6 +58,7 @@
     .board[data-size="8"] .memory-card { font-size: clamp(2rem, 9vw, 4rem); }
     .board[data-size="12"] .memory-card { font-size: clamp(1.8rem, 8vw, 3.2rem); }
     .board[data-size="18"] .memory-card { font-size: clamp(1.5rem, 7vw, 2.8rem); }
+    .board[data-size="24"] .memory-card { font-size: clamp(1.5rem, 6vw, 2.6rem); }
     .memory-card::before, .memory-card::after { position: absolute; inset: 0; display: grid; place-items: center; backface-visibility: hidden; }
     .memory-card::before { content: '?'; color: #FFFFFF; font-size: .8em; font-weight: 800; }
     .memory-card::after { content: attr(data-icon); color: var(--text); background: #FFFFFF; transform: rotateY(180deg); }
@@ -114,7 +115,7 @@
       <button class="new-game" id="newGame" type="button">Neues Spiel</button>
       <a class="symbols-link" href="memory-symbols.html">Alle Symbole ansehen&nbsp; →</a>
     </section>
-    <button class="version" data-version type="button" title="Klicken, um die Seite neu zu laden">Version 2.23</button>
+    <button class="version" data-version type="button" title="Klicken, um die Seite neu zu laden">Version 2.24</button>
     <script>const versionButton = document.querySelector('[data-version]'); versionButton.addEventListener('click', () => location.replace(`${location.pathname}?v=${Date.now()}`)); fetch(`VERSION?${Date.now()}`, { cache: 'no-store' }).then(response => response.text()).then(version => { versionButton.textContent = `Version ${version.trim()}`; }).catch(() => {});</script>
   </main>
   <script src="memory-symbols.js"></script>
@@ -131,9 +132,9 @@
     }
     const reduceMotion = () => matchMedia('(prefers-reduced-motion: reduce)').matches;
     const tabletLandscape = () => matchMedia('(min-width: 768px) and (max-width: 1366px) and (orientation: landscape)').matches;
-    const boardColumns = () => size === 18 || (size === 12 && tabletLandscape()) ? 6 : 4;
+    const boardColumns = () => size === 24 ? 5 : size === 18 || (size === 12 && tabletLandscape()) ? 6 : 4;
     function applyBoardLayout() { boardElement.style.gridTemplateColumns = `repeat(${boardColumns()}, 1fr)`; appElement.classList.toggle('tablet-wide', size === 12 && tabletLandscape()); }
-    function updateSizeLabels() { sizeButtons.forEach(button => { button.textContent = button.dataset.size === '12' && tabletLandscape() ? '6 × 4' : button.dataset.size === '12' ? '4 × 6' : button.dataset.size === '18' ? '6 × 6' : '4 × 4'; }); }
+    function updateSizeLabels() { sizeButtons.forEach(button => { button.textContent = button.dataset.size === '12' && tabletLandscape() ? '6 × 4' : button.dataset.size === '12' ? '4 × 6' : button.dataset.size === '18' ? '6 × 6' : button.dataset.size === '24' ? '5 × 5' : '4 × 4'; }); }
     window.addEventListener('resize', () => { if (!gamePanel.classList.contains('victory')) { applyBoardLayout(); updateSizeLabels(); } });
     const pose = (dx = 0, dy = 0, rot = 0, flip = 0) => ({ dx, dy, rot, flip });
     const transformOf = p => `translate(${p.dx}px, ${p.dy}px) rotate(${p.rot}deg) rotateY(${p.flip}deg)`;
@@ -195,7 +196,13 @@
     function build(stacked) {
       clearInterval(timer); gamePanel.classList.remove('victory'); const chosen = shuffle(icons).slice(0, size); cards = shuffle(chosen.flatMap(icon => [icon, icon])); first = second = null; locked = stacked; currentPlayer = 1; playerScores = [0, 0]; moves = pairs = seconds = 0;
       boardElement.dataset.size = size; applyBoardLayout(); updateSizeLabels(); boardElement.innerHTML = '';
-      cards.forEach((icon, index) => { const card = document.createElement('button'); card.className = 'memory-card'; card.type = 'button'; card.dataset.index = index; card.dataset.icon = icon.symbol; card.style.setProperty('--symbol-bg', icon.color); card.setAttribute('role', 'gridcell'); card.setAttribute('aria-label', `Karte ${index + 1}, verdeckt`); card.addEventListener('click', () => flip(card)); boardElement.appendChild(card); });
+      const totalCells = size === 24 ? 25 : size;
+      let cardIndex = 0;
+      for (let cell = 0; cell < totalCells; cell++) {
+        if (size === 24 && cell === 12) { const hole = document.createElement('div'); hole.className = 'memory-hole'; boardElement.appendChild(hole); continue; }
+        const icon = cards[cardIndex++];
+        const card = document.createElement('button'); card.className = 'memory-card'; card.type = 'button'; card.dataset.index = cardIndex - 1; card.dataset.icon = icon.symbol; card.style.setProperty('--symbol-bg', icon.color); card.setAttribute('role', 'gridcell'); card.setAttribute('aria-label', `Karte ${cardIndex}, verdeckt`); card.addEventListener('click', () => flip(card)); boardElement.appendChild(card);
+      }
       if (stacked) [...boardElement.children].forEach((card, index) => { const center = centerOffset(card); card.style.zIndex = cards.length - index; setPose(card, pose(center.x + jitter(3), center.y + jitter(3), jitter(8), 0)); });
       document.getElementById('time').textContent = '0:00'; updateStats(); document.getElementById('message').innerHTML = mode === 'two' ? '<b>Spieler 1 ist dran.</b> Finde ein Paar.' : '<b>Bereit?</b> Finde das erste Paar.';
     }
