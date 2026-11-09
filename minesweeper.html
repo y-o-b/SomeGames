@@ -205,7 +205,7 @@
       </div>
       <button class="settings-done" id="settingsDone" type="button">Spiel starten</button>
     </dialog>
-    <button class="version" data-version type="button" title="Klicken, um die Seite neu zu laden">Version 2.17</button>
+    <button class="version" data-version type="button" title="Klicken, um die Seite neu zu laden">Version 2.18</button>
     <script>const versionButton = document.querySelector('[data-version]'); versionButton.addEventListener('click', () => location.replace(`${location.pathname}?v=${Date.now()}`)); fetch(`VERSION?${Date.now()}`, { cache: 'no-store' }).then(response => response.text()).then(version => { versionButton.textContent = `Version ${version.trim()}`; }).catch(() => {});</script>
   </main>
   <script>
@@ -256,10 +256,9 @@
     document.querySelectorAll('[data-size]').forEach(button => button.classList.toggle('active', button.dataset.size === boardSize));
     document.querySelectorAll('[data-shape]').forEach(button => button.classList.toggle('active', button.dataset.shape === boardShape));
     document.querySelectorAll('[data-wrap]').forEach(button => button.classList.toggle('active', (button.dataset.wrap === 'on') === boardWrap));
-    function updateMineControl() { mineCount = minesForPercent(settingsCells(), minePercent); mineCountInput.min = MINE_PERCENT_MIN; mineCountInput.max = MINE_PERCENT_MAX; mineCountInput.step = '10'; mineCountInput.value = minePercent; mineCountOutput.value = `${minePercent} %`; mineCountOutput.textContent = mineCountOutput.value; }
+    function updateMineControl() { mineCount = minesForPercent(settingsCells(), minePercent); mineCountInput.min = MINE_PERCENT_MIN; mineCountInput.max = MINE_PERCENT_MAX; mineCountInput.step = '10'; mineCountInput.value = minePercent; mineCountOutput.value = mineTerm(minePercent); mineCountOutput.textContent = mineCountOutput.value; }
     updateMineControl();
     const tabletLandscape = () => matchMedia('(min-width: 768px) and (max-width: 1366px) and (orientation: landscape)').matches;
-    function boardSizeLabel(size, landscape = tabletLandscape()) { const { cols, rows } = boardSizes[size]; return size === '12x21' && landscape ? `${rows}×${cols}` : `${cols}×${rows}`; }
     function selectedConfig() {
       const size = boardSizes[boardSize], rotate = !boardWrap && boardSize === '12x21' && tabletLandscape();
       const { cols, rows } = boardWrap ? wrappedDimensions(wrapBoardSize, boardShape) : { cols: rotate ? size.rows : size.cols, rows: rotate ? size.cols : size.rows };
@@ -270,7 +269,10 @@
       const landscape = activeConfig ? activeConfig.cols > activeConfig.rows : tabletLandscape();
       document.querySelectorAll('[data-size]').forEach(button => { button.textContent = boardSizeLabel(button.dataset.size, landscape); button.classList.toggle('active', button.dataset.size === boardSize); });
     }
-    const wrapBoardLabel = size => { const { cols, rows } = wrappedDimensions(size, boardShape); return `${cols}×${rows}`; };
+    const sizeTerm = size => ({ '9x9': 'Klein', '12x12': 'Mittel', '12x21': 'Groß' })[size] || size;
+    const boardSizeLabel = size => sizeTerm(size);
+    const wrapSizeTerm = size => size <= 14 ? 'Klein' : size <= 18 ? 'Mittel' : size <= 22 ? 'Groß' : size <= 26 ? 'Sehr groß' : 'Riesig';
+    const wrapBoardLabel = size => wrapSizeTerm(size);
     function updateWrapBoardSizeControl() { sizeButtonsRow.hidden = boardWrap; wrapBoardSizeRow.hidden = !boardWrap; const label = wrapBoardLabel(wrapBoardSize); wrapBoardSizeInput.value = wrapBoardSize; wrapBoardSizeOutput.value = label; wrapBoardSizeOutput.textContent = label; }
     updateSizeButtons();
     const settingsDialog = document.getElementById('settingsDialog');
@@ -770,7 +772,7 @@
     wrapBoardSizeInput.addEventListener('change', () => { const raw = Number(wrapBoardSizeInput.value); const size = Math.round(raw / 4) * 4; if (!Number.isInteger(size) || size < WRAP_BOARD_MIN || size > WRAP_BOARD_MAX || size === wrapBoardSize) return; wrapBoardSize = size; refreshSettingsControls(); });
     document.querySelectorAll('[data-shape]').forEach(button => button.addEventListener('click', () => { boardShape = button.dataset.shape; refreshSettingsControls(); }));
     document.querySelectorAll('[data-size]').forEach(button => button.addEventListener('click', () => { boardSize = button.dataset.size; refreshSettingsControls(); }));
-    mineCountInput.addEventListener('input', () => { mineCountOutput.value = `${mineCountInput.value} %`; mineCountOutput.textContent = mineCountOutput.value; });
+    mineCountInput.addEventListener('input', () => { mineCountOutput.value = mineTerm(Number(mineCountInput.value)); mineCountOutput.textContent = mineCountOutput.value; });
     mineCountInput.addEventListener('change', () => { minePercent = clamp(Math.round(Number(mineCountInput.value) / 10) * 10, MINE_PERCENT_MIN, MINE_PERCENT_MAX); refreshSettingsControls(); });
     // Drehen oder Fenstergröße ändern: Fenster neu einpassen, das Spiel läuft weiter.
     let fitFrame = 0;
