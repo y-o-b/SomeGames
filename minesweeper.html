@@ -205,7 +205,7 @@
       </div>
       <button class="settings-done" id="settingsDone" type="button">Spiel starten</button>
     </dialog>
-    <button class="version" data-version type="button" title="Klicken, um die Seite neu zu laden">Version 2.18</button>
+    <button class="version" data-version type="button" title="Klicken, um die Seite neu zu laden">Version 2.19</button>
     <script>const versionButton = document.querySelector('[data-version]'); versionButton.addEventListener('click', () => location.replace(`${location.pathname}?v=${Date.now()}`)); fetch(`VERSION?${Date.now()}`, { cache: 'no-store' }).then(response => response.text()).then(version => { versionButton.textContent = `Version ${version.trim()}`; }).catch(() => {});</script>
   </main>
   <script>
@@ -256,6 +256,12 @@
     document.querySelectorAll('[data-size]').forEach(button => button.classList.toggle('active', button.dataset.size === boardSize));
     document.querySelectorAll('[data-shape]').forEach(button => button.classList.toggle('active', button.dataset.shape === boardShape));
     document.querySelectorAll('[data-wrap]').forEach(button => button.classList.toggle('active', (button.dataset.wrap === 'on') === boardWrap));
+    const sizeTerm = size => ({ '9x9': 'Klein', '12x12': 'Mittel', '12x21': 'Groß' })[size] || size;
+    const mineTerm = percent => percent <= 10 ? 'Wenig' : percent <= 20 ? 'Mittel' : percent <= 30 ? 'Viel' : percent <= 40 ? 'Sehr viel' : 'Extrem';
+    const boardSizeLabel = size => sizeTerm(size);
+    const wrapSizeTerm = size => size <= 14 ? 'Klein' : size <= 18 ? 'Mittel' : size <= 22 ? 'Groß' : size <= 26 ? 'Sehr groß' : 'Riesig';
+    const wrapBoardLabel = size => wrapSizeTerm(size);
+
     function updateMineControl() { mineCount = minesForPercent(settingsCells(), minePercent); mineCountInput.min = MINE_PERCENT_MIN; mineCountInput.max = MINE_PERCENT_MAX; mineCountInput.step = '10'; mineCountInput.value = minePercent; mineCountOutput.value = mineTerm(minePercent); mineCountOutput.textContent = mineCountOutput.value; }
     updateMineControl();
     const tabletLandscape = () => matchMedia('(min-width: 768px) and (max-width: 1366px) and (orientation: landscape)').matches;
@@ -269,10 +275,6 @@
       const landscape = activeConfig ? activeConfig.cols > activeConfig.rows : tabletLandscape();
       document.querySelectorAll('[data-size]').forEach(button => { button.textContent = boardSizeLabel(button.dataset.size, landscape); button.classList.toggle('active', button.dataset.size === boardSize); });
     }
-    const sizeTerm = size => ({ '9x9': 'Klein', '12x12': 'Mittel', '12x21': 'Groß' })[size] || size;
-    const boardSizeLabel = size => sizeTerm(size);
-    const wrapSizeTerm = size => size <= 14 ? 'Klein' : size <= 18 ? 'Mittel' : size <= 22 ? 'Groß' : size <= 26 ? 'Sehr groß' : 'Riesig';
-    const wrapBoardLabel = size => wrapSizeTerm(size);
     function updateWrapBoardSizeControl() { sizeButtonsRow.hidden = boardWrap; wrapBoardSizeRow.hidden = !boardWrap; const label = wrapBoardLabel(wrapBoardSize); wrapBoardSizeInput.value = wrapBoardSize; wrapBoardSizeOutput.value = label; wrapBoardSizeOutput.textContent = label; }
     updateSizeButtons();
     const settingsDialog = document.getElementById('settingsDialog');
