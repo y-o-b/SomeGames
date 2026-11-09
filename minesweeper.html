@@ -30,6 +30,7 @@
     body.board-view-mode .back-button { pointer-events: auto; }
     body.board-view-mode .back-button { left: max(10px, env(safe-area-inset-left)); }
     body.board-view-mode .version { display: none; }
+    body.board-view-mode .settings-dialog .version { display: block; }
     body.board-view-mode .game { padding: 0; border: 0; border-radius: 0; box-shadow: none; background: transparent; }
     body.board-view-mode .game.wrap-mode .board.wrap { position: fixed; z-index: 1; inset: 0; width: 100%; height: 100%; max-width: none; margin: 0; border: 0; border-radius: 0; aspect-ratio: auto; }
     body.board-view-mode .game .stats { display: grid; position: fixed; z-index: 3; top: max(64px, calc(env(safe-area-inset-top) + 58px)); left: 50%; width: min(calc(100% - 24px), 460px); padding: 4px; margin: 0; border: 2px solid #171717; border-radius: 12px; background: rgba(255,255,255,.92); box-shadow: 3px 3px 0 #171717; transform: translateX(-50%); gap: 2px; }
@@ -199,14 +200,15 @@
           <label for="mineCount">Minen</label>
           <div class="mine-setting">
             <input id="mineCount" type="range" min="10" max="50" step="10" value="20" aria-label="Anteil der Minen in Prozent" />
-            <output id="mineCountValue" for="mineCount">15 %</output>
+            <output id="mineCountValue" for="mineCount">Mittel</output>
           </div>
         </div>
       </div>
       <button class="settings-done" id="settingsDone" type="button">Spiel starten</button>
+      <button class="version" data-version type="button" title="Klicken, um die Seite neu zu laden">Version 2.21</button>
     </dialog>
-    <button class="version" data-version type="button" title="Klicken, um die Seite neu zu laden">Version 2.20</button>
-    <script>const versionButton = document.querySelector('[data-version]'); versionButton.addEventListener('click', () => location.replace(`${location.pathname}?v=${Date.now()}`)); fetch(`VERSION?${Date.now()}`, { cache: 'no-store' }).then(response => response.text()).then(version => { versionButton.textContent = `Version ${version.trim()}`; }).catch(() => {});</script>
+    <button class="version" data-version type="button" title="Klicken, um die Seite neu zu laden">Version 2.21</button>
+    <script>document.querySelectorAll('[data-version]').forEach(versionButton => { versionButton.addEventListener('click', () => location.replace(`${location.pathname}?v=${Date.now()}`)); fetch(`VERSION?${Date.now()}`, { cache: 'no-store' }).then(response => response.text()).then(version => { versionButton.textContent = `Version ${version.trim()}`; }).catch(() => {}); });</script>
   </main>
   <script>
     const boardSizes = { '9x9': { cols: 9, rows: 9 }, '12x12': { cols: 12, rows: 12 }, '12x21': { cols: 12, rows: 21 } };
