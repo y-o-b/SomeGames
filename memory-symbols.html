@@ -30,13 +30,17 @@
     .panel { padding: clamp(16px, 4vw, 26px); border: 3px solid #171717; border-radius: 18px; background: var(--panel); box-shadow: 7px 7px 0 #171717; }
     .intro { margin: 0 0 18px; color: var(--muted); text-align: center; }
     .symbol-count { color: var(--text); font-weight: 800; }
-    .symbols { display: grid; grid-template-columns: repeat(auto-fill, minmax(64px, 1fr)); gap: 9px; }
+    #symbols { display: block; }
+     .symbol-group { margin-top: 20px; }
+     .symbol-group:first-child { margin-top: 0; }
+     .symbol-group h2 { margin: 0 0 9px; font-size: 1.1rem; }
+     .symbol-group .symbols { display: grid; grid-template-columns: repeat(auto-fill, minmax(64px, 1fr)); gap: 9px; }
     .symbol { display: grid; place-items: center; align-content: center; gap: 5px; min-height: 88px; border: 2px solid #171717; border-radius: 11px; background: var(--symbol-bg, #FFFFFF); box-shadow: 2px 2px 0 #171717; font-size: clamp(2rem, 7vw, 2.8rem); line-height: 1; }
      .symbol-name { color: var(--text); font-size: .62rem; font-weight: 700; line-height: 1.1; text-align: center; }
     .play-link { display: block; width: fit-content; margin: 22px auto 0; padding: 11px 20px; border: 3px solid #171717; border-radius: 10px; color: #FFFFFF; background: #EF4B3F; box-shadow: 4px 4px 0 #171717; font-weight: 800; text-decoration: none; }
     .version { display: block; margin: 12px auto 0; padding: 0; border: 0; color: rgba(23,23,23,.7); background: transparent; font: inherit; font-size: .72rem; cursor: pointer; }
     .version:focus-visible { outline: 2px solid #171717; outline-offset: 3px; }
-    @media (max-width: 400px) { body { padding: 16px 12px 24px; } header { margin-bottom: 14px; } .symbols { grid-template-columns: repeat(auto-fill, minmax(76px, 1fr)); gap: 7px; } .symbol { border-radius: 9px; font-size: 2rem; } }
+    @media (max-width: 400px) { body { padding: 16px 12px 24px; } header { margin-bottom: 14px; } .symbol-group .symbols { grid-template-columns: repeat(auto-fill, minmax(76px, 1fr)); gap: 7px; } .symbol { border-radius: 9px; font-size: 2rem; } }
   </style>
 </head>
 <body>
@@ -50,7 +54,7 @@
       <div class="symbols" id="symbols" role="list" aria-label="Symbole"></div>
       <a class="play-link" href="memory.html">Memory spielen&nbsp; →</a>
     </section>
-    <button class="version" data-version type="button" title="Klicken, um die Seite neu zu laden">Version 2.35</button>
+    <button class="version" data-version type="button" title="Klicken, um die Seite neu zu laden">Version 2.36</button>
     <script>const versionButton = document.querySelector('[data-version]'); versionButton.addEventListener('click', () => location.replace(`${location.pathname}?v=${Date.now()}`)); fetch(`VERSION?${Date.now()}`, { cache: 'no-store' }).then(response => response.text()).then(version => { versionButton.textContent = `Version ${version.trim()}`; }).catch(() => {});</script>
   </main>
   <script src="memory-symbols.js"></script>
