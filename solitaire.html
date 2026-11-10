@@ -128,7 +128,7 @@
       <div class="controls"><button class="undo" id="undo" type="button" disabled>↶ Rückgängig</button><button id="sameGame" class="undo" type="button">↻ Gleiches Deck</button><button id="solutionHint" type="button">💡 Lösung: Aus</button><button id="autoFinish" type="button" hidden>▶ Fertigspielen</button><button id="newGame" type="button">Neues Spiel</button></div>
       <div class="heap" id="heap" aria-hidden="true"></div>
     </section>
-    <button class="version" data-version type="button" title="Klicken, um die Seite neu zu laden">Version 2.53</button>
+    <button class="version" data-version type="button" title="Klicken, um die Seite neu zu laden">Version 2.54</button>
     <script>const versionButton = document.querySelector('[data-version]'); versionButton.addEventListener('click', () => location.replace(`${location.pathname}?v=${Date.now()}`)); fetch(`VERSION?${Date.now()}`, { cache: 'no-store' }).then(response => response.text()).then(version => { versionButton.textContent = `Version ${version.trim()}`; }).catch(() => {});</script>
   </main>
   <script>
@@ -136,7 +136,7 @@
     const stockElement = document.getElementById('stock'), wasteElement = document.getElementById('waste'), tableauElement = document.getElementById('tableau'), foundationsElement = document.getElementById('foundations'), message = document.getElementById('message'), autoFinishButton = document.getElementById('autoFinish');
     const gamePanel = document.querySelector('.game');
     let tableau, stock, waste, foundations, selected = null, history = [], moves = 0, seconds = 0, timer, cardDrag = null, suppressClick = false, suppressClickUntil = 0, dragClickGuard = null, revealedCards = [], lastCardTap = null, lastStockTapAt = 0, revealTimer = null, revealClearTimer = null, animationToken = 0;
-    let deckIndex = [], deckCursor = 0, currentDeckSolutions = [], currentDeck = [], heapMode = false, solutionMode = false;
+    let deckIndex = [], deckCursor = 0, currentDeckSolutions = [], currentDeck = [], heapMode = false, solutionMode = false, solutionHintAction = null, solutionHintBoard = '';
     const STORAGE_KEY = 'y-o-b.solitaire.save.v2';
     // Nach einem verarbeiteten Touch-Tap erzeugt Safari noch einen Click. Hat sich das Layout inzwischen verschoben (z. B. wird ein Button ausgeblendet),
     // träfe er sonst ein anderes Element unter dem Finger. Solche Clicks werden deshalb kurz global verworfen.
@@ -429,13 +429,33 @@
       }
       return best;
     }
+    function solutionBoardSignature() {
+      const counts = [0, 0, 0, 0];
+      foundations.forEach(pile => { if (pile.length) counts[suits.indexOf(pile[0].suit)] = pile.length; });
+      return JSON.stringify({ columns: tableau.map(column => column.map(item => [cardNumber(item), Boolean(item.faceUp)])), foundations: counts });
+    }
+    function solutionActionValid(action) {
+      return applySolutionAction(currentSolutionState(), action) !== null;
+    }
     // Markiert die nächste Karte eines gespeicherten Lösungswegs; der Ziehstapel
     // wird markiert, wenn als Nächstes gezogen oder neu ausgelegt werden muss.
     function applySolutionMark() {
       stockElement.classList.remove('solution-target');
       if (!tableau) { selected = null; return; }
-      if (!solutionMode || heapMode || autoFinishing || dealing || gamePanel.classList.contains('victory')) { selected = null; render(); return; }
-      const action = findSolutionAction();
+      if (!solutionMode || heapMode || autoFinishing || dealing || gamePanel.classList.contains('victory')) {
+        selected = null; solutionHintAction = null; solutionHintBoard = ''; render(); return;
+      }
+      const board = solutionBoardSignature();
+      let action = findSolutionAction();
+      // Beim Weiterblättern im Talon ändern sich nur Stock und Abwurf. Solange
+      // das übrige Spielfeld gleich bleibt, bleibt die letzte Markierung stehen.
+      if (!action && solutionHintAction && solutionHintBoard === board) {
+        if (solutionActionValid(solutionHintAction)) action = solutionHintAction;
+        else if (stock.length) action = [4, cardNumber(stock.at(-1))];
+        else if (waste.length) action = [5];
+      }
+      solutionHintAction = action;
+      solutionHintBoard = action ? board : '';
       if (!action) { selected = null; render(); return; }
       if (action[0] === 0) selected = { source: 'tableau', index: action[1], cardIndex: tableau[action[1]].length - 1 };
       else if (action[0] === 1 || action[0] === 3) selected = { source: 'waste', index: 0, cardIndex: 0 };
