@@ -4,7 +4,8 @@
 Successful deals are stored as one JSON file per deck in solitaire-decks/ plus an
 index.json, so the game can load a single deck on demand. Card IDs are integers
 0..51 (suit * 13 + rank), in the order used to deal the tableau and stock.
-Solutions use compact integer action arrays (column/card indices are zero-based):
+Known paths are extended by swapping adjacent independent actions and replaying
+the result. Solutions use compact integer action arrays (indices zero-based):
 `[0, fromColumn, cardId]` tableau→foundation; `[1, cardId]` waste→foundation;
 `[2, fromColumn, toColumn, startIndex, count, cardId]` tableau→tableau;
 `[3, toColumn, cardId]` waste→tableau; `[4, cardId]` draw stock; `[5]` recycle waste.
@@ -214,6 +215,177 @@ def solve(deck: list[int], max_states: int, solution_limit: int = 3) -> tuple[li
     return solutions, expanded, not queue and not truncated
 
 
+def apply_action(state: State, action: list[int]) -> State | None:
+    """Apply one compact action to a solver state, or return None if invalid."""
+    columns, stock, waste, foundations = state
+    kind = action[0]
+
+    if kind == 0:
+        column_index, card = action[1], action[2]
+        cards, face_up = columns[column_index]
+        if not face_up or not cards or cards[-1] != card:
+            return None
+        card_suit = suit(card)
+        if rank(card) != foundations[card_suit]:
+            return None
+        remaining = cards[:-1]
+        next_up = face_up - 1
+        if not next_up and remaining:
+            next_up = 1
+        next_columns = list(columns)
+        next_columns[column_index] = (remaining, next_up)
+        next_foundations = list(foundations)
+        next_foundations[card_suit] += 1
+        return (tuple(next_columns), stock, waste, tuple(next_foundations))
+
+    if kind == 1:
+        card = action[1]
+        if not waste or waste[-1] != card:
+            return None
+        card_suit = suit(card)
+        if rank(card) != foundations[card_suit]:
+            return None
+        next_foundations = list(foundations)
+        next_foundations[card_suit] += 1
+        return (columns, stock, waste[:-1], tuple(next_foundations))
+
+    if kind == 2:
+        source_index, target_index, start, count, card = action[1], action[2], action[3], action[4], action[5]
+        if source_index == target_index or start < 0 or count < 1:
+            return None
+        source_cards, source_up = columns[source_index]
+        if start + count > len(source_cards):
+            return None
+        moving = source_cards[start : start + count]
+        if len(moving) != count or moving[0] != card or start < len(source_cards) - source_up:
+            return None
+        if any(
+            rank(moving[index - 1]) != rank(moving[index]) + 1
+            or COLORS[suit(moving[index - 1])] == COLORS[suit(moving[index])]
+            for index in range(1, len(moving))
+        ):
+            return None
+        target_cards, target_up = columns[target_index]
+        if not compatible_on_tableau(card, target_cards[-1] if target_cards else None):
+            return None
+        remaining = source_cards[:start]
+        next_up = source_up - count
+        if not next_up and remaining:
+            next_up = 1
+        next_columns = list(columns)
+        next_columns[source_index] = (remaining, next_up)
+        next_columns[target_index] = (target_cards + moving, target_up + count)
+        return (tuple(next_columns), stock, waste, foundations)
+
+    if kind == 3:
+        target_index, card = action[1], action[2]
+        if not waste or waste[-1] != card:
+            return None
+        target_cards, target_up = columns[target_index]
+        if not compatible_on_tableau(card, target_cards[-1] if target_cards else None):
+            return None
+        next_columns = list(columns)
+        next_columns[target_index] = (target_cards + (card,), target_up + 1)
+        return (tuple(next_columns), stock, waste[:-1], foundations)
+
+    if kind == 4:
+        card = action[1]
+        if not stock or stock[-1] != card:
+            return None
+        return (columns, stock[:-1], waste + (card,), foundations)
+
+    if kind == 5:
+        if stock or not waste:
+            return None
+        return (columns, tuple(reversed(waste)), (), foundations)
+
+    return None
+
+
+def replay_solution(deck: list[int], actions: list[list[int]]) -> State | None:
+    state = initial_state(deck)
+    for action in actions:
+        state = apply_action(state, action)
+        if state is None:
+            return None
+    return state if all(count == 13 for count in state[3]) else None
+
+
+def action_resources(action: list[int]) -> tuple[set[int], set[int], bool, bool]:
+    kind = action[0]
+    columns: set[int] = set()
+    foundations: set[int] = set()
+    uses_waste = False
+    uses_stock = False
+    if kind == 0:
+        columns = {action[1]}
+        foundations = {suit(action[2])}
+    elif kind == 1:
+        foundations = {suit(action[1])}
+        uses_waste = True
+    elif kind == 2:
+        columns = {action[1], action[2]}
+    elif kind == 3:
+        columns = {action[1]}
+        uses_waste = True
+    elif kind in (4, 5):
+        uses_waste = True
+        uses_stock = True
+    return columns, foundations, uses_waste, uses_stock
+
+
+def actions_commute(first: list[int], second: list[int]) -> bool:
+    first_columns, first_foundations, first_waste, first_stock = action_resources(first)
+    second_columns, second_foundations, second_waste, second_stock = action_resources(second)
+    return (
+        not (first_columns & second_columns)
+        and not (first_foundations & second_foundations)
+        and not (first_waste and second_waste)
+        and not (first_stock and second_stock)
+    )
+
+
+def derive_solutions(deck: list[int], solutions: list[list[list[int]]], limit: int) -> list[list[list[int]]]:
+    """Derive further valid paths by swapping adjacent independent actions."""
+    if limit <= 1:
+        return [list(solution) for solution in solutions[:limit]]
+    known: set[tuple[tuple[int, ...], ...]] = set()
+    result: list[list[list[int]]] = []
+    queue: list[list[list[int]]] = []
+    for solution in solutions:
+        key = tuple(tuple(action) for action in solution)
+        if key in known or replay_solution(deck, solution) is None:
+            continue
+        known.add(key)
+        copy = [list(action) for action in solution]
+        result.append(copy)
+        queue.append(copy)
+        if len(result) >= limit:
+            return result
+    while queue and len(result) < limit:
+        solution = queue.pop(0)
+        for index in range(len(solution) - 1):
+            if not actions_commute(solution[index], solution[index + 1]):
+                continue
+            candidate = solution[:index] + [solution[index + 1], solution[index]] + solution[index + 2:]
+            key = tuple(tuple(action) for action in candidate)
+            if key in known or replay_solution(deck, candidate) is None:
+                continue
+            known.add(key)
+            result.append(candidate)
+            queue.append(candidate)
+            if len(result) >= limit:
+                break
+    return result
+
+
+def expand_with_derived(deck: list[int], solutions: list[list[list[int]]], derive_per_deal: int, max_solutions: int) -> list[list[list[int]]]:
+    if derive_per_deal <= 0 or not solutions:
+        return solutions
+    target = min(max_solutions, len(solutions) + derive_per_deal)
+    return derive_solutions(deck, solutions, target) if target > len(solutions) else solutions
+
+
 def valid_deck(deck: object) -> bool:
     return isinstance(deck, list) and len(deck) == 52 and len(set(deck)) == 52 and all(type(card) is int and 0 <= card < 52 for card in deck)
 
@@ -389,12 +561,17 @@ def main() -> int:
     parser.add_argument("--max-attempts", type=int, default=1000, help="Maximale Zahl zufälliger Decks pro Aufruf (Standard: 1000).")
     parser.add_argument("--max-states", type=int, default=100_000, help="Maximale Zahl geprüfter Zustände pro Deck (Standard: 100000).")
     parser.add_argument("--solutions-per-deal", type=int, default=3, help="Wie viele unterschiedliche Lösungswege pro Deck gesucht werden (Standard: 3).")
+    parser.add_argument("--derive-per-deal", type=int, default=3, help="Wie viele zusätzliche Wege pro Deck aus bekannten Lösungen abgeleitet werden (Standard: 3).")
+    parser.add_argument("--max-solutions-per-deal", type=int, default=12, help="Obergrenze gespeicherter Wege pro Deck (Standard: 12).")
+    parser.add_argument("--derive-only", action="store_true", help="Nur vorhandene Lösungen ableiten und speichern, ohne neue Decks zu suchen.")
     parser.add_argument("--backfill-limit", type=int, default=None, help="Backfills aktivieren und bis zu N bestehende Decks ohne Lösung pro Lauf prüfen (nur bei Angabe).")
     parser.add_argument("--deck-dir", type=Path, default=DEFAULT_DECK_DIR, help=f"Verzeichnis mit einem JSON je lösbarem Deck (Standard: {DEFAULT_DECK_DIR}).")
     parser.add_argument("--unsolved-output", type=Path, default=DEFAULT_UNSOLVED_OUTPUT, help=f"Decks ohne Lösungsweg (Standard: {DEFAULT_UNSOLVED_OUTPUT}).")
     args = parser.parse_args()
     if min(args.count, args.max_attempts, args.max_states, args.solutions_per_deal) < 1 or (args.backfill_limit is not None and args.backfill_limit < 1):
         parser.error("count, max-attempts, max-states, solutions-per-deal und ein angegebenes backfill-limit müssen mindestens 1 sein.")
+    if args.derive_per_deal < 0 or args.max_solutions_per_deal < 1 or args.max_solutions_per_deal < args.solutions_per_deal:
+        parser.error("derive-per-deal muss >= 0 und max-solutions-per-deal mindestens solutions-per-deal sein.")
     if args.deck_dir.resolve() == args.unsolved_output.resolve():
         parser.error("--deck-dir und --unsolved-output müssen verschiedene Pfade sein.")
 
@@ -413,12 +590,31 @@ def main() -> int:
             unsolved_by_deck[key] = deal
     unsolved_data["deals"] = list(unsolved_by_deck.values())
 
+    # Enrich known deals with alternative paths derived from their existing
+    # solutions before spending time on any search.
+    derived_count = 0
+    if args.derive_per_deal > 0:
+        for deal in solved_by_deck.values():
+            current = structured_solutions(deal)
+            target = min(args.max_solutions_per_deal, len(current) + args.derive_per_deal)
+            if target <= len(current):
+                continue
+            expanded = derive_solutions(deal["deckOrder"], current, target)
+            if len(expanded) > len(current):
+                deal["solutions"] = expanded
+                derived_count += len(expanded) - len(current)
+        if derived_count:
+            print(f"{derived_count} zusätzliche Lösungswege aus bekannten Wegen abgeleitet.", file=sys.stderr)
+
     def save_outputs() -> None:
         data["deals"] = list(solved_by_deck.values())
         write_solved_decks(args.deck_dir, data)
         write_unsolved_collection(args.unsolved_output, unsolved_data)
 
     save_outputs()
+    if args.derive_only:
+        print(f"Nur abgeleitet: {len(solved_by_deck)} Decks, {derived_count} neue Wege gespeichert.", file=sys.stderr)
+        return 0
 
     # Existing solutionless decks are searched only when explicitly requested.
     if args.backfill_limit is not None:
@@ -439,6 +635,8 @@ def main() -> int:
             index = next(i for i, item in enumerate(unsolved_data["deals"]) if tuple(item["deckOrder"]) == deck_key)
             deal = unsolved_data["deals"][index]
             solutions, expanded, exhausted = solve(deal["deckOrder"], args.max_states, args.solutions_per_deal)
+            if solutions:
+                solutions = expand_with_derived(deal["deckOrder"], solutions, args.derive_per_deal, args.max_solutions_per_deal)
             tried += 1
             if solutions:
                 solved_by_deck[tuple(deal["deckOrder"])] = {"deckOrder": deal["deckOrder"], "solutions": solutions}
@@ -483,6 +681,8 @@ def main() -> int:
         if tuple(deck) in existing:
             continue
         solutions, expanded, exhausted = solve(deck, args.max_states, args.solutions_per_deal)
+        if solutions:
+            solutions = expand_with_derived(deck, solutions, args.derive_per_deal, args.max_solutions_per_deal)
         if not solutions:
             unsolved_data["deals"].append({
                 "deckOrder": deck,
