@@ -91,6 +91,8 @@
     .controls .undo { color: var(--ink); background: var(--paper); }
     .controls button:disabled { cursor: not-allowed; opacity: .45; }
     .controls button[hidden] { display: none; }
+    #solutionHint.active { color: var(--paper); background: var(--red); }
+    #stock.solution-target { outline: calc(4 * var(--u)) solid var(--red); outline-offset: calc(2 * var(--u)); }
     button:focus-visible { outline: 3px solid var(--red); outline-offset: 2px; }
     .flight-back { position: relative; overflow: hidden; width: 100%; height: 100%; border: calc(3 * var(--u)) solid var(--ink); border-radius: calc(8 * var(--u)); background: var(--blue); box-shadow: calc(2 * var(--u)) calc(2 * var(--u)) 0 var(--ink); }
     button, .pile { -webkit-tap-highlight-color: transparent; }
@@ -123,10 +125,10 @@
       <div class="tableau" id="tableau" aria-label="Spielfeld"></div>
       <p class="message" id="message" aria-live="polite"><b>Los geht's!</b> Lege Karten in absteigender Reihenfolge und wechselnden Farben.</p>
       <div class="status"><span>Züge: <strong id="moves">0</strong></span><span>Zeit: <strong id="time">0:00</strong></span></div>
-      <div class="controls"><button class="undo" id="undo" type="button" disabled>↶ Rückgängig</button><button id="sameGame" class="undo" type="button">↻ Gleiches Deck</button><button id="autoFinish" type="button" hidden>▶ Fertigspielen</button><button id="newGame" type="button">Neues Spiel</button></div>
+      <div class="controls"><button class="undo" id="undo" type="button" disabled>↶ Rückgängig</button><button id="sameGame" class="undo" type="button">↻ Gleiches Deck</button><button id="solutionHint" type="button">💡 Lösung: Aus</button><button id="autoFinish" type="button" hidden>▶ Fertigspielen</button><button id="newGame" type="button">Neues Spiel</button></div>
       <div class="heap" id="heap" aria-hidden="true"></div>
     </section>
-    <button class="version" data-version type="button" title="Klicken, um die Seite neu zu laden">Version 2.50</button>
+    <button class="version" data-version type="button" title="Klicken, um die Seite neu zu laden">Version 2.51</button>
     <script>const versionButton = document.querySelector('[data-version]'); versionButton.addEventListener('click', () => location.replace(`${location.pathname}?v=${Date.now()}`)); fetch(`VERSION?${Date.now()}`, { cache: 'no-store' }).then(response => response.text()).then(version => { versionButton.textContent = `Version ${version.trim()}`; }).catch(() => {});</script>
   </main>
   <script>
@@ -134,7 +136,7 @@
     const stockElement = document.getElementById('stock'), wasteElement = document.getElementById('waste'), tableauElement = document.getElementById('tableau'), foundationsElement = document.getElementById('foundations'), message = document.getElementById('message'), autoFinishButton = document.getElementById('autoFinish');
     const gamePanel = document.querySelector('.game');
     let tableau, stock, waste, foundations, selected = null, history = [], moves = 0, seconds = 0, timer, cardDrag = null, suppressClick = false, suppressClickUntil = 0, dragClickGuard = null, revealedCards = [], lastCardTap = null, lastStockTapAt = 0, revealTimer = null, revealClearTimer = null, animationToken = 0;
-    let deckIndex = [], deckCursor = 0, currentDeckSolutions = [], currentDeck = [], heapMode = false;
+    let deckIndex = [], deckCursor = 0, currentDeckSolutions = [], currentDeck = [], heapMode = false, solutionMode = false;
     const STORAGE_KEY = 'y-o-b.solitaire.save.v2';
     // Nach einem verarbeiteten Touch-Tap erzeugt Safari noch einen Click. Hat sich das Layout inzwischen verschoben (z. B. wird ein Button ausgeblendet),
     // träfe er sonst ein anderes Element unter dem Finger. Solche Clicks werden deshalb kurz global verworfen.
@@ -170,7 +172,7 @@
       }
       return null;
     }
-    function start(deckToUse = null) { const dealt = deckToUse; if (!dealt) { message.innerHTML = '<b>Kartendecks konnten nicht geladen werden.</b> „Neues Spiel" versucht es erneut.'; return false; } clearInterval(timer); timer = null; clearHeap(); flyingIds.clear(); finishRun++; autoFinishing = false; lockBoard(false); document.querySelectorAll('.card-flight').forEach(flight => flight.remove()); message.innerHTML = `<b>Los geht's!</b> Lege Karten in absteigender Reihenfolge und wechselnden Farben.`; gamePanel.classList.remove('victory'); let cards = dealt.map(item => { const id = typeof item === 'string' ? item : item.id; const [suitIndex, rank] = id.split('-').map(Number); return card(suitIndex, rank); }); currentDeck = cards.map(item => item.id); tableau = Array.from({ length: 7 }, (_, column) => { const pile = cards.splice(0, column + 1); pile.forEach((card, index) => { card.faceUp = index === pile.length - 1; }); return pile; }); stock = cards; waste = []; foundations = suits.map(() => []); selected = null; history = []; moves = seconds = 0; render(); updateStatus(); return true; }
+    function start(deckToUse = null) { const dealt = deckToUse; if (!dealt) { message.innerHTML = '<b>Kartendecks konnten nicht geladen werden.</b> „Neues Spiel" versucht es erneut.'; return false; } clearInterval(timer); timer = null; clearHeap(); flyingIds.clear(); finishRun++; autoFinishing = false; lockBoard(false); document.querySelectorAll('.card-flight').forEach(flight => flight.remove()); message.innerHTML = `<b>Los geht's!</b> Lege Karten in absteigender Reihenfolge und wechselnden Farben.`; gamePanel.classList.remove('victory'); let cards = dealt.map(item => { const id = typeof item === 'string' ? item : item.id; const [suitIndex, rank] = id.split('-').map(Number); return card(suitIndex, rank); }); currentDeck = cards.map(item => item.id); tableau = Array.from({ length: 7 }, (_, column) => { const pile = cards.splice(0, column + 1); pile.forEach((card, index) => { card.faceUp = index === pile.length - 1; }); return pile; }); stock = cards; waste = []; foundations = suits.map(() => []); selected = null; history = []; moves = seconds = 0; render(); if (solutionMode) applySolutionMark(); updateStatus(); return true; }
     function copyState() { return { tableau: tableau.map(column => column.map(card => ({ ...card }))), stock: stock.map(card => ({ ...card })), waste: waste.map(card => ({ ...card })), foundations: foundations.map(pile => pile.map(card => ({ ...card }))) }; }
     function sameStateWithoutFaceUp(first, second) { return JSON.stringify(first, (key, value) => key === 'faceUp' ? undefined : value) === JSON.stringify(second, (key, value) => key === 'faceUp' ? undefined : value); }
     function allCards() { return [...tableau.flat(), ...stock, ...waste, ...foundations.flat()]; }
@@ -178,7 +180,7 @@
     function saveState() { history.push(copyState()); if (history.length > HISTORY_LIMIT) history.shift(); document.getElementById('undo').disabled = false; }
     function persistGame() {
       if (!tableau || !stock || !waste || !foundations) return;
-      try { localStorage.setItem(STORAGE_KEY, JSON.stringify({ version: 1, tableau, stock, waste, foundations, history, moves, seconds, currentDeck, won: gamePanel.classList.contains('victory') })); } catch (error) { console.warn('Solitär-Spielstand konnte nicht gespeichert werden.', error); }
+      try { localStorage.setItem(STORAGE_KEY, JSON.stringify({ version: 1, tableau, stock, waste, foundations, history, moves, seconds, currentDeck, solutions: currentDeckSolutions, won: gamePanel.classList.contains('victory') })); } catch (error) { console.warn('Solitär-Spielstand konnte nicht gespeichert werden.', error); }
     }
     const validCardIds = new Set(suits.flatMap((suit, suitIndex) => names.map((name, rank) => `${suitIndex}-${rank}`)));
     // Ein gespeicherter Stand muss genau die 52 Karten enthalten und jede Karte muss zu ihrer ID passen (schützt vor beschädigten oder manipulierten Daten).
@@ -195,10 +197,10 @@
         tableau = saved.tableau; stock = saved.stock; waste = saved.waste; foundations = saved.foundations;
         // Ein beschädigter Verlauf darf den eigentlichen Spielstand nicht unbrauchbar machen.
         history = Array.isArray(saved.history) ? saved.history.filter(validState) : [];
-        moves = Number(saved.moves) || 0; seconds = Number(saved.seconds) || 0; currentDeck = saved.currentDeck; showTopCards(); selected = null;
+        moves = Number(saved.moves) || 0; seconds = Number(saved.seconds) || 0; currentDeck = saved.currentDeck; currentDeckSolutions = Array.isArray(saved.solutions) ? saved.solutions : []; showTopCards(); selected = null;
         if (saved.won) { clearInterval(timer); gamePanel.classList.add('victory'); message.innerHTML = '<b>Spielstand geladen.</b> Partie bereits abgeschlossen.'; }
         else { gamePanel.classList.remove('victory'); message.innerHTML = '<b>Spielstand geladen.</b> Du kannst weiterspielen.'; }
-        render(); updateStatus(); if (saved.won) startHeap(false); return true;
+        render(); if (solutionMode) applySolutionMark(); updateStatus(); if (saved.won) startHeap(false); return true;
       } catch (error) { console.warn('Solitär-Spielstand konnte nicht geladen werden.', error); return false; }
     }
     function showStatus() { document.getElementById('moves').textContent = moves; document.getElementById('time').textContent = `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, '0')}`; }
@@ -215,7 +217,7 @@
     function hasHiddenCards() { return tableau.some(column => column.some(card => !card.faceUp)); }
     function showTopCards() { tableau.forEach(column => { if (column.length) column.at(-1).faceUp = true; }); }
     function cancelPendingReveal() { animationToken++; clearTimeout(revealTimer); clearTimeout(revealClearTimer); revealTimer = revealClearTimer = null; revealedCards = []; }
-    function undo() { if (gamePanel.classList.contains('victory')) return; let previous = history.pop(); if (!previous) return; cancelPendingReveal(); const current = copyState(); while (previous && sameStateWithoutFaceUp(previous, current) && history.length) previous = history.pop(); if (!previous) return; const origins = captureCardPositions(allCards()); tableau = previous.tableau; stock = previous.stock; waste = previous.waste; foundations = previous.foundations; showTopCards(); selected = null; moves++; document.getElementById('undo').disabled = !history.length; message.innerHTML = '<b>Rückgängig.</b> Das zählt als Zug.'; const restored = allCards(); render(); animateCardMoves(restored, origins); updateStatus(); }
+    function undo() { if (gamePanel.classList.contains('victory')) return; let previous = history.pop(); if (!previous) return; cancelPendingReveal(); const current = copyState(); while (previous && sameStateWithoutFaceUp(previous, current) && history.length) previous = history.pop(); if (!previous) return; const origins = captureCardPositions(allCards()); tableau = previous.tableau; stock = previous.stock; waste = previous.waste; foundations = previous.foundations; showTopCards(); selected = null; moves++; document.getElementById('undo').disabled = !history.length; message.innerHTML = '<b>Rückgängig.</b> Das zählt als Zug.'; const restored = allCards(); render(); if (solutionMode) applySolutionMark(); animateCardMoves(restored, origins); updateStatus(); }
     function captureCardPositions(cards, override) { return new Map(cards.map(item => { const element = document.querySelector(`[data-card-id="${item.id}"]`); return [item.id, override?.get(item.id) || element?.getBoundingClientRect()]; })); }
     const flyingIds = new Set();
     function animateCardMoves(cards, origins) { return new Promise(resolve => requestAnimationFrame(() => { const animations = cards.map(item => { const element = document.querySelector(`[data-card-id="${item.id}"]`); const origin = origins.get(item.id); if (!element || !origin) return Promise.resolve(); const target = element.getBoundingClientRect(); const flight = element.cloneNode(true); flight.classList.add('card-flight'); flight.style.width = `${target.width}px`; flight.style.height = `${target.height}px`; flight.style.left = `${origin.left}px`; flight.style.top = `${origin.top}px`; element.style.visibility = 'hidden'; flyingIds.add(item.id); document.body.appendChild(flight); const animation = flight.animate([{ transform: 'translate(0, 0)' }, { transform: `translate(${target.left - origin.left}px, ${target.top - origin.top}px)` }], { duration: reduceMotion() ? 1 : 600, easing: 'ease-in-out' }); return animation.finished.catch(() => {}).then(() => { flight.remove(); flyingIds.delete(item.id); element.style.visibility = ''; const current = document.querySelector(`[data-card-id="${item.id}"]`); if (current) current.style.visibility = ''; }); }); Promise.all(animations).then(resolve); })); }
@@ -334,12 +336,63 @@
     }
     function picked() { return selected?.source === 'waste' ? [waste[waste.length - 1]] : selected?.source === 'foundation' ? [foundations[selected.index].at(-1)] : selected ? tableau[selected.index].slice(selected.cardIndex) : []; }
     function removeSelected(reveal = true) { if (selected.source === 'waste') waste.pop(); else if (selected.source === 'foundation') foundations[selected.index].pop(); else { tableau[selected.index].splice(selected.cardIndex); if (reveal && tableau[selected.index].length) tableau[selected.index].at(-1).faceUp = true; } selected = null; }
-    function revealAfterMove(card, token) { if (!card || card.faceUp || token !== animationToken) return; revealTimer = setTimeout(() => { if (token !== animationToken) return; card.faceUp = true; revealedCards = [card]; render(); revealClearTimer = setTimeout(() => { revealedCards = []; }, 600); }, 0); }
+    function revealAfterMove(card, token) { if (!card || card.faceUp || token !== animationToken) return; revealTimer = setTimeout(() => { if (token !== animationToken) return; card.faceUp = true; revealedCards = [card]; render(); if (solutionMode) applySolutionMark(); revealClearTimer = setTimeout(() => { revealedCards = []; }, 600); }, 0); }
     function validSequence(cards) { return cards.every((card, index) => index === 0 || (card.rank === cards[index - 1].rank - 1 && card.red !== cards[index - 1].red)); }
     function canPlaceOnFoundation(card, pile) { const top = pile.at(-1); return top ? top.suit === card.suit && card.rank === top.rank + 1 : card.rank === 0; }
+    const cardNumber = item => suits.indexOf(item.suit) * 13 + item.rank;
+    const canPlaceOnTableau = (card, target) => target ? target.red !== card.red && target.rank === card.rank + 1 : card.rank === 12;
+    // Prüft, ob eine gespeicherte Lösungsaktion im aktuellen Spiel ausführbar ist.
+    function solutionActionMatches(action) {
+      if (!Array.isArray(action) || !action.length) return false;
+      const [type] = action;
+      if (type === 0) {
+        const column = tableau[action[1]];
+        if (!column?.length) return false;
+        const card = column.at(-1);
+        return card.faceUp && cardNumber(card) === action[2] && foundations.some(pile => canPlaceOnFoundation(card, pile));
+      }
+      if (type === 1) {
+        const card = waste.at(-1);
+        return Boolean(card) && cardNumber(card) === action[1] && foundations.some(pile => canPlaceOnFoundation(card, pile));
+      }
+      if (type === 2) {
+        const column = tableau[action[1]], startIndex = action[3], count = action[4];
+        if (!column || !Number.isInteger(startIndex) || !Number.isInteger(count) || startIndex < 0 || count < 1 || startIndex + count > column.length) return false;
+        const moving = column.slice(startIndex, startIndex + count);
+        return moving.every(item => item.faceUp) && validSequence(moving) && cardNumber(moving[0]) === action[5] && action[2] !== action[1] && canPlaceOnTableau(moving[0], tableau[action[2]]?.at(-1));
+      }
+      if (type === 3) {
+        const card = waste.at(-1);
+        return Boolean(card) && cardNumber(card) === action[2] && canPlaceOnTableau(card, tableau[action[1]]?.at(-1));
+      }
+      if (type === 4) { const card = stock.at(-1); return Boolean(card) && cardNumber(card) === action[1]; }
+      if (type === 5) return stock.length === 0 && waste.length > 0;
+      return false;
+    }
+    function findSolutionAction() {
+      for (const solution of currentDeckSolutions) {
+        if (!Array.isArray(solution)) continue;
+        for (const action of solution) if (solutionActionMatches(action)) return action;
+      }
+      return null;
+    }
+    // Markiert die nächste Karte eines gespeicherten Lösungswegs; der Ziehstapel
+    // wird markiert, wenn als Nächstes gezogen oder neu ausgelegt werden muss.
+    function applySolutionMark() {
+      stockElement.classList.remove('solution-target');
+      if (!tableau) { selected = null; return; }
+      if (!solutionMode || heapMode || autoFinishing || dealing || gamePanel.classList.contains('victory')) { selected = null; render(); return; }
+      const action = findSolutionAction();
+      if (!action) { selected = null; render(); return; }
+      if (action[0] === 0) selected = { source: 'tableau', index: action[1], cardIndex: tableau[action[1]].length - 1 };
+      else if (action[0] === 1 || action[0] === 3) selected = { source: 'waste', index: 0, cardIndex: 0 };
+      else if (action[0] === 2) selected = { source: 'tableau', index: action[1], cardIndex: action[3] };
+      else { selected = null; stockElement.classList.add('solution-target'); }
+      render();
+    }
     function autoMove() { const moving = picked(); const card = moving[0]; if (!card) return false; if (moving.length === 1) { for (let pileIndex = 0; pileIndex < foundations.length; pileIndex++) if (canPlaceOnFoundation(card, foundations[pileIndex])) return moveToFoundation(pileIndex); } for (let destination = 0; destination < tableau.length; destination++) { if (selected.source === 'tableau' && selected.index === destination) continue; const target = tableau[destination].at(-1); if ((!target && card.rank === 12) || (target && target.red !== card.red && target.rank === card.rank + 1)) return moveToTableau(destination); } return false; }
-    function moveToTableau(destination, originsOverride = null) { const moving = picked(); const card = moving[0]; if (!card || !validSequence(moving) || (selected.source === 'tableau' && selected.index === destination)) return false; const sourceColumn = selected.source === 'tableau' ? selected.index : null; const revealCard = sourceColumn === null ? null : tableau[sourceColumn][selected.cardIndex - 1]; const origins = captureCardPositions(moving, originsOverride); const target = tableau[destination].at(-1); if ((!target && card.rank === 12) || (target && target.red !== card.red && target.rank === card.rank + 1)) { const token = animationToken; saveState(); removeSelected(false); tableau[destination].push(...moving); moves++; message.innerHTML = '<b>Guter Zug!</b> Wähle die nächste Karte.'; render(); animateCardMoves(moving, origins).then(() => revealAfterMove(revealCard, token)); updateStatus(); return true; } return false; }
-    function moveToFoundation(pileIndex, originsOverride = null) { const moving = picked(); const card = moving[0]; if (!card || moving.length !== 1 || !canPlaceOnFoundation(card, foundations[pileIndex])) return false; const sourceColumn = selected.source === 'tableau' ? selected.index : null; const revealCard = sourceColumn === null ? null : tableau[sourceColumn][selected.cardIndex - 1]; const origins = captureCardPositions(moving, originsOverride); const token = animationToken; saveState(); removeSelected(false); foundations[pileIndex].push(card); moves++; const won = foundations.every(pile => pile.length === 13); if (won) { clearInterval(timer); gamePanel.classList.add('victory'); } message.innerHTML = won ? '<b>Gewonnen!</b> Alle Karten liegen auf den Grundstapeln.' : '<b>Passt!</b> Baue weiter auf.'; render(); animateCardMoves(moving, origins).then(() => { revealAfterMove(revealCard, token); if (won) later(startHeap, 300); }); updateStatus(); return true; }
+    function moveToTableau(destination, originsOverride = null) { const moving = picked(); const card = moving[0]; if (!card || !validSequence(moving) || (selected.source === 'tableau' && selected.index === destination)) return false; const sourceColumn = selected.source === 'tableau' ? selected.index : null; const revealCard = sourceColumn === null ? null : tableau[sourceColumn][selected.cardIndex - 1]; const origins = captureCardPositions(moving, originsOverride); const target = tableau[destination].at(-1); if ((!target && card.rank === 12) || (target && target.red !== card.red && target.rank === card.rank + 1)) { const token = animationToken; saveState(); removeSelected(false); tableau[destination].push(...moving); moves++; message.innerHTML = '<b>Guter Zug!</b> Wähle die nächste Karte.'; render(); if (solutionMode) applySolutionMark(); animateCardMoves(moving, origins).then(() => revealAfterMove(revealCard, token)); updateStatus(); return true; } return false; }
+    function moveToFoundation(pileIndex, originsOverride = null) { const moving = picked(); const card = moving[0]; if (!card || moving.length !== 1 || !canPlaceOnFoundation(card, foundations[pileIndex])) return false; const sourceColumn = selected.source === 'tableau' ? selected.index : null; const revealCard = sourceColumn === null ? null : tableau[sourceColumn][selected.cardIndex - 1]; const origins = captureCardPositions(moving, originsOverride); const token = animationToken; saveState(); removeSelected(false); foundations[pileIndex].push(card); moves++; const won = foundations.every(pile => pile.length === 13); if (won) { clearInterval(timer); gamePanel.classList.add('victory'); } message.innerHTML = won ? '<b>Gewonnen!</b> Alle Karten liegen auf den Grundstapeln.' : '<b>Passt!</b> Baue weiter auf.'; render(); if (solutionMode) applySolutionMark(); animateCardMoves(moving, origins).then(() => { revealAfterMove(revealCard, token); if (won) later(startHeap, 300); }); updateStatus(); return true; }
     function animateStockDraw(card, origin) {
       const target = document.querySelector(`[data-card-id="${card.id}"]`); if (!target) return;
       const destination = target.getBoundingClientRect(), flight = document.createElement('div'); flight.className = 'playing-card card-flight';
@@ -348,7 +401,7 @@
       const duration = reduceMotion() ? 1 : 600, animation = flight.animate([{ transform: 'translate(0, 0) rotateY(0)' }, { transform: `translate(${destination.left - origin.left}px, ${destination.top - origin.top}px) rotateY(90deg)`, offset: .5 }, { transform: `translate(${destination.left - origin.left}px, ${destination.top - origin.top}px) rotateY(0)` }], { duration, easing: 'ease-in-out', fill: 'forwards' });
       setTimeout(() => { flight.replaceChildren(face(card)); }, duration / 2); animation.finished.catch(() => {}).then(() => { flight.remove(); target.style.visibility = ''; });
     }
-    function drawStock() { const origin = stockElement.getBoundingClientRect(), drawn = stock.length ? stock.at(-1) : null; saveState(); if (stock.length) { const card = stock.pop(); card.faceUp = true; waste.push(card); } else { stock = waste.reverse(); waste = []; } moves++; selected = null; render(); updateStatus(); if (drawn) animateStockDraw(drawn, origin); }
+    function drawStock() { const origin = stockElement.getBoundingClientRect(), drawn = stock.length ? stock.at(-1) : null; saveState(); if (stock.length) { const card = stock.pop(); card.faceUp = true; waste.push(card); } else { stock = waste.reverse(); waste = []; } moves++; selected = null; render(); if (solutionMode) applySolutionMark(); updateStatus(); if (drawn) animateStockDraw(drawn, origin); }
     // Nach einem Touch-Drag verschluckt Safari den nächsten Klick; Buttons reagieren daher direkt auf das Touch-pointerup.
     function onTap(button, action) {
       button.addEventListener('pointerup', event => {
@@ -507,6 +560,8 @@
       gamePanel.inert = false; dealing = false;
     }
     onTap(document.getElementById('newGame'), () => startNewGame()); onTap(document.getElementById('sameGame'), () => startNewGame(currentDeck)); onTap(autoFinishButton, autoFinishGame);
+    const solutionHintButton = document.getElementById('solutionHint');
+    onTap(solutionHintButton, () => { solutionMode = !solutionMode; solutionHintButton.textContent = `💡 Lösung: ${solutionMode ? 'An' : 'Aus'}`; solutionHintButton.classList.toggle('active', solutionMode); if (solutionMode && !currentDeckSolutions.length) message.innerHTML = '<b>Kein Lösungsweg geladen.</b> Starte ein neues Spiel.'; applySolutionMark(); });
     onTap(document.getElementById('undo'), undo);
     // Gespeichert wird bei jeder Zustandsänderung (updateStatus) sowie beim Verlassen oder Verbergen der Seite, nicht mehr im Sekundentakt.
     document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'hidden') persistGame(); });

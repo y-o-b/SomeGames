@@ -89,6 +89,12 @@ Karten, die gerade zum Ziel fliegen, stehen in `flyingIds`. `cardButton()` zeich
 - Deckdateien werden über einen Inhalts-Hash benannt (`deck-<hash>.json`). Dasselbe Deck kann dadurch nicht doppelt abgelegt werden; das Skript dedupliziert zusätzlich beim Einlesen und Schreiben.
 - „Neues Spiel" und „Gleiches Deck" (`startNewGame()`) lassen alle 52 Karten von ihrer aktuellen Position (auch aus dem Haufen oder den Zielstapeln) an ihren Platz im neuen Spiel fliegen. Die Reihenfolge entspricht dem Austeilen: Spalte für Spalte reihum, zuletzt der Ziehstapel. Karten, die ihre Seite wechseln, drehen sich unterwegs (Breite skaliert auf nahe 0 und wieder zurück). Während des Austeilens ist das Spielfeld gesperrt. Bei „Bewegung reduzieren" entfällt die Animation.
 
+## Lösungshinweis
+
+- Der Button „💡 Lösung“ schaltet eine Markierung für den nächsten Zug aus den gespeicherten Lösungswegen des aktuellen Decks ein oder aus. `currentDeckSolutions` kommt aus der geladenen Deckdatei und wird im Spielstand mitgespeichert.
+- `findSolutionAction()` prüft die kompakten Aktionen aller Lösungswege gegen das aktuelle Spielfeld und liefert die erste ausführbare Aktion. `applySolutionMark()` markiert die betroffene Karte über `selected`; muss gezogen oder der Abwurfstapel neu ausgelegt werden, wird stattdessen der Ziehstapel (`#stock.solution-target`) hervorgehoben.
+- Die Markierung wird nach jedem Zug, nach dem Aufdecken einer Karte, bei „Rückgängig“ und beim Start eines Spiels neu berechnet. Bei Sieg, Haufenansicht oder laufender Austeil-/Fertigspiel-Animation bleibt sie aus.
+
 ## Fertigspielen und Spielende
 
 - „Fertigspielen" erscheint, sobald keine verdeckte Karte mehr liegt. `autoFinishGame()` sperrt das Spielfeld bis auf „Neues Spiel" (`lockBoard()`, `inert`); „Neues Spiel" bricht den Ablauf ab. Die Flugkarten verwenden Seitenkoordinaten und bleiben beim Scrollen auf Kurs. Bei „Bewegung reduzieren" (`prefers-reduced-motion`) entfällt die Animation. Die übrigen Karten fliegen einzeln auf ihren Zielstapel: aufsteigend nach Rang, reihum über die vier Stapel (110 ms Takt, 450 ms Flug). Jede Farbe landet auf dem Stapel, der mit ihrem Ass begonnen wurde.
