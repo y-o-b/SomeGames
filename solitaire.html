@@ -126,7 +126,7 @@
       <div class="controls"><button class="undo" id="undo" type="button" disabled>↶ Rückgängig</button><button id="sameGame" class="undo" type="button">↻ Gleiches Deck</button><button id="autoFinish" type="button" hidden>▶ Fertigspielen</button><button id="newGame" type="button">Neues Spiel</button></div>
       <div class="heap" id="heap" aria-hidden="true"></div>
     </section>
-    <button class="version" data-version type="button" title="Klicken, um die Seite neu zu laden">Version 2.49</button>
+    <button class="version" data-version type="button" title="Klicken, um die Seite neu zu laden">Version 2.50</button>
     <script>const versionButton = document.querySelector('[data-version]'); versionButton.addEventListener('click', () => location.replace(`${location.pathname}?v=${Date.now()}`)); fetch(`VERSION?${Date.now()}`, { cache: 'no-store' }).then(response => response.text()).then(version => { versionButton.textContent = `Version ${version.trim()}`; }).catch(() => {});</script>
   </main>
   <script>
@@ -134,7 +134,7 @@
     const stockElement = document.getElementById('stock'), wasteElement = document.getElementById('waste'), tableauElement = document.getElementById('tableau'), foundationsElement = document.getElementById('foundations'), message = document.getElementById('message'), autoFinishButton = document.getElementById('autoFinish');
     const gamePanel = document.querySelector('.game');
     let tableau, stock, waste, foundations, selected = null, history = [], moves = 0, seconds = 0, timer, cardDrag = null, suppressClick = false, suppressClickUntil = 0, dragClickGuard = null, revealedCards = [], lastCardTap = null, lastStockTapAt = 0, revealTimer = null, revealClearTimer = null, animationToken = 0;
-    let deckIndex = [], deckCursor = 0, fallbackDecks = [], currentDeckSolutions = [], currentDeck = [], heapMode = false;
+    let deckIndex = [], deckCursor = 0, currentDeckSolutions = [], currentDeck = [], heapMode = false;
     const STORAGE_KEY = 'y-o-b.solitaire.save.v2';
     // Nach einem verarbeiteten Touch-Tap erzeugt Safari noch einen Click. Hat sich das Layout inzwischen verschoben (z. B. wird ein Button ausgeblendet),
     // träfe er sonst ein anderes Element unter dem Finger. Solche Clicks werden deshalb kurz global verworfen.
@@ -154,17 +154,7 @@
         if (!names.length) throw new Error('Leerer Deck-Index.');
         deckIndex = names;
         deckCursor = Math.floor(Math.random() * deckIndex.length);
-        return;
-      } catch (error) { console.info('Deck-Index nicht verfügbar, nutze Deckliste.', error); }
-      try {
-        const response = await fetch('solitaire-deals.json', { cache: 'no-store' });
-        if (!response.ok) throw new Error(`HTTP ${response.status}`);
-        const data = await response.json();
-        if (Array.isArray(data)) {
-          fallbackDecks = data.filter(validDeck);
-          deckCursor = fallbackDecks.length ? Math.floor(Math.random() * fallbackDecks.length) : 0;
-        }
-      } catch (error) { console.info('Keine JSON-Decksammlung geladen.', error); }
+      } catch (error) { console.info('Deck-Index konnte nicht geladen werden.', error); }
     }
     async function solvableDeck() {
       for (let attempt = 0; attempt < deckIndex.length; attempt++) {
@@ -177,17 +167,6 @@
           currentDeckSolutions = Array.isArray(data.solutions) ? data.solutions : [];
           return data.deckOrder.map(id => card(Math.floor(id / 13), id % 13));
         } catch (error) { /* nächstes Deck versuchen */ }
-      }
-      if (!fallbackDecks.length) {
-        try {
-          const response = await fetch('solitaire-deals.json', { cache: 'no-store' });
-          if (response.ok) { const data = await response.json(); if (Array.isArray(data)) fallbackDecks = data.filter(validDeck); }
-        } catch (error) { /* Ausfallsicherung nicht verfügbar */ }
-      }
-      if (fallbackDecks.length) {
-        const deal = fallbackDecks[deckCursor++ % fallbackDecks.length];
-        currentDeckSolutions = [];
-        return deal.map(id => card(Math.floor(id / 13), id % 13));
       }
       return null;
     }
@@ -494,7 +473,7 @@
     async function startNewGame(deckToUse = null) {
       if (dealing) return;
       if (!deckToUse) {
-        if (!deckIndex.length && !fallbackDecks.length) await loadSolvableDeals();
+        if (!deckIndex.length) await loadSolvableDeals();
         deckToUse = await solvableDeck();
       }
       const before = tableau && !autoFinishing && !reduceMotion() ? cardLayout() : null;

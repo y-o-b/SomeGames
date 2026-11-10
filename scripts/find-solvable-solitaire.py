@@ -8,8 +8,8 @@ Solutions use compact integer action arrays (column/card indices are zero-based)
 `[0, fromColumn, cardId]` tableau→foundation; `[1, cardId]` waste→foundation;
 `[2, fromColumn, toColumn, startIndex, count, cardId]` tableau→tableau;
 `[3, toColumn, cardId]` waste→tableau; `[4, cardId]` draw stock; `[5]` recycle waste.
-Deals without a solution are kept in deals-without-solutions.json.
-solitaire-deals.json remains a deck-only fallback list.
+Deals without a solution are kept in deals-without-solutions.json. Deck files are
+named by a content hash, so the same deck can never be stored twice.
 """
 
 from __future__ import annotations
@@ -29,7 +29,6 @@ from typing import Iterator
 COLORS = (0, 1, 1, 0)  # black, red, red, black
 RULES = "klondike-draw-1-unlimited-redeals-no-foundation-return"
 DEFAULT_DECK_DIR = Path(__file__).resolve().parent.parent / "solitaire-decks"
-DEFAULT_GAME_OUTPUT = Path(__file__).resolve().parent.parent / "solitaire-deals.json"
 DEFAULT_UNSOLVED_OUTPUT = Path(__file__).resolve().parent.parent / "deals-without-solutions.json"
 
 # State: (columns, stock, waste, foundations); a column is (cards, face_up_count).
@@ -227,6 +226,7 @@ def deck_file_name(deck: list[int]) -> str:
 def read_solved_decks(directory: Path) -> dict:
     index_path = directory / "index.json"
     deals = []
+    seen = set()
     if index_path.exists():
         try:
             index = json.loads(index_path.read_text(encoding="utf-8"))
@@ -246,7 +246,8 @@ def read_solved_decks(directory: Path) -> dict:
             if not isinstance(item, dict) or not valid_deck(item.get("deckOrder")):
                 continue
             solutions = structured_solutions(item)
-            if solutions:
+            if solutions and tuple(item["deckOrder"]) not in seen:
+                seen.add(tuple(item["deckOrder"]))
                 deals.append({"deckOrder": item["deckOrder"], "solutions": solutions})
     return {"deals": deals}
 
@@ -254,10 +255,15 @@ def read_solved_decks(directory: Path) -> dict:
 def write_solved_decks(directory: Path, data: dict) -> None:
     directory.mkdir(parents=True, exist_ok=True)
     names = []
+    seen = set()
     for deal in data["deals"]:
         solutions = structured_solutions(deal)
         if not solutions:
             continue
+        key = tuple(deal["deckOrder"])
+        if key in seen:
+            continue
+        seen.add(key)
         name = deck_file_name(deal["deckOrder"])
         names.append(name)
         write_json(directory / name, {"deckOrder": deal["deckOrder"], "solutions": solutions}, compact=True)
@@ -300,11 +306,6 @@ def write_unsolved_collection(path: Path, data: dict) -> None:
         "solutionSearchCursor": data.get("solutionSearchCursor", 0),
         "deals": deals,
     }, compact=True)
-
-
-def write_game_deals(path: Path, data: dict) -> None:
-    # The browser only needs the ordered card IDs for each playable deal.
-    write_json(path, [deal["deckOrder"] for deal in data["deals"]], compact=True)
 
 
 ACTION_LENGTHS = {0: 3, 1: 2, 2: 6, 3: 3, 4: 2, 5: 1}
@@ -391,13 +392,11 @@ def main() -> int:
     parser.add_argument("--backfill-limit", type=int, default=None, help="Backfills aktivieren und bis zu N bestehende Decks ohne Lösung pro Lauf prüfen (nur bei Angabe).")
     parser.add_argument("--deck-dir", type=Path, default=DEFAULT_DECK_DIR, help=f"Verzeichnis mit einem JSON je lösbarem Deck (Standard: {DEFAULT_DECK_DIR}).")
     parser.add_argument("--unsolved-output", type=Path, default=DEFAULT_UNSOLVED_OUTPUT, help=f"Decks ohne Lösungsweg (Standard: {DEFAULT_UNSOLVED_OUTPUT}).")
-    parser.add_argument("--game-output", type=Path, default=DEFAULT_GAME_OUTPUT, help=f"Deckliste als Ausfallsicherung für solitaire.html (Standard: {DEFAULT_GAME_OUTPUT}).")
     args = parser.parse_args()
     if min(args.count, args.max_attempts, args.max_states, args.solutions_per_deal) < 1 or (args.backfill_limit is not None and args.backfill_limit < 1):
         parser.error("count, max-attempts, max-states, solutions-per-deal und ein angegebenes backfill-limit müssen mindestens 1 sein.")
-    output_paths = [args.unsolved_output.resolve(), args.game_output.resolve()]
-    if len(set(output_paths)) != len(output_paths):
-        parser.error("--unsolved-output und --game-output müssen verschiedene Dateien sein.")
+    if args.deck_dir.resolve() == args.unsolved_output.resolve():
+        parser.error("--deck-dir und --unsolved-output müssen verschiedene Pfade sein.")
 
     data = read_solved_decks(args.deck_dir)
     unsolved_data = read_unsolved_collection(args.unsolved_output)
@@ -418,7 +417,6 @@ def main() -> int:
         data["deals"] = list(solved_by_deck.values())
         write_solved_decks(args.deck_dir, data)
         write_unsolved_collection(args.unsolved_output, unsolved_data)
-        write_game_deals(args.game_output, data)
 
     save_outputs()
 

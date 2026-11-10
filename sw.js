@@ -1,7 +1,7 @@
 // Service Worker: macht die Seite offline nutzbar.
 // Strategie: Netzwerk zuerst (mit kurzem Timeout), bei Fehler oder Offline aus dem Cache.
 // So sieht man online immer den neuesten Stand, offline den zuletzt geladenen.
-const CACHE = 'y-o-b-v102';
+const CACHE = 'y-o-b-v103';
 const NETWORK_TIMEOUT_MS = 4000;
 
 // Alles, was die Spiele zum Starten brauchen. Neue Dateien hier ergänzen und CACHE erhöhen.
@@ -14,7 +14,6 @@ const PRECACHE = [
   'memory-symbols.js',
   'solitaire.html',
   'minesweeper.html',
-  'solitaire-deals.json',
   'solitaire-decks/index.json',
   'VERSION',
   'manifest.webmanifest',

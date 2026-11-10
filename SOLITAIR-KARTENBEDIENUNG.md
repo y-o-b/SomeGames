@@ -85,7 +85,8 @@ Karten, die gerade zum Ziel fliegen, stehen in `flyingIds`. `cardButton()` zeich
 
 ## Neues Spiel und Austeilen
 
-- Es gibt keinen eingebauten Ersatz für die Deck-Sammlung mehr. Die Spiele kommen ausschließlich aus `solitaire-deals.json`. Lässt sie sich nicht laden, zeigt „Neues Spiel" eine Meldung und ändert nichts. Der nächste Versuch lädt die Sammlung erneut.
+- Es gibt keinen eingebauten Ersatz für die Deck-Sammlung mehr. Die Spiele kommen ausschließlich aus `solitaire-decks/index.json` und den einzelnen Deckdateien `solitaire-decks/deck-*.json`. Der Index wird einmal geladen; beim Start eines Spiels wird gezielt eine Deckdatei geholt. Lässt sich der Index nicht laden, zeigt „Neues Spiel" eine Meldung und ändert nichts. Der nächste Versuch lädt den Index erneut.
+- Deckdateien werden über einen Inhalts-Hash benannt (`deck-<hash>.json`). Dasselbe Deck kann dadurch nicht doppelt abgelegt werden; das Skript dedupliziert zusätzlich beim Einlesen und Schreiben.
 - „Neues Spiel" und „Gleiches Deck" (`startNewGame()`) lassen alle 52 Karten von ihrer aktuellen Position (auch aus dem Haufen oder den Zielstapeln) an ihren Platz im neuen Spiel fliegen. Die Reihenfolge entspricht dem Austeilen: Spalte für Spalte reihum, zuletzt der Ziehstapel. Karten, die ihre Seite wechseln, drehen sich unterwegs (Breite skaliert auf nahe 0 und wieder zurück). Während des Austeilens ist das Spielfeld gesperrt. Bei „Bewegung reduzieren" entfällt die Animation.
 
 ## Fertigspielen und Spielende
@@ -101,7 +102,7 @@ Karten, die gerade zum Ziel fliegen, stehen in `flyingIds`. `cardButton()` zeich
 - Der Spielstand liegt im `localStorage` (`STORAGE_KEY`). Geschrieben wird bei jeder Zustandsänderung (`updateStatus()`) sowie beim Verbergen oder Verlassen der Seite (`visibilitychange`, `pagehide`), nicht mehr jede Sekunde und nicht bei jedem Neuzeichnen.
 - Der Rückgängig-Verlauf ist auf `HISTORY_LIMIT` (200) Einträge begrenzt, damit der gespeicherte Stand nicht unbegrenzt wächst.
 - Beim Laden prüft `validState()`, dass der Stand (und jeder Verlaufseintrag) genau die 52 Karten enthält und jede Karte zu ihrer ID passt. Ein beschädigter oder manipulierter Stand wird verworfen und ein neues Spiel gestartet. Karten werden ohne `innerHTML` gezeichnet (`face()` nutzt `textContent`).
-- Ein gespeicherter Stand wird sofort angezeigt, ohne auf `solitaire-deals.json` zu warten. Nur ein neues Spiel braucht die Deck-Sammlung.
+- Ein gespeicherter Stand wird sofort angezeigt, ohne auf den Deck-Index zu warten. Nur ein neues Spiel braucht den Index und eine Deckdatei.
 
 ## Relevante Funktionen
 
