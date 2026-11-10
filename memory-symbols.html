@@ -54,7 +54,7 @@
       <div class="symbols" id="symbols" role="list" aria-label="Symbole"></div>
       <a class="play-link" href="memory.html">Memory spielen&nbsp; →</a>
     </section>
-    <button class="version" data-version type="button" title="Klicken, um die Seite neu zu laden">Version 2.47</button>
+    <button class="version" data-version type="button" title="Klicken, um die Seite neu zu laden">Version 2.48</button>
     <script>const versionButton = document.querySelector('[data-version]'); versionButton.addEventListener('click', () => location.replace(`${location.pathname}?v=${Date.now()}`)); fetch(`VERSION?${Date.now()}`, { cache: 'no-store' }).then(response => response.text()).then(version => { versionButton.textContent = `Version ${version.trim()}`; }).catch(() => {});</script>
   </main>
   <script src="memory-symbols.js"></script>

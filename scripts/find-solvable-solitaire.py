@@ -347,13 +347,13 @@ def main() -> int:
     parser.add_argument("--max-attempts", type=int, default=1000, help="Maximale Zahl zufälliger Decks pro Aufruf (Standard: 1000).")
     parser.add_argument("--max-states", type=int, default=100_000, help="Maximale Zahl geprüfter Zustände pro Deck (Standard: 100000).")
     parser.add_argument("--solutions-per-deal", type=int, default=3, help="Wie viele unterschiedliche Lösungswege pro Deck gesucht werden (Standard: 3).")
-    parser.add_argument("--backfill-limit", type=int, default=10, help="Maximale Zahl bestehender Decks ohne Lösung, die pro Lauf zuerst geprüft werden (Standard: 10).")
+    parser.add_argument("--backfill-limit", type=int, default=None, help="Backfills aktivieren und bis zu N bestehende Decks ohne Lösung pro Lauf prüfen (nur bei Angabe).")
     parser.add_argument("--output", type=Path, default=DEFAULT_OUTPUT, help=f"Kombinierte Deck- und Lösungsdatei (Standard: {DEFAULT_OUTPUT}).")
     parser.add_argument("--unsolved-output", type=Path, default=DEFAULT_UNSOLVED_OUTPUT, help=f"Decks ohne Lösungsweg (Standard: {DEFAULT_UNSOLVED_OUTPUT}).")
     parser.add_argument("--game-output", type=Path, default=DEFAULT_GAME_OUTPUT, help=f"Kompakte JSON-Datei für solitaire.html (Standard: {DEFAULT_GAME_OUTPUT}).")
     args = parser.parse_args()
-    if min(args.count, args.max_attempts, args.max_states, args.solutions_per_deal, args.backfill_limit) < 1:
-        parser.error("count, max-attempts, max-states, solutions-per-deal und backfill-limit müssen mindestens 1 sein.")
+    if min(args.count, args.max_attempts, args.max_states, args.solutions_per_deal) < 1 or (args.backfill_limit is not None and args.backfill_limit < 1):
+        parser.error("count, max-attempts, max-states, solutions-per-deal und ein angegebenes backfill-limit müssen mindestens 1 sein.")
     output_paths = [args.output.resolve(), args.unsolved_output.resolve(), args.game_output.resolve()]
     if len(set(output_paths)) != len(output_paths):
         parser.error("--output, --unsolved-output und --game-output müssen verschiedene Dateien sein.")
@@ -393,8 +393,11 @@ def main() -> int:
 
     save_outputs()
 
-    # Backfill old known deals before spending time searching for new ones.
-    pending = deals_needing_solutions(unsolved_data)
+    # Existing solutionless decks are searched only when explicitly requested.
+    if args.backfill_limit is not None:
+        pending = deals_needing_solutions(unsolved_data)
+    else:
+        pending = []
     if pending:
         deal_count = len(unsolved_data["deals"])
         cursor = unsolved_data.get("solutionSearchCursor", 0)
