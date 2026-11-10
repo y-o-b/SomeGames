@@ -123,10 +123,10 @@
       <div class="tableau" id="tableau" aria-label="Spielfeld"></div>
       <p class="message" id="message" aria-live="polite"><b>Los geht's!</b> Lege Karten in absteigender Reihenfolge und wechselnden Farben.</p>
       <div class="status"><span>Züge: <strong id="moves">0</strong></span><span>Zeit: <strong id="time">0:00</strong></span></div>
-      <div class="controls"><button class="undo" id="undo" type="button" disabled>↶ Rückgängig</button><button id="sameGame" class="undo" type="button">↻ Gleiches Deck</button><button id="autoFinish" type="button" hidden>▶ Fertigspielen</button><button id="solution" type="button">☷ Musterlösung</button><button id="newGame" type="button">Neues Spiel</button></div>
+      <div class="controls"><button class="undo" id="undo" type="button" disabled>↶ Rückgängig</button><button id="sameGame" class="undo" type="button">↻ Gleiches Deck</button><button id="autoFinish" type="button" hidden>▶ Fertigspielen</button><button id="newGame" type="button">Neues Spiel</button></div>
       <div class="heap" id="heap" aria-hidden="true"></div>
     </section>
-    <button class="version" data-version type="button" title="Klicken, um die Seite neu zu laden">Version 2.39</button>
+    <button class="version" data-version type="button" title="Klicken, um die Seite neu zu laden">Version 2.40</button>
     <script>const versionButton = document.querySelector('[data-version]'); versionButton.addEventListener('click', () => location.replace(`${location.pathname}?v=${Date.now()}`)); fetch(`VERSION?${Date.now()}`, { cache: 'no-store' }).then(response => response.text()).then(version => { versionButton.textContent = `Version ${version.trim()}`; }).catch(() => {});</script>
   </main>
   <script>
@@ -134,7 +134,7 @@
     const stockElement = document.getElementById('stock'), wasteElement = document.getElementById('waste'), tableauElement = document.getElementById('tableau'), foundationsElement = document.getElementById('foundations'), message = document.getElementById('message'), autoFinishButton = document.getElementById('autoFinish');
     const gamePanel = document.querySelector('.game');
     let tableau, stock, waste, foundations, selected = null, history = [], moves = 0, seconds = 0, timer, cardDrag = null, suppressClick = false, suppressClickUntil = 0, dragClickGuard = null, revealedCards = [], lastCardTap = null, lastStockTapAt = 0, revealTimer = null, revealClearTimer = null, animationToken = 0;
-    let solvableDeals = [], solutionDeals = [], dealCursor = 0, currentDeck = [], heapMode = false;
+    let solvableDeals = [], dealCursor = 0, currentDeck = [], heapMode = false;
     const STORAGE_KEY = 'y-o-b.solitaire.save.v2';
     // Nach einem verarbeiteten Touch-Tap erzeugt Safari noch einen Click. Hat sich das Layout inzwischen verschoben (z. B. wird ein Button ausgeblendet),
     // träfe er sonst ein anderes Element unter dem Finger. Solche Clicks werden deshalb kurz global verworfen.
@@ -151,21 +151,14 @@
     }
     async function loadSolvableDeals() {
       try {
-        const [gameResult, solutionResult] = await Promise.allSettled([
-          fetch('solitaire-deals.json', { cache: 'no-store' }).then(response => response.ok ? response.json() : null),
-          fetch('solvable-deals.json', { cache: 'no-store' }).then(response => response.ok ? response.json() : null),
-        ]);
-        const gameData = gameResult.status === 'fulfilled' ? gameResult.value : null;
-        const solutionData = solutionResult.status === 'fulfilled' ? solutionResult.value : null;
-        solutionDeals = Array.isArray(solutionData?.deals) ? solutionData.deals.filter(deal => Array.isArray(deal?.deckOrder) && deal.deckOrder.length === 52 && Array.isArray(deal.solution)) : [];
-        const solutionDecks = solutionDeals.map(deal => deal.deckOrder);
-        const gameDecks = Array.isArray(gameData) ? gameData.filter(deck => Array.isArray(deck) && deck.length === 52 && new Set(deck).size === 52 && deck.every(id => Number.isInteger(id) && id >= 0 && id < 52)) : [];
-        // Die vollständige Sammlung ist die Quelle für neue Spiele, damit jeder Decksatz einen Lösungsweg besitzt.
-        solvableDeals = solutionDecks.length ? solutionDecks : gameDecks;
-        dealCursor = solvableDeals.length ? Math.floor(Math.random() * solvableDeals.length) : 0;
-      } catch (error) {
-        console.info('Keine JSON-Decksammlung geladen.', error);
-      }
+        const response = await fetch('solitaire-deals.json', { cache: 'no-store' });
+        if (!response.ok) throw new Error(`HTTP ${response.status}`);
+        const data = await response.json();
+        if (Array.isArray(data)) {
+          solvableDeals = data.filter(deck => Array.isArray(deck) && deck.length === 52 && new Set(deck).size === 52 && deck.every(id => Number.isInteger(id) && id >= 0 && id < 52));
+          dealCursor = solvableDeals.length ? Math.floor(Math.random() * solvableDeals.length) : 0;
+        }
+      } catch (error) { console.info('Keine JSON-Decksammlung geladen.', error); }
     }
     function start(deckToUse = null) { const dealt = deckToUse || solvableDeck(); if (!dealt) { message.innerHTML = '<b>Kartendecks konnten nicht geladen werden.</b> „Neues Spiel" versucht es erneut.'; return false; } clearInterval(timer); timer = null; clearHeap(); flyingIds.clear(); finishRun++; autoFinishing = false; lockBoard(false); document.querySelectorAll('.card-flight').forEach(flight => flight.remove()); message.innerHTML = `<b>Los geht's!</b> Lege Karten in absteigender Reihenfolge und wechselnden Farben.`; gamePanel.classList.remove('victory'); let cards = dealt.map(item => { const id = typeof item === 'string' ? item : item.id; const [suitIndex, rank] = id.split('-').map(Number); return card(suitIndex, rank); }); currentDeck = cards.map(item => item.id); tableau = Array.from({ length: 7 }, (_, column) => { const pile = cards.splice(0, column + 1); pile.forEach((card, index) => { card.faceUp = index === pile.length - 1; }); return pile; }); stock = cards; waste = []; foundations = suits.map(() => []); selected = null; history = []; moves = seconds = 0; render(); updateStatus(); return true; }
     function copyState() { return { tableau: tableau.map(column => column.map(card => ({ ...card }))), stock: stock.map(card => ({ ...card })), waste: waste.map(card => ({ ...card })), foundations: foundations.map(pile => pile.map(card => ({ ...card }))) }; }
@@ -347,13 +340,6 @@
     }
     function drawStock() { const origin = stockElement.getBoundingClientRect(), drawn = stock.length ? stock.at(-1) : null; saveState(); if (stock.length) { const card = stock.pop(); card.faceUp = true; waste.push(card); } else { stock = waste.reverse(); waste = []; } moves++; selected = null; render(); updateStatus(); if (drawn) animateStockDraw(drawn, origin); }
     // Nach einem Touch-Drag verschluckt Safari den nächsten Klick; Buttons reagieren daher direkt auf das Touch-pointerup.
-    function showSolution() {
-      const deal = solutionDeals.find(item => item.deckOrder.join(',') === currentDeck.join(','));
-      const intro = document.getElementById('solutionIntro'), steps = document.getElementById('solutionSteps'); steps.innerHTML = '';
-      if (!deal) { intro.textContent = 'Für dieses Deck ist kein vollständiger Lösungsweg geladen.'; }
-      else { intro.textContent = `${deal.solution.length} Züge für das aktuelle Deck`; deal.solution.forEach((move, index) => { const item = document.createElement('li'); item.textContent = move; item.value = index + 1; steps.appendChild(item); }); }
-      document.getElementById('solutionDialog').showModal();
-    }
     function onTap(button, action) {
       button.addEventListener('pointerup', event => {
         if (event.pointerType !== 'touch' || button.disabled) return;
@@ -508,7 +494,6 @@
       gamePanel.inert = false; dealing = false;
     }
     onTap(document.getElementById('newGame'), () => startNewGame()); onTap(document.getElementById('sameGame'), () => startNewGame(currentDeck)); onTap(autoFinishButton, autoFinishGame);
-    onTap(document.getElementById('solution'), showSolution); onTap(document.getElementById('solutionClose'), () => document.getElementById('solutionDialog').close());
     onTap(document.getElementById('undo'), undo);
     // Gespeichert wird bei jeder Zustandsänderung (updateStatus) sowie beim Verlassen oder Verbergen der Seite, nicht mehr im Sekundentakt.
     document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'hidden') persistGame(); });
