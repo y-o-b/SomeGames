@@ -7,8 +7,8 @@ Solutions use compact integer action arrays (column/card indices are zero-based)
 `[0, fromColumn, cardId]` tableau→foundation; `[1, cardId]` waste→foundation;
 `[2, fromColumn, toColumn, startIndex, count, cardId]` tableau→tableau;
 `[3, toColumn, cardId]` waste→tableau; `[4, cardId]` draw stock; `[5]` recycle waste.
-The combined JSON is the canonical collection; solitaire-deals.json remains a
-small deck-only list for the current game.
+The combined JSON contains solved deals; deals without a solution are kept in
+deals-without-solutions.json. solitaire-deals.json remains the deck-only list.
 """
 
 from __future__ import annotations
@@ -28,6 +28,7 @@ COLORS = (0, 1, 1, 0)  # black, red, red, black
 RULES = "klondike-draw-1-unlimited-redeals-no-foundation-return"
 DEFAULT_OUTPUT = Path(__file__).resolve().parent.parent / "solitaire-deals-with-solutions.json"
 DEFAULT_GAME_OUTPUT = Path(__file__).resolve().parent.parent / "solitaire-deals.json"
+DEFAULT_UNSOLVED_OUTPUT = Path(__file__).resolve().parent.parent / "deals-without-solutions.json"
 
 # State: (columns, stock, waste, foundations); a column is (cards, face_up_count).
 State = tuple[tuple[tuple[int, ...], int], ...], tuple[int, ...], tuple[int, ...], tuple[int, ...]
@@ -234,7 +235,20 @@ def read_collection(path: Path) -> dict:
 def write_collection(path: Path, data: dict) -> None:
     deals = []
     for deal in data["deals"]:
-        item = {"deckOrder": deal["deckOrder"], "solutions": structured_solutions(deal)}
+        solutions = structured_solutions(deal)
+        if solutions:
+            deals.append({"deckOrder": deal["deckOrder"], "solutions": solutions})
+    write_json(path, {
+        "version": 1,
+        "rules": RULES,
+        "deals": deals,
+    }, compact=True)
+
+
+def write_unsolved_collection(path: Path, data: dict) -> None:
+    deals = []
+    for deal in data["deals"]:
+        item = {"deckOrder": deal["deckOrder"]}
         search = deal.get("solutionSearch")
         if isinstance(search, dict) and search.get("status") in {"search_limit", "exhausted"}:
             item["solutionSearch"] = search
@@ -335,43 +349,71 @@ def main() -> int:
     parser.add_argument("--solutions-per-deal", type=int, default=3, help="Wie viele unterschiedliche Lösungswege pro Deck gesucht werden (Standard: 3).")
     parser.add_argument("--backfill-limit", type=int, default=10, help="Maximale Zahl bestehender Decks ohne Lösung, die pro Lauf zuerst geprüft werden (Standard: 10).")
     parser.add_argument("--output", type=Path, default=DEFAULT_OUTPUT, help=f"Kombinierte Deck- und Lösungsdatei (Standard: {DEFAULT_OUTPUT}).")
+    parser.add_argument("--unsolved-output", type=Path, default=DEFAULT_UNSOLVED_OUTPUT, help=f"Decks ohne Lösungsweg (Standard: {DEFAULT_UNSOLVED_OUTPUT}).")
     parser.add_argument("--game-output", type=Path, default=DEFAULT_GAME_OUTPUT, help=f"Kompakte JSON-Datei für solitaire.html (Standard: {DEFAULT_GAME_OUTPUT}).")
     args = parser.parse_args()
     if min(args.count, args.max_attempts, args.max_states, args.solutions_per_deal, args.backfill_limit) < 1:
         parser.error("count, max-attempts, max-states, solutions-per-deal und backfill-limit müssen mindestens 1 sein.")
-    output_paths = [args.output.resolve(), args.game_output.resolve()]
+    output_paths = [args.output.resolve(), args.unsolved_output.resolve(), args.game_output.resolve()]
     if len(set(output_paths)) != len(output_paths):
-        parser.error("--output und --game-output müssen verschiedene Dateien sein.")
+        parser.error("--output, --unsolved-output und --game-output müssen verschiedene Dateien sein.")
 
     data = read_collection(args.output)
+    unsolved_data = read_collection(args.unsolved_output)
     remove_legacy_text_solutions(data)
-    write_collection(args.output, data)
-    write_game_deals(args.game_output, data)
+    remove_legacy_text_solutions(unsolved_data)
+
+    # Move solutionless entries already in the combined collection to the
+    # dedicated backlog file; solved entries take precedence on duplicates.
+    solved_by_deck = {}
+    unsolved_by_deck = {}
+    for deal in data["deals"]:
+        key = tuple(deal["deckOrder"])
+        if structured_solutions(deal):
+            solved_by_deck[key] = deal
+        else:
+            unsolved_by_deck[key] = deal
+    for deal in unsolved_data["deals"]:
+        key = tuple(deal["deckOrder"])
+        if structured_solutions(deal):
+            solved_by_deck[key] = deal
+            unsolved_by_deck.pop(key, None)
+        elif key not in solved_by_deck:
+            unsolved_by_deck[key] = deal
+    data["deals"] = list(solved_by_deck.values())
+    unsolved_data["deals"] = list(unsolved_by_deck.values())
+    old_cursor = data.get("solutionSearchCursor", 0)
+    if isinstance(old_cursor, int) and not isinstance(old_cursor, bool):
+        unsolved_data["solutionSearchCursor"] = old_cursor
 
     def save_outputs() -> None:
         write_collection(args.output, data)
+        write_unsolved_collection(args.unsolved_output, unsolved_data)
         write_game_deals(args.game_output, data)
 
+    save_outputs()
+
     # Backfill old known deals before spending time searching for new ones.
-    pending = deals_needing_solutions(data)
+    pending = deals_needing_solutions(unsolved_data)
     if pending:
-        deal_count = len(data["deals"])
-        cursor = data.get("solutionSearchCursor", 0)
+        deal_count = len(unsolved_data["deals"])
+        cursor = unsolved_data.get("solutionSearchCursor", 0)
         if not isinstance(cursor, int) or isinstance(cursor, bool):
             cursor = 0
         cursor %= deal_count
         pending.sort(key=lambda index: (index - cursor) % deal_count)
+        pending_decks = [tuple(unsolved_data["deals"][index]["deckOrder"]) for index in pending[:args.backfill_limit]]
         found_existing = 0
         tried = 0
-        for index in pending[:args.backfill_limit]:
-            deal = data["deals"][index]
+        for deck_key in pending_decks:
+            index = next(i for i, item in enumerate(unsolved_data["deals"]) if tuple(item["deckOrder"]) == deck_key)
+            deal = unsolved_data["deals"][index]
             solutions, expanded, exhausted = solve(deal["deckOrder"], args.max_states, args.solutions_per_deal)
             tried += 1
-            cursor = (index + 1) % deal_count
             if solutions:
-                deal["solutions"] = solutions
-                deal.pop("solution", None)
-                deal.pop("solutionSearch", None)
+                solved_by_deck[tuple(deal["deckOrder"])] = {"deckOrder": deal["deckOrder"], "solutions": solutions}
+                unsolved_data["deals"].pop(index)
+                cursor = index % max(1, len(unsolved_data["deals"]))
                 found_existing += 1
                 status = f"{len(solutions)} Lösungen gefunden"
             else:
@@ -379,14 +421,16 @@ def main() -> int:
                     "status": "exhausted" if exhausted else "search_limit",
                     "statesExpanded": expanded,
                 }
+                cursor = (index + 1) % max(1, len(unsolved_data["deals"]))
                 status = f"keine Lösung ({deal['solutionSearch']['status']})"
-            data["solutionSearchCursor"] = cursor
+            unsolved_data["solutionSearchCursor"] = cursor
+            data["deals"] = list(solved_by_deck.values())
             save_outputs()
-            print(f"Bestandsdeck {index + 1}/{deal_count}: {status}, {expanded} Zustände.", file=sys.stderr)
+            print(f"Bestandsdeck: {status}, {expanded} Zustände.", file=sys.stderr)
             if found_existing >= args.count:
                 break
 
-        remaining = deals_needing_solutions(data)
+        remaining = deals_needing_solutions(unsolved_data)
         if found_existing >= args.count:
             print(f"{found_existing} bestehendes Deck mit Lösungswegen ergänzt.", file=sys.stderr)
             return 0
@@ -399,6 +443,7 @@ def main() -> int:
             return 1
 
     existing = {tuple(deal.get("deckOrder", [])) for deal in data["deals"]}
+    existing.update(tuple(deal.get("deckOrder", [])) for deal in unsolved_data["deals"])
     rng = secrets.SystemRandom()
     found = 0
 
@@ -409,18 +454,25 @@ def main() -> int:
             continue
         solutions, expanded, exhausted = solve(deck, args.max_states, args.solutions_per_deal)
         if not solutions:
-            print(f"Versuch {attempt}/{args.max_attempts}: kein lösbares Deck bestätigt ({expanded} Zustände).", file=sys.stderr)
+            unsolved_data["deals"].append({
+                "deckOrder": deck,
+                "solutionSearch": {"status": "exhausted" if exhausted else "search_limit", "statesExpanded": expanded},
+            })
+            existing.add(tuple(deck))
+            save_outputs()
+            print(f"Versuch {attempt}/{args.max_attempts}: Deck ohne Lösung gespeichert ({expanded} Zustände).", file=sys.stderr)
             continue
 
         deal = {
             "deckOrder": deck,
             "solutions": solutions,
         }
-        data["deals"].append(deal)
+        solved_by_deck[tuple(deck)] = deal
+        data["deals"] = list(solved_by_deck.values())
         existing.add(tuple(deck))
         found += 1
         save_outputs()
-        print(f"Deck {found}/{args.count} gespeichert: {deal['id']} ({len(solutions)} Lösungen, {expanded} Zustände).", file=sys.stderr)
+        print(f"Deck {found}/{args.count} gespeichert ({len(solutions)} Lösungen, {expanded} Zustände).", file=sys.stderr)
         if found >= args.count:
             break
 
