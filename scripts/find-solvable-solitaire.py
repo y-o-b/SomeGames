@@ -3,6 +3,7 @@
 
 Successful deals are appended to solvable-deals.json. Card IDs are integers
 0..51 (suit * 13 + rank), in the order used to deal the tableau and stock.
+Solutions are arrays of structured action objects with zero-based indices.
 The script also writes solitaire-deals-with-solutions.json for consumers that
 need each deck order and several distinct complete solutions.
 """
@@ -21,8 +22,6 @@ import tempfile
 from typing import Iterator
 
 
-SUITS = ["♠", "♥", "♦", "♣"]
-RANKS = ["A", "2", "3", "4", "5", "6", "7", "8", "9", "10", "J", "Q", "K"]
 COLORS = (0, 1, 1, 0)  # black, red, red, black
 RULES = "klondike-draw-1-unlimited-redeals-no-foundation-return"
 DEFAULT_OUTPUT = Path(__file__).resolve().parent.parent / "solvable-deals.json"
@@ -39,10 +38,6 @@ def rank(card: int) -> int:
 
 def suit(card: int) -> int:
     return card // 13
-
-
-def card_name(card: int) -> str:
-    return f"{RANKS[rank(card)]}{SUITS[suit(card)]}"
 
 
 def initial_state(deck: list[int]) -> State:
@@ -67,7 +62,7 @@ def compatible_on_tableau(card: int, target: int | None) -> bool:
     return rank(target) == rank(card) + 1 and COLORS[suit(target)] != COLORS[suit(card)]
 
 
-def moves_from(state: State) -> Iterator[tuple[State, str]]:
+def moves_from(state: State) -> Iterator[tuple[State, dict[str, int | str]]]:
     columns, stock, waste, foundations = state
 
     # Tableau top card to foundation.
@@ -87,7 +82,7 @@ def moves_from(state: State) -> Iterator[tuple[State, str]]:
             next_foundations[card_suit] += 1
             yield (
                 (tuple(next_columns), stock, waste, tuple(next_foundations)),
-                f"Spalte {column_index + 1} → Ablage {SUITS[card_suit]} ({card_name(card)})",
+                {"type": "tableau-to-foundation", "fromColumn": column_index, "cardId": card},
             )
 
     # Waste top card to foundation.
@@ -99,7 +94,7 @@ def moves_from(state: State) -> Iterator[tuple[State, str]]:
             next_foundations[card_suit] += 1
             yield (
                 (columns, stock, waste[:-1], tuple(next_foundations)),
-                f"Ablage {card_name(card)} vom Abwurfstapel",
+                {"type": "waste-to-foundation", "cardId": card},
             )
 
     # Move any valid face-up tableau sequence to another column.
@@ -124,10 +119,9 @@ def moves_from(state: State) -> Iterator[tuple[State, str]]:
                     next_up = 1
                 next_columns[source_index] = (remaining, next_up)
                 next_columns[target_index] = (target_cards + moving, target_up + len(moving))
-                suffix = " und Folge" if len(moving) > 1 else ""
                 yield (
                     (tuple(next_columns), stock, waste, foundations),
-                    f"Spalte {source_index + 1} → Spalte {target_index + 1} ({card_name(card)}{suffix})",
+                    {"type": "tableau-to-tableau", "fromColumn": source_index, "toColumn": target_index, "startIndex": start, "cardId": card, "count": len(moving)},
                 )
 
     # Waste top card to tableau.
@@ -140,28 +134,28 @@ def moves_from(state: State) -> Iterator[tuple[State, str]]:
             next_columns[target_index] = (target_cards + (card,), target_up + 1)
             yield (
                 (tuple(next_columns), stock, waste[:-1], foundations),
-                f"Abwurfstapel {card_name(card)} → Spalte {target_index + 1}",
+                {"type": "waste-to-tableau", "toColumn": target_index, "cardId": card},
             )
 
     # Draw one card, or recycle the waste pile when stock is empty.
     if stock:
         card = stock[-1]
-        yield (columns, stock[:-1], waste + (card,), foundations), f"Ziehe {card_name(card)}"
+        yield (columns, stock[:-1], waste + (card,), foundations), {"type": "draw-stock", "cardId": card}
     elif waste:
-        yield (columns, tuple(reversed(waste)), (), foundations), "Abwurfstapel wieder als Talon verwenden"
+        yield (columns, tuple(reversed(waste)), (), foundations), {"type": "recycle-waste"}
 
 
-def solve(deck: list[int], max_states: int, solution_limit: int = 3) -> tuple[list[list[str]], int, bool]:
+def solve(deck: list[int], max_states: int, solution_limit: int = 3) -> tuple[list[list[dict[str, int | str]]], int, bool]:
     start = initial_state(deck)
     # Nodes retain their own parent path so several routes to the same state
     # can be explored without overwriting each other.
-    nodes: list[tuple[State, int | None, str | None, int, int]] = [(start, None, None, 0, hash(()))]
+    nodes: list[tuple[State, int | None, dict[str, int | str] | None, int, int]] = [(start, None, None, 0, hash(()))]
     queue: list[tuple[float, int, int, int]] = []
     sequence = 0
     heapq.heappush(queue, (priority(start, 0), sequence, 0, 0))
     paths_by_state: dict[State, set[int]] = {start: {hash(())}}
-    solutions: list[list[str]] = []
-    unique_solutions: set[tuple[str, ...]] = set()
+    solutions: list[list[dict[str, int | str]]] = []
+    unique_solutions: set[tuple[tuple[tuple[str, int | str], ...], ...]] = set()
     expanded = 0
     truncated = False
 
@@ -169,17 +163,17 @@ def solve(deck: list[int], max_states: int, solution_limit: int = 3) -> tuple[li
         _, _, depth, node_index = heapq.heappop(queue)
         state, _, _, _, path_hash = nodes[node_index]
         if all(count == 13 for count in state[3]):
-            reversed_solution = []
+            reversed_solution: list[dict[str, int | str]] = []
             current_index: int | None = node_index
             while current_index is not None:
                 _, parent_index, move, _, _ = nodes[current_index]
                 if move is not None:
                     reversed_solution.append(move)
                 current_index = parent_index
-            solution = tuple(reversed(reversed_solution))
+            solution = tuple(tuple(sorted(move.items())) for move in reversed(reversed_solution))
             if solution not in unique_solutions:
                 unique_solutions.add(solution)
-                solutions.append(list(solution))
+                solutions.append(list(reversed(reversed_solution)))
                 if len(solutions) >= solution_limit:
                     return solutions, expanded, False
             continue
@@ -199,7 +193,8 @@ def solve(deck: list[int], max_states: int, solution_limit: int = 3) -> tuple[li
             if is_ancestor:
                 continue
 
-            next_path_hash = hash((path_hash, move))
+            move_key = tuple(sorted(move.items()))
+            next_path_hash = hash((path_hash, move_key))
             state_paths = paths_by_state.setdefault(next_state, set())
             if next_path_hash in state_paths or len(state_paths) >= solution_limit:
                 continue
@@ -239,10 +234,28 @@ def write_game_deals(path: Path, data: dict) -> None:
     write_json(path, [deal["deckOrder"] for deal in data["deals"]], compact=True)
 
 
+def structured_solutions(deal: dict) -> list[list[dict[str, int | str]]]:
+    candidates = deal.get("solutions")
+    if not isinstance(candidates, list):
+        candidates = [deal["solution"]] if isinstance(deal.get("solution"), list) else []
+    return [
+        solution for solution in candidates
+        if isinstance(solution, list)
+        and all(isinstance(action, dict) and isinstance(action.get("type"), str) for action in solution)
+    ]
+
+
+def remove_legacy_text_solutions(data: dict) -> None:
+    """Migrate older prose paths away and retain only machine-readable actions."""
+    for deal in data["deals"]:
+        deal["solutions"] = structured_solutions(deal)
+        deal.pop("solution", None)
+
+
 def write_solution_deals(path: Path, data: dict) -> None:
-    # Keep this browser-friendly file focused on each deck and its solution paths.
+    # Keep this browser-friendly file focused on each deck and its action paths.
     write_json(path, [
-        {"deckOrder": deal["deckOrder"], "solutions": deal.get("solutions") or [deal["solution"]]}
+        {"deckOrder": deal["deckOrder"], "solutions": structured_solutions(deal)}
         for deal in data["deals"]
     ], compact=True)
 
@@ -281,6 +294,8 @@ def main() -> int:
         parser.error("--output, --game-output und --solutions-output müssen verschiedene Dateien sein.")
 
     data = read_collection(args.output)
+    remove_legacy_text_solutions(data)
+    write_collection(args.output, data)
     write_game_deals(args.game_output, data)
     write_solution_deals(args.solutions_output, data)
     existing = {tuple(deal.get("deckOrder", [])) for deal in data["deals"]}
@@ -315,7 +330,6 @@ def main() -> int:
         deal = {
             "id": secrets.token_hex(6),
             "deckOrder": deck,
-            "solution": solutions[0],  # Backwards-compatible first solution.
             "solutions": solutions,
             "statesExpanded": expanded,
         }
