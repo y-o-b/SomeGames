@@ -126,7 +126,7 @@
       <div class="controls"><button class="undo" id="undo" type="button" disabled>↶ Rückgängig</button><button id="sameGame" class="undo" type="button">↻ Gleiches Deck</button><button id="autoFinish" type="button" hidden>▶ Fertigspielen</button><button id="solution" type="button">☷ Musterlösung</button><button id="newGame" type="button">Neues Spiel</button></div>
       <div class="heap" id="heap" aria-hidden="true"></div>
     </section>
-    <button class="version" data-version type="button" title="Klicken, um die Seite neu zu laden">Version 2.38</button>
+    <button class="version" data-version type="button" title="Klicken, um die Seite neu zu laden">Version 2.39</button>
     <script>const versionButton = document.querySelector('[data-version]'); versionButton.addEventListener('click', () => location.replace(`${location.pathname}?v=${Date.now()}`)); fetch(`VERSION?${Date.now()}`, { cache: 'no-store' }).then(response => response.text()).then(version => { versionButton.textContent = `Version ${version.trim()}`; }).catch(() => {});</script>
   </main>
   <script>
@@ -151,15 +151,18 @@
     }
     async function loadSolvableDeals() {
       try {
-        const [gameResponse, solutionResponse] = await Promise.all([fetch('solitaire-deals.json', { cache: 'no-store' }), fetch('solvable-deals.json', { cache: 'no-store' })]);
-        if (!gameResponse.ok || !solutionResponse.ok) throw new Error('Solitaire-JSON konnte nicht geladen werden.');
-        const gameData = await gameResponse.json(), solutionData = await solutionResponse.json();
+        const [gameResult, solutionResult] = await Promise.allSettled([
+          fetch('solitaire-deals.json', { cache: 'no-store' }).then(response => response.ok ? response.json() : null),
+          fetch('solvable-deals.json', { cache: 'no-store' }).then(response => response.ok ? response.json() : null),
+        ]);
+        const gameData = gameResult.status === 'fulfilled' ? gameResult.value : null;
+        const solutionData = solutionResult.status === 'fulfilled' ? solutionResult.value : null;
         solutionDeals = Array.isArray(solutionData?.deals) ? solutionData.deals.filter(deal => Array.isArray(deal?.deckOrder) && deal.deckOrder.length === 52 && Array.isArray(deal.solution)) : [];
         const solutionDecks = solutionDeals.map(deal => deal.deckOrder);
         const gameDecks = Array.isArray(gameData) ? gameData.filter(deck => Array.isArray(deck) && deck.length === 52 && new Set(deck).size === 52 && deck.every(id => Number.isInteger(id) && id >= 0 && id < 52)) : [];
         // Die vollständige Sammlung ist die Quelle für neue Spiele, damit jeder Decksatz einen Lösungsweg besitzt.
         solvableDeals = solutionDecks.length ? solutionDecks : gameDecks;
-        dealCursor = Math.floor(Math.random() * solvableDeals.length);
+        dealCursor = solvableDeals.length ? Math.floor(Math.random() * solvableDeals.length) : 0;
       } catch (error) {
         console.info('Keine JSON-Decksammlung geladen.', error);
       }
@@ -177,6 +180,7 @@
     const validCardIds = new Set(suits.flatMap((suit, suitIndex) => names.map((name, rank) => `${suitIndex}-${rank}`)));
     // Ein gespeicherter Stand muss genau die 52 Karten enthalten und jede Karte muss zu ihrer ID passen (schützt vor beschädigten oder manipulierten Daten).
     function validState(state) {
+      if (!state || !Array.isArray(state.tableau) || state.tableau.length !== 7 || !Array.isArray(state.stock) || !Array.isArray(state.waste) || !Array.isArray(state.foundations) || state.foundations.length !== 4) return false;
       const cards = [...state.tableau.flat(), ...state.stock, ...state.waste, ...state.foundations.flat()];
       return cards.length === 52 && new Set(cards.map(item => item?.id)).size === 52 && cards.every(item => { if (!validCardIds.has(item.id)) return false; const [suitIndex, rank] = item.id.split('-').map(Number); return item.suit === suits[suitIndex] && item.name === names[rank] && item.rank === rank && item.red === (suitIndex === 1 || suitIndex === 2); });
     }
@@ -184,8 +188,11 @@
       try {
         const saved = JSON.parse(localStorage.getItem(STORAGE_KEY) || 'null');
         if (!saved || saved.version !== 1 || !Array.isArray(saved.tableau) || saved.tableau.length !== 7 || !Array.isArray(saved.stock) || !Array.isArray(saved.waste) || !Array.isArray(saved.foundations) || saved.foundations.length !== 4 || !Array.isArray(saved.currentDeck)) return false;
-        if (!validState(saved) || saved.currentDeck.length !== 52 || !saved.currentDeck.every(id => validCardIds.has(id)) || (Array.isArray(saved.history) && !saved.history.every(validState))) return false;
-        tableau = saved.tableau; stock = saved.stock; waste = saved.waste; foundations = saved.foundations; history = Array.isArray(saved.history) ? saved.history : []; moves = Number(saved.moves) || 0; seconds = Number(saved.seconds) || 0; currentDeck = saved.currentDeck; showTopCards(); selected = null;
+        if (!validState(saved) || saved.currentDeck.length !== 52 || !saved.currentDeck.every(id => validCardIds.has(id))) return false;
+        tableau = saved.tableau; stock = saved.stock; waste = saved.waste; foundations = saved.foundations;
+        // Ein beschädigter Verlauf darf den eigentlichen Spielstand nicht unbrauchbar machen.
+        history = Array.isArray(saved.history) ? saved.history.filter(validState) : [];
+        moves = Number(saved.moves) || 0; seconds = Number(saved.seconds) || 0; currentDeck = saved.currentDeck; showTopCards(); selected = null;
         if (saved.won) { clearInterval(timer); gamePanel.classList.add('victory'); message.innerHTML = '<b>Spielstand geladen.</b> Partie bereits abgeschlossen.'; }
         else { gamePanel.classList.remove('victory'); message.innerHTML = '<b>Spielstand geladen.</b> Du kannst weiterspielen.'; }
         render(); updateStatus(); if (saved.won) startHeap(false); return true;
