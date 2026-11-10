@@ -3,6 +3,8 @@
 
 Successful deals are appended to solvable-deals.json. Card IDs are integers
 0..51 (suit * 13 + rank), in the order used to deal the tableau and stock.
+The script also writes solitaire-deals-with-solutions.json for consumers that
+need both each deck order and its complete solution.
 """
 
 from __future__ import annotations
@@ -25,6 +27,7 @@ COLORS = (0, 1, 1, 0)  # black, red, red, black
 RULES = "klondike-draw-1-unlimited-redeals-no-foundation-return"
 DEFAULT_OUTPUT = Path(__file__).resolve().parent.parent / "solvable-deals.json"
 DEFAULT_GAME_OUTPUT = Path(__file__).resolve().parent.parent / "solitaire-deals.json"
+DEFAULT_SOLUTIONS_OUTPUT = Path(__file__).resolve().parent.parent / "solitaire-deals-with-solutions.json"
 
 # State: (columns, stock, waste, foundations); a column is (cards, face_up_count).
 State = tuple[tuple[tuple[int, ...], int], ...], tuple[int, ...], tuple[int, ...], tuple[int, ...]
@@ -213,6 +216,14 @@ def write_game_deals(path: Path, data: dict) -> None:
     write_json(path, [deal["deckOrder"] for deal in data["deals"]], compact=True)
 
 
+def write_solution_deals(path: Path, data: dict) -> None:
+    # Keep this browser-friendly file focused on the deck and its full move list.
+    write_json(path, [
+        {"deckOrder": deal["deckOrder"], "solution": deal["solution"]}
+        for deal in data["deals"]
+    ], compact=True)
+
+
 def write_json(path: Path, data: object, compact: bool = False) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     temp_name = None
@@ -237,14 +248,17 @@ def main() -> int:
     parser.add_argument("--max-states", type=int, default=100_000, help="Maximale Zahl geprüfter Zustände pro Deck (Standard: 100000).")
     parser.add_argument("--output", type=Path, default=DEFAULT_OUTPUT, help=f"JSON-Zieldatei (Standard: {DEFAULT_OUTPUT}).")
     parser.add_argument("--game-output", type=Path, default=DEFAULT_GAME_OUTPUT, help=f"Kompakte JSON-Datei für solitaire.html (Standard: {DEFAULT_GAME_OUTPUT}).")
+    parser.add_argument("--solutions-output", type=Path, default=DEFAULT_SOLUTIONS_OUTPUT, help=f"Decks samt Lösungswegen (Standard: {DEFAULT_SOLUTIONS_OUTPUT}).")
     args = parser.parse_args()
     if min(args.count, args.max_attempts, args.max_states) < 1:
         parser.error("count, max-attempts und max-states müssen mindestens 1 sein.")
-    if args.output.resolve() == args.game_output.resolve():
-        parser.error("--output und --game-output müssen verschiedene Dateien sein.")
+    output_paths = [args.output.resolve(), args.game_output.resolve(), args.solutions_output.resolve()]
+    if len(set(output_paths)) != len(output_paths):
+        parser.error("--output, --game-output und --solutions-output müssen verschiedene Dateien sein.")
 
     data = read_collection(args.output)
     write_game_deals(args.game_output, data)
+    write_solution_deals(args.solutions_output, data)
     existing = {tuple(deal.get("deckOrder", [])) for deal in data["deals"]}
     existing.update(tuple(deal.get("deckOrder", [])) for deal in data["rejectedDeals"])
     rng = secrets.SystemRandom()
@@ -267,6 +281,7 @@ def main() -> int:
             existing.add(tuple(deck))
             data["generatedAt"] = datetime.now(timezone.utc).isoformat()
             write_collection(args.output, data)
+            write_solution_deals(args.solutions_output, data)
             print(
                 f"Versuch {attempt}/{args.max_attempts}: Deck gespeichert ({rejected['status']}, {expanded} Zustände).",
                 file=sys.stderr,
@@ -285,6 +300,7 @@ def main() -> int:
         data["generatedAt"] = datetime.now(timezone.utc).isoformat()
         write_collection(args.output, data)
         write_game_deals(args.game_output, data)
+        write_solution_deals(args.solutions_output, data)
         print(f"Deck {found}/{args.count} gespeichert: {deal['id']} ({len(solution)} Züge, {expanded} Zustände).", file=sys.stderr)
         if found >= args.count:
             break
