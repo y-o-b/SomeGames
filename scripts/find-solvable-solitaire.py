@@ -285,6 +285,15 @@ def remove_legacy_text_solutions(data: dict) -> None:
         deal.pop("solution", None)
 
 
+def deals_needing_solutions(data: dict) -> list[int]:
+    pending = []
+    for index, deal in enumerate(data["deals"]):
+        search = deal.get("solutionSearch")
+        if not structured_solutions(deal) and (not isinstance(search, dict) or search.get("status") != "exhausted"):
+            pending.append(index)
+    return pending
+
+
 def write_solution_deals(path: Path, data: dict) -> None:
     # Keep this browser-friendly file focused on each deck and its action paths.
     write_json(path, [
@@ -316,12 +325,13 @@ def main() -> int:
     parser.add_argument("--max-attempts", type=int, default=1000, help="Maximale Zahl zufälliger Decks pro Aufruf (Standard: 1000).")
     parser.add_argument("--max-states", type=int, default=100_000, help="Maximale Zahl geprüfter Zustände pro Deck (Standard: 100000).")
     parser.add_argument("--solutions-per-deal", type=int, default=3, help="Wie viele unterschiedliche Lösungswege pro Deck gesucht werden (Standard: 3).")
+    parser.add_argument("--backfill-limit", type=int, default=10, help="Maximale Zahl bestehender Decks ohne Lösung, die pro Lauf zuerst geprüft werden (Standard: 10).")
     parser.add_argument("--output", type=Path, default=DEFAULT_OUTPUT, help=f"JSON-Zieldatei (Standard: {DEFAULT_OUTPUT}).")
     parser.add_argument("--game-output", type=Path, default=DEFAULT_GAME_OUTPUT, help=f"Kompakte JSON-Datei für solitaire.html (Standard: {DEFAULT_GAME_OUTPUT}).")
     parser.add_argument("--solutions-output", type=Path, default=DEFAULT_SOLUTIONS_OUTPUT, help=f"Decks samt Lösungswegen (Standard: {DEFAULT_SOLUTIONS_OUTPUT}).")
     args = parser.parse_args()
-    if min(args.count, args.max_attempts, args.max_states, args.solutions_per_deal) < 1:
-        parser.error("count, max-attempts, max-states und solutions-per-deal müssen mindestens 1 sein.")
+    if min(args.count, args.max_attempts, args.max_states, args.solutions_per_deal, args.backfill_limit) < 1:
+        parser.error("count, max-attempts, max-states, solutions-per-deal und backfill-limit müssen mindestens 1 sein.")
     output_paths = [args.output.resolve(), args.game_output.resolve(), args.solutions_output.resolve()]
     if len(set(output_paths)) != len(output_paths):
         parser.error("--output, --game-output und --solutions-output müssen verschiedene Dateien sein.")
@@ -331,6 +341,60 @@ def main() -> int:
     write_collection(args.output, data)
     write_game_deals(args.game_output, data)
     write_solution_deals(args.solutions_output, data)
+
+    def save_outputs() -> None:
+        data["generatedAt"] = datetime.now(timezone.utc).isoformat()
+        write_collection(args.output, data)
+        write_game_deals(args.game_output, data)
+        write_solution_deals(args.solutions_output, data)
+
+    # Backfill old known deals before spending time searching for new ones.
+    pending = deals_needing_solutions(data)
+    if pending:
+        deal_count = len(data["deals"])
+        cursor = data.get("solutionSearchCursor", 0)
+        if not isinstance(cursor, int) or isinstance(cursor, bool):
+            cursor = 0
+        cursor %= deal_count
+        pending.sort(key=lambda index: (index - cursor) % deal_count)
+        found_existing = 0
+        tried = 0
+        for index in pending[:args.backfill_limit]:
+            deal = data["deals"][index]
+            solutions, expanded, exhausted = solve(deal["deckOrder"], args.max_states, args.solutions_per_deal)
+            tried += 1
+            cursor = (index + 1) % deal_count
+            if solutions:
+                deal["solutions"] = solutions
+                deal.pop("solution", None)
+                deal.pop("solutionSearch", None)
+                deal["statesExpanded"] = expanded
+                found_existing += 1
+                status = f"{len(solutions)} Lösungen gefunden"
+            else:
+                deal["solutionSearch"] = {
+                    "status": "exhausted" if exhausted else "search_limit",
+                    "statesExpanded": expanded,
+                }
+                status = f"keine Lösung ({deal['solutionSearch']['status']})"
+            data["solutionSearchCursor"] = cursor
+            save_outputs()
+            print(f"Bestandsdeck {index + 1}/{deal_count}: {status}, {expanded} Zustände.", file=sys.stderr)
+            if found_existing >= args.count:
+                break
+
+        remaining = deals_needing_solutions(data)
+        if found_existing >= args.count:
+            print(f"{found_existing} bestehendes Deck mit Lösungswegen ergänzt.", file=sys.stderr)
+            return 0
+        if remaining:
+            print(
+                f"Bestandsdecks werden priorisiert: {tried} Deck(s) geprüft, {len(remaining)} ohne Lösung verbleiben. "
+                "Erneut ausführen, um fortzufahren.",
+                file=sys.stderr,
+            )
+            return 1
+
     existing = {tuple(deal.get("deckOrder", [])) for deal in data["deals"]}
     existing.update(tuple(deal.get("deckOrder", [])) for deal in data["rejectedDeals"])
     rng = secrets.SystemRandom()
@@ -351,9 +415,7 @@ def main() -> int:
             }
             data["rejectedDeals"].append(rejected)
             existing.add(tuple(deck))
-            data["generatedAt"] = datetime.now(timezone.utc).isoformat()
-            write_collection(args.output, data)
-            write_solution_deals(args.solutions_output, data)
+            save_outputs()
             print(
                 f"Versuch {attempt}/{args.max_attempts}: Deck gespeichert ({rejected['status']}, {expanded} Zustände).",
                 file=sys.stderr,
@@ -369,10 +431,7 @@ def main() -> int:
         data["deals"].append(deal)
         existing.add(tuple(deck))
         found += 1
-        data["generatedAt"] = datetime.now(timezone.utc).isoformat()
-        write_collection(args.output, data)
-        write_game_deals(args.game_output, data)
-        write_solution_deals(args.solutions_output, data)
+        save_outputs()
         print(f"Deck {found}/{args.count} gespeichert: {deal['id']} ({len(solutions)} Lösungen, {expanded} Zustände).", file=sys.stderr)
         if found >= args.count:
             break
