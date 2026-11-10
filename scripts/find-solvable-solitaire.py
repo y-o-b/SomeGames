@@ -379,11 +379,11 @@ def derive_solutions(deck: list[int], solutions: list[list[list[int]]], limit: i
     return result
 
 
-def expand_with_derived(deck: list[int], solutions: list[list[list[int]]], derive_per_deal: int, max_solutions: int) -> list[list[list[int]]]:
+def expand_with_derived(deck: list[int], solutions: list[list[list[int]]], derive_per_deal: int) -> list[list[list[int]]]:
     if derive_per_deal <= 0 or not solutions:
         return solutions
-    target = min(max_solutions, len(solutions) + derive_per_deal)
-    return derive_solutions(deck, solutions, target) if target > len(solutions) else solutions
+    target = len(solutions) + derive_per_deal
+    return derive_solutions(deck, solutions, target)
 
 
 def valid_deck(deck: object) -> bool:
@@ -562,7 +562,6 @@ def main() -> int:
     parser.add_argument("--max-states", type=int, default=100_000, help="Maximale Zahl geprüfter Zustände pro Deck (Standard: 100000).")
     parser.add_argument("--solutions-per-deal", type=int, default=3, help="Wie viele unterschiedliche Lösungswege pro Deck gesucht werden (Standard: 3).")
     parser.add_argument("--derive-per-deal", type=int, default=3, help="Wie viele zusätzliche Wege pro Deck aus bekannten Lösungen abgeleitet werden (Standard: 3).")
-    parser.add_argument("--max-solutions-per-deal", type=int, default=12, help="Obergrenze gespeicherter Wege pro Deck (Standard: 12).")
     parser.add_argument("--derive-only", action="store_true", help="Nur vorhandene Lösungen ableiten und speichern, ohne neue Decks zu suchen.")
     parser.add_argument("--backfill-limit", type=int, default=None, help="Backfills aktivieren und bis zu N bestehende Decks ohne Lösung pro Lauf prüfen (nur bei Angabe).")
     parser.add_argument("--deck-dir", type=Path, default=DEFAULT_DECK_DIR, help=f"Verzeichnis mit einem JSON je lösbarem Deck (Standard: {DEFAULT_DECK_DIR}).")
@@ -570,8 +569,8 @@ def main() -> int:
     args = parser.parse_args()
     if min(args.count, args.max_attempts, args.max_states, args.solutions_per_deal) < 1 or (args.backfill_limit is not None and args.backfill_limit < 1):
         parser.error("count, max-attempts, max-states, solutions-per-deal und ein angegebenes backfill-limit müssen mindestens 1 sein.")
-    if args.derive_per_deal < 0 or args.max_solutions_per_deal < 1 or args.max_solutions_per_deal < args.solutions_per_deal:
-        parser.error("derive-per-deal muss >= 0 und max-solutions-per-deal mindestens solutions-per-deal sein.")
+    if args.derive_per_deal < 0:
+        parser.error("derive-per-deal muss >= 0 sein.")
     if args.deck_dir.resolve() == args.unsolved_output.resolve():
         parser.error("--deck-dir und --unsolved-output müssen verschiedene Pfade sein.")
 
@@ -596,7 +595,7 @@ def main() -> int:
     if args.derive_per_deal > 0:
         for deal in solved_by_deck.values():
             current = structured_solutions(deal)
-            target = min(args.max_solutions_per_deal, len(current) + args.derive_per_deal)
+            target = len(current) + args.derive_per_deal
             if target <= len(current):
                 continue
             expanded = derive_solutions(deal["deckOrder"], current, target)
@@ -636,7 +635,7 @@ def main() -> int:
             deal = unsolved_data["deals"][index]
             solutions, expanded, exhausted = solve(deal["deckOrder"], args.max_states, args.solutions_per_deal)
             if solutions:
-                solutions = expand_with_derived(deal["deckOrder"], solutions, args.derive_per_deal, args.max_solutions_per_deal)
+                solutions = expand_with_derived(deal["deckOrder"], solutions, args.derive_per_deal)
             tried += 1
             if solutions:
                 solved_by_deck[tuple(deal["deckOrder"])] = {"deckOrder": deal["deckOrder"], "solutions": solutions}
@@ -682,7 +681,7 @@ def main() -> int:
             continue
         solutions, expanded, exhausted = solve(deck, args.max_states, args.solutions_per_deal)
         if solutions:
-            solutions = expand_with_derived(deck, solutions, args.derive_per_deal, args.max_solutions_per_deal)
+            solutions = expand_with_derived(deck, solutions, args.derive_per_deal)
         if not solutions:
             unsolved_data["deals"].append({
                 "deckOrder": deck,
