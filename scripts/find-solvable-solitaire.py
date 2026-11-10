@@ -1,19 +1,21 @@
 #!/usr/bin/env python3
 """Find Klondike draw-one deals solvable by the rules in solitaire.html.
 
-Successful deals are appended to solitaire-deals-with-solutions.json. Card IDs are integers
+Successful deals are stored as one JSON file per deck in solitaire-decks/ plus an
+index.json, so the game can load a single deck on demand. Card IDs are integers
 0..51 (suit * 13 + rank), in the order used to deal the tableau and stock.
 Solutions use compact integer action arrays (column/card indices are zero-based):
 `[0, fromColumn, cardId]` tableau→foundation; `[1, cardId]` waste→foundation;
 `[2, fromColumn, toColumn, startIndex, count, cardId]` tableau→tableau;
 `[3, toColumn, cardId]` waste→tableau; `[4, cardId]` draw stock; `[5]` recycle waste.
-The combined JSON contains solved deals; deals without a solution are kept in
-deals-without-solutions.json. solitaire-deals.json remains the deck-only list.
+Deals without a solution are kept in deals-without-solutions.json.
+solitaire-deals.json remains a deck-only fallback list.
 """
 
 from __future__ import annotations
 
 import argparse
+import hashlib
 import heapq
 import json
 import os
@@ -26,7 +28,7 @@ from typing import Iterator
 
 COLORS = (0, 1, 1, 0)  # black, red, red, black
 RULES = "klondike-draw-1-unlimited-redeals-no-foundation-return"
-DEFAULT_OUTPUT = Path(__file__).resolve().parent.parent / "solitaire-deals-with-solutions.json"
+DEFAULT_DECK_DIR = Path(__file__).resolve().parent.parent / "solitaire-decks"
 DEFAULT_GAME_OUTPUT = Path(__file__).resolve().parent.parent / "solitaire-deals.json"
 DEFAULT_UNSOLVED_OUTPUT = Path(__file__).resolve().parent.parent / "deals-without-solutions.json"
 
@@ -213,12 +215,64 @@ def solve(deck: list[int], max_states: int, solution_limit: int = 3) -> tuple[li
     return solutions, expanded, not queue and not truncated
 
 
-def read_collection(path: Path) -> dict:
+def valid_deck(deck: object) -> bool:
+    return isinstance(deck, list) and len(deck) == 52 and len(set(deck)) == 52 and all(type(card) is int and 0 <= card < 52 for card in deck)
+
+
+def deck_file_name(deck: list[int]) -> str:
+    digest = hashlib.sha1(json.dumps(deck, separators=(",", ":")).encode("utf-8")).hexdigest()
+    return f"deck-{digest[:12]}.json"
+
+
+def read_solved_decks(directory: Path) -> dict:
+    index_path = directory / "index.json"
+    deals = []
+    if index_path.exists():
+        try:
+            index = json.loads(index_path.read_text(encoding="utf-8"))
+            names = index.get("decks", []) if isinstance(index, dict) else index
+        except (OSError, json.JSONDecodeError):
+            names = []
+        for name in names if isinstance(names, list) else []:
+            if not isinstance(name, str) or "/" in name or "\\" in name:
+                continue
+            path = directory / name
+            if not path.exists():
+                continue
+            try:
+                item = json.loads(path.read_text(encoding="utf-8"))
+            except (OSError, json.JSONDecodeError):
+                continue
+            if not isinstance(item, dict) or not valid_deck(item.get("deckOrder")):
+                continue
+            solutions = structured_solutions(item)
+            if solutions:
+                deals.append({"deckOrder": item["deckOrder"], "solutions": solutions})
+    return {"deals": deals}
+
+
+def write_solved_decks(directory: Path, data: dict) -> None:
+    directory.mkdir(parents=True, exist_ok=True)
+    names = []
+    for deal in data["deals"]:
+        solutions = structured_solutions(deal)
+        if not solutions:
+            continue
+        name = deck_file_name(deal["deckOrder"])
+        names.append(name)
+        write_json(directory / name, {"deckOrder": deal["deckOrder"], "solutions": solutions}, compact=True)
+    write_json(directory / "index.json", {"version": 1, "rules": RULES, "decks": names}, compact=True)
+    keep = set(names) | {"index.json"}
+    for path in directory.glob("deck-*.json"):
+        if path.name not in keep:
+            path.unlink()
+
+
+def read_unsolved_collection(path: Path) -> dict:
     if not path.exists():
         return {"version": 1, "rules": RULES, "deals": [], "solutionSearchCursor": 0}
     with path.open(encoding="utf-8") as file:
         data = json.load(file)
-    # Migrate the previous browser format (a bare deals array) in memory.
     if isinstance(data, list):
         data = {"version": 1, "rules": RULES, "deals": data, "solutionSearchCursor": 0}
     if not isinstance(data, dict) or data.get("version") != 1 or data.get("rules") != RULES or not isinstance(data.get("deals"), list):
@@ -228,21 +282,8 @@ def read_collection(path: Path) -> dict:
         "version": 1,
         "rules": RULES,
         "solutionSearchCursor": cursor if isinstance(cursor, int) and not isinstance(cursor, bool) else 0,
-        "deals": data["deals"],
+        "deals": [deal for deal in data["deals"] if isinstance(deal, dict) and valid_deck(deal.get("deckOrder"))],
     }
-
-
-def write_collection(path: Path, data: dict) -> None:
-    deals = []
-    for deal in data["deals"]:
-        solutions = structured_solutions(deal)
-        if solutions:
-            deals.append({"deckOrder": deal["deckOrder"], "solutions": solutions})
-    write_json(path, {
-        "version": 1,
-        "rules": RULES,
-        "deals": deals,
-    }, compact=True)
 
 
 def write_unsolved_collection(path: Path, data: dict) -> None:
@@ -348,46 +389,34 @@ def main() -> int:
     parser.add_argument("--max-states", type=int, default=100_000, help="Maximale Zahl geprüfter Zustände pro Deck (Standard: 100000).")
     parser.add_argument("--solutions-per-deal", type=int, default=3, help="Wie viele unterschiedliche Lösungswege pro Deck gesucht werden (Standard: 3).")
     parser.add_argument("--backfill-limit", type=int, default=None, help="Backfills aktivieren und bis zu N bestehende Decks ohne Lösung pro Lauf prüfen (nur bei Angabe).")
-    parser.add_argument("--output", type=Path, default=DEFAULT_OUTPUT, help=f"Kombinierte Deck- und Lösungsdatei (Standard: {DEFAULT_OUTPUT}).")
+    parser.add_argument("--deck-dir", type=Path, default=DEFAULT_DECK_DIR, help=f"Verzeichnis mit einem JSON je lösbarem Deck (Standard: {DEFAULT_DECK_DIR}).")
     parser.add_argument("--unsolved-output", type=Path, default=DEFAULT_UNSOLVED_OUTPUT, help=f"Decks ohne Lösungsweg (Standard: {DEFAULT_UNSOLVED_OUTPUT}).")
-    parser.add_argument("--game-output", type=Path, default=DEFAULT_GAME_OUTPUT, help=f"Kompakte JSON-Datei für solitaire.html (Standard: {DEFAULT_GAME_OUTPUT}).")
+    parser.add_argument("--game-output", type=Path, default=DEFAULT_GAME_OUTPUT, help=f"Deckliste als Ausfallsicherung für solitaire.html (Standard: {DEFAULT_GAME_OUTPUT}).")
     args = parser.parse_args()
     if min(args.count, args.max_attempts, args.max_states, args.solutions_per_deal) < 1 or (args.backfill_limit is not None and args.backfill_limit < 1):
         parser.error("count, max-attempts, max-states, solutions-per-deal und ein angegebenes backfill-limit müssen mindestens 1 sein.")
-    output_paths = [args.output.resolve(), args.unsolved_output.resolve(), args.game_output.resolve()]
+    output_paths = [args.unsolved_output.resolve(), args.game_output.resolve()]
     if len(set(output_paths)) != len(output_paths):
-        parser.error("--output, --unsolved-output und --game-output müssen verschiedene Dateien sein.")
+        parser.error("--unsolved-output und --game-output müssen verschiedene Dateien sein.")
 
-    data = read_collection(args.output)
-    unsolved_data = read_collection(args.unsolved_output)
+    data = read_solved_decks(args.deck_dir)
+    unsolved_data = read_unsolved_collection(args.unsolved_output)
     remove_legacy_text_solutions(data)
     remove_legacy_text_solutions(unsolved_data)
 
-    # Move solutionless entries already in the combined collection to the
-    # dedicated backlog file; solved entries take precedence on duplicates.
-    solved_by_deck = {}
+    # Solved decks take precedence; any solutionless duplicate stays only in
+    # the backlog file.
+    solved_by_deck = {tuple(deal["deckOrder"]): deal for deal in data["deals"]}
     unsolved_by_deck = {}
-    for deal in data["deals"]:
-        key = tuple(deal["deckOrder"])
-        if structured_solutions(deal):
-            solved_by_deck[key] = deal
-        else:
-            unsolved_by_deck[key] = deal
     for deal in unsolved_data["deals"]:
         key = tuple(deal["deckOrder"])
-        if structured_solutions(deal):
-            solved_by_deck[key] = deal
-            unsolved_by_deck.pop(key, None)
-        elif key not in solved_by_deck:
+        if key not in solved_by_deck:
             unsolved_by_deck[key] = deal
-    data["deals"] = list(solved_by_deck.values())
     unsolved_data["deals"] = list(unsolved_by_deck.values())
-    old_cursor = data.get("solutionSearchCursor", 0)
-    if isinstance(old_cursor, int) and not isinstance(old_cursor, bool):
-        unsolved_data["solutionSearchCursor"] = old_cursor
 
     def save_outputs() -> None:
-        write_collection(args.output, data)
+        data["deals"] = list(solved_by_deck.values())
+        write_solved_decks(args.deck_dir, data)
         write_unsolved_collection(args.unsolved_output, unsolved_data)
         write_game_deals(args.game_output, data)
 
@@ -445,7 +474,7 @@ def main() -> int:
             )
             return 1
 
-    existing = {tuple(deal.get("deckOrder", [])) for deal in data["deals"]}
+    existing = set(solved_by_deck)
     existing.update(tuple(deal.get("deckOrder", [])) for deal in unsolved_data["deals"])
     rng = secrets.SystemRandom()
     found = 0
@@ -471,7 +500,6 @@ def main() -> int:
             "solutions": solutions,
         }
         solved_by_deck[tuple(deck)] = deal
-        data["deals"] = list(solved_by_deck.values())
         existing.add(tuple(deck))
         found += 1
         save_outputs()
@@ -481,11 +509,11 @@ def main() -> int:
 
     if found < args.count:
         print(
-            f"Nur {found} von {args.count} gewünschten Decks gefunden. JSON enthält {len(data['deals'])} Decks insgesamt.",
+            f"Nur {found} von {args.count} gewünschten Decks gefunden. Sammlung enthält {len(solved_by_deck)} Decks insgesamt.",
             file=sys.stderr,
         )
         return 1
-    print(f"{args.count} neues lösbares Deck in {args.output} gespeichert; Sammlung enthält {len(data['deals'])} Deck(s).", file=sys.stderr)
+    print(f"{args.count} neues lösbares Deck in {args.deck_dir} gespeichert; Sammlung enthält {len(solved_by_deck)} Deck(s).", file=sys.stderr)
     return 0
 
 

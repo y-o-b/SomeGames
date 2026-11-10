@@ -126,7 +126,7 @@
       <div class="controls"><button class="undo" id="undo" type="button" disabled>↶ Rückgängig</button><button id="sameGame" class="undo" type="button">↻ Gleiches Deck</button><button id="autoFinish" type="button" hidden>▶ Fertigspielen</button><button id="newGame" type="button">Neues Spiel</button></div>
       <div class="heap" id="heap" aria-hidden="true"></div>
     </section>
-    <button class="version" data-version type="button" title="Klicken, um die Seite neu zu laden">Version 2.48</button>
+    <button class="version" data-version type="button" title="Klicken, um die Seite neu zu laden">Version 2.49</button>
     <script>const versionButton = document.querySelector('[data-version]'); versionButton.addEventListener('click', () => location.replace(`${location.pathname}?v=${Date.now()}`)); fetch(`VERSION?${Date.now()}`, { cache: 'no-store' }).then(response => response.text()).then(version => { versionButton.textContent = `Version ${version.trim()}`; }).catch(() => {});</script>
   </main>
   <script>
@@ -134,7 +134,7 @@
     const stockElement = document.getElementById('stock'), wasteElement = document.getElementById('waste'), tableauElement = document.getElementById('tableau'), foundationsElement = document.getElementById('foundations'), message = document.getElementById('message'), autoFinishButton = document.getElementById('autoFinish');
     const gamePanel = document.querySelector('.game');
     let tableau, stock, waste, foundations, selected = null, history = [], moves = 0, seconds = 0, timer, cardDrag = null, suppressClick = false, suppressClickUntil = 0, dragClickGuard = null, revealedCards = [], lastCardTap = null, lastStockTapAt = 0, revealTimer = null, revealClearTimer = null, animationToken = 0;
-    let solvableDeals = [], dealCursor = 0, currentDeck = [], heapMode = false;
+    let deckIndex = [], deckCursor = 0, fallbackDecks = [], currentDeckSolutions = [], currentDeck = [], heapMode = false;
     const STORAGE_KEY = 'y-o-b.solitaire.save.v2';
     // Nach einem verarbeiteten Touch-Tap erzeugt Safari noch einen Click. Hat sich das Layout inzwischen verschoben (z. B. wird ein Button ausgeblendet),
     // träfe er sonst ein anderes Element unter dem Finger. Solche Clicks werden deshalb kurz global verworfen.
@@ -142,25 +142,56 @@
     const noteTouchTap = () => { touchTapUntil = performance.now() + 800; };
     document.addEventListener('click', event => { if (performance.now() < touchTapUntil) { event.preventDefault(); event.stopImmediatePropagation(); return; } if (!dragClickGuard) return; const now = performance.now(); const targetIsCard = event.target.closest?.('.playing-card'); const nearRelease = Math.hypot((event.clientX || 0) - dragClickGuard.x, (event.clientY || 0) - dragClickGuard.y) < 48; if (now < dragClickGuard.until && (targetIsCard || nearRelease)) { event.preventDefault(); event.stopImmediatePropagation(); dragClickGuard = null; } else if (now >= dragClickGuard.until) dragClickGuard = null; }, true);
     function card(suitIndex, rank) { return { id: `${suitIndex}-${rank}`, suit: suits[suitIndex], rank, name: names[rank], red: suitIndex === 1 || suitIndex === 2 }; }
-    function solvableDeck() {
-      if (solvableDeals.length) {
-        const deal = solvableDeals[dealCursor++ % solvableDeals.length];
-        return deal.map(id => card(Math.floor(id / 13), id % 13));
-      }
-      return null;
-    }
+    const validDeck = deck => Array.isArray(deck) && deck.length === 52 && new Set(deck).size === 52 && deck.every(id => Number.isInteger(id) && id >= 0 && id < 52);
     async function loadSolvableDeals() {
+      // Bevorzugt wird der Index; jedes Deck liegt als eigene Datei vor und wird
+      // erst beim Auswählen geladen.
+      try {
+        const response = await fetch('solitaire-decks/index.json', { cache: 'no-store' });
+        if (!response.ok) throw new Error(`HTTP ${response.status}`);
+        const data = await response.json();
+        const names = Array.isArray(data?.decks) ? data.decks.filter(name => typeof name === 'string' && name && !/[/\\]/.test(name)) : [];
+        if (!names.length) throw new Error('Leerer Deck-Index.');
+        deckIndex = names;
+        deckCursor = Math.floor(Math.random() * deckIndex.length);
+        return;
+      } catch (error) { console.info('Deck-Index nicht verfügbar, nutze Deckliste.', error); }
       try {
         const response = await fetch('solitaire-deals.json', { cache: 'no-store' });
         if (!response.ok) throw new Error(`HTTP ${response.status}`);
         const data = await response.json();
         if (Array.isArray(data)) {
-          solvableDeals = data.filter(deck => Array.isArray(deck) && deck.length === 52 && new Set(deck).size === 52 && deck.every(id => Number.isInteger(id) && id >= 0 && id < 52));
-          dealCursor = solvableDeals.length ? Math.floor(Math.random() * solvableDeals.length) : 0;
+          fallbackDecks = data.filter(validDeck);
+          deckCursor = fallbackDecks.length ? Math.floor(Math.random() * fallbackDecks.length) : 0;
         }
       } catch (error) { console.info('Keine JSON-Decksammlung geladen.', error); }
     }
-    function start(deckToUse = null) { const dealt = deckToUse || solvableDeck(); if (!dealt) { message.innerHTML = '<b>Kartendecks konnten nicht geladen werden.</b> „Neues Spiel" versucht es erneut.'; return false; } clearInterval(timer); timer = null; clearHeap(); flyingIds.clear(); finishRun++; autoFinishing = false; lockBoard(false); document.querySelectorAll('.card-flight').forEach(flight => flight.remove()); message.innerHTML = `<b>Los geht's!</b> Lege Karten in absteigender Reihenfolge und wechselnden Farben.`; gamePanel.classList.remove('victory'); let cards = dealt.map(item => { const id = typeof item === 'string' ? item : item.id; const [suitIndex, rank] = id.split('-').map(Number); return card(suitIndex, rank); }); currentDeck = cards.map(item => item.id); tableau = Array.from({ length: 7 }, (_, column) => { const pile = cards.splice(0, column + 1); pile.forEach((card, index) => { card.faceUp = index === pile.length - 1; }); return pile; }); stock = cards; waste = []; foundations = suits.map(() => []); selected = null; history = []; moves = seconds = 0; render(); updateStatus(); return true; }
+    async function solvableDeck() {
+      for (let attempt = 0; attempt < deckIndex.length; attempt++) {
+        const name = deckIndex[deckCursor++ % deckIndex.length];
+        try {
+          const response = await fetch(`solitaire-decks/${name}`, { cache: 'no-store' });
+          if (!response.ok) continue;
+          const data = await response.json();
+          if (!validDeck(data?.deckOrder)) continue;
+          currentDeckSolutions = Array.isArray(data.solutions) ? data.solutions : [];
+          return data.deckOrder.map(id => card(Math.floor(id / 13), id % 13));
+        } catch (error) { /* nächstes Deck versuchen */ }
+      }
+      if (!fallbackDecks.length) {
+        try {
+          const response = await fetch('solitaire-deals.json', { cache: 'no-store' });
+          if (response.ok) { const data = await response.json(); if (Array.isArray(data)) fallbackDecks = data.filter(validDeck); }
+        } catch (error) { /* Ausfallsicherung nicht verfügbar */ }
+      }
+      if (fallbackDecks.length) {
+        const deal = fallbackDecks[deckCursor++ % fallbackDecks.length];
+        currentDeckSolutions = [];
+        return deal.map(id => card(Math.floor(id / 13), id % 13));
+      }
+      return null;
+    }
+    function start(deckToUse = null) { const dealt = deckToUse; if (!dealt) { message.innerHTML = '<b>Kartendecks konnten nicht geladen werden.</b> „Neues Spiel" versucht es erneut.'; return false; } clearInterval(timer); timer = null; clearHeap(); flyingIds.clear(); finishRun++; autoFinishing = false; lockBoard(false); document.querySelectorAll('.card-flight').forEach(flight => flight.remove()); message.innerHTML = `<b>Los geht's!</b> Lege Karten in absteigender Reihenfolge und wechselnden Farben.`; gamePanel.classList.remove('victory'); let cards = dealt.map(item => { const id = typeof item === 'string' ? item : item.id; const [suitIndex, rank] = id.split('-').map(Number); return card(suitIndex, rank); }); currentDeck = cards.map(item => item.id); tableau = Array.from({ length: 7 }, (_, column) => { const pile = cards.splice(0, column + 1); pile.forEach((card, index) => { card.faceUp = index === pile.length - 1; }); return pile; }); stock = cards; waste = []; foundations = suits.map(() => []); selected = null; history = []; moves = seconds = 0; render(); updateStatus(); return true; }
     function copyState() { return { tableau: tableau.map(column => column.map(card => ({ ...card }))), stock: stock.map(card => ({ ...card })), waste: waste.map(card => ({ ...card })), foundations: foundations.map(pile => pile.map(card => ({ ...card }))) }; }
     function sameStateWithoutFaceUp(first, second) { return JSON.stringify(first, (key, value) => key === 'faceUp' ? undefined : value) === JSON.stringify(second, (key, value) => key === 'faceUp' ? undefined : value); }
     function allCards() { return [...tableau.flat(), ...stock, ...waste, ...foundations.flat()]; }
@@ -462,7 +493,10 @@
     // Neues Spiel und Gleiches Deck: Alle Karten fliegen von ihrer aktuellen Position an ihren Platz im neuen Spiel.
     async function startNewGame(deckToUse = null) {
       if (dealing) return;
-      if (!deckToUse && !solvableDeals.length) await loadSolvableDeals();
+      if (!deckToUse) {
+        if (!deckIndex.length && !fallbackDecks.length) await loadSolvableDeals();
+        deckToUse = await solvableDeck();
+      }
       const before = tableau && !autoFinishing && !reduceMotion() ? cardLayout() : null;
       if (!start(deckToUse) || !before) return;
       dealing = true; gamePanel.inert = true;
@@ -499,7 +533,7 @@
     document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'hidden') persistGame(); });
     window.addEventListener('pagehide', persistGame);
     const dealsLoaded = loadSolvableDeals();
-    if (!restoreGame()) dealsLoaded.then(() => start());
+    if (!restoreGame()) dealsLoaded.then(async () => { const deck = await solvableDeck(); if (deck) start(deck); });
   </script>
   <script>if ('serviceWorker' in navigator) addEventListener('load', () => navigator.serviceWorker.register('sw.js').catch(() => {}));</script>
 </body>
