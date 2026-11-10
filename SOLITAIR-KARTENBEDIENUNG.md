@@ -92,7 +92,8 @@ Karten, die gerade zum Ziel fliegen, stehen in `flyingIds`. `cardButton()` zeich
 ## Lösungshinweis
 
 - Der Button „💡 Lösung“ schaltet eine Markierung für den nächsten Zug aus den gespeicherten Lösungswegen des aktuellen Decks ein oder aus. `currentDeckSolutions` kommt aus der geladenen Deckdatei und wird im Spielstand mitgespeichert.
-- `findSolutionAction()` prüft die kompakten Aktionen aller Lösungswege gegen das aktuelle Spielfeld und liefert die erste ausführbare Aktion. `applySolutionMark()` markiert die betroffene Karte über `selected`; muss gezogen oder der Abwurfstapel neu ausgelegt werden, wird stattdessen der Ziehstapel (`#stock.solution-target`) hervorgehoben.
+- `findSolutionAction()` spielt die gespeicherten Lösungswege ab dem ursprünglichen Deck nach und vergleicht jeden Zwischenzustand mit dem aktuellen Spiel. Nur wenn der aktuelle Zustand exakt einem Präfix eines Weges entspricht, wird dessen nächste Aktion zurückgegeben. Weicht der Spieler vom Weg ab, liefert die Funktion `null` und es wird keine Karte mehr markiert.
+- `applySolutionMark()` markiert die betroffene Karte über `selected`; muss gezogen oder der Abwurfstapel neu ausgelegt werden, wird stattdessen der Ziehstapel (`#stock.solution-target`) hervorgehoben.
 - Die Markierung wird nach jedem Zug, nach dem Aufdecken einer Karte, bei „Rückgängig“ und beim Start eines Spiels neu berechnet. Bei Sieg, Haufenansicht oder laufender Austeil-/Fertigspiel-Animation bleibt sie aus.
 
 ## Fertigspielen und Spielende

@@ -128,7 +128,7 @@
       <div class="controls"><button class="undo" id="undo" type="button" disabled>↶ Rückgängig</button><button id="sameGame" class="undo" type="button">↻ Gleiches Deck</button><button id="solutionHint" type="button">💡 Lösung: Aus</button><button id="autoFinish" type="button" hidden>▶ Fertigspielen</button><button id="newGame" type="button">Neues Spiel</button></div>
       <div class="heap" id="heap" aria-hidden="true"></div>
     </section>
-    <button class="version" data-version type="button" title="Klicken, um die Seite neu zu laden">Version 2.51</button>
+    <button class="version" data-version type="button" title="Klicken, um die Seite neu zu laden">Version 2.52</button>
     <script>const versionButton = document.querySelector('[data-version]'); versionButton.addEventListener('click', () => location.replace(`${location.pathname}?v=${Date.now()}`)); fetch(`VERSION?${Date.now()}`, { cache: 'no-store' }).then(response => response.text()).then(version => { versionButton.textContent = `Version ${version.trim()}`; }).catch(() => {});</script>
   </main>
   <script>
@@ -340,41 +340,94 @@
     function validSequence(cards) { return cards.every((card, index) => index === 0 || (card.rank === cards[index - 1].rank - 1 && card.red !== cards[index - 1].red)); }
     function canPlaceOnFoundation(card, pile) { const top = pile.at(-1); return top ? top.suit === card.suit && card.rank === top.rank + 1 : card.rank === 0; }
     const cardNumber = item => suits.indexOf(item.suit) * 13 + item.rank;
-    const canPlaceOnTableau = (card, target) => target ? target.red !== card.red && target.rank === card.rank + 1 : card.rank === 12;
-    // Prüft, ob eine gespeicherte Lösungsaktion im aktuellen Spiel ausführbar ist.
-    function solutionActionMatches(action) {
-      if (!Array.isArray(action) || !action.length) return false;
+    const idToNumber = id => { const [suitIndex, rank] = id.split('-').map(Number); return suitIndex * 13 + rank; };
+    // Der Lösungsweg wird ab dem ursprünglichen Deck nachgespielt. Nur wenn der
+    // aktuelle Zustand exakt einem Präfix eines Weges entspricht, gibt es einen Hinweis.
+    function initialSolutionState(deckIds) {
+      const columns = [];
+      let offset = 0;
+      for (let size = 1; size <= 7; size++) {
+        columns.push(deckIds.slice(offset, offset + size).map((id, index) => ({ n: idToNumber(id), faceUp: index === size - 1 })));
+        offset += size;
+      }
+      return { columns, stock: deckIds.slice(offset).map(idToNumber), waste: [], foundations: [0, 0, 0, 0] };
+    }
+    function currentSolutionState() {
+      const counts = [0, 0, 0, 0];
+      foundations.forEach(pile => { if (pile.length) counts[suits.indexOf(pile[0].suit)] = pile.length; });
+      return {
+        columns: tableau.map(column => column.map(item => ({ n: cardNumber(item), faceUp: Boolean(item.faceUp) }))),
+        stock: stock.map(cardNumber), waste: waste.map(cardNumber), foundations: counts,
+      };
+    }
+    function solutionStatesMatch(first, second) {
+      if (first.stock.length !== second.stock.length || first.waste.length !== second.waste.length) return false;
+      for (let index = 0; index < 4; index++) if (first.foundations[index] !== second.foundations[index]) return false;
+      for (let column = 0; column < first.columns.length; column++) {
+        const a = first.columns[column], b = second.columns[column];
+        if (a.length !== b.length) return false;
+        for (let index = 0; index < a.length; index++) if (a[index].n !== b[index].n || a[index].faceUp !== b[index].faceUp) return false;
+      }
+      return first.stock.every((n, index) => n === second.stock[index]) && first.waste.every((n, index) => n === second.waste[index]);
+    }
+    function applySolutionAction(state, action) {
       const [type] = action;
+      const next = { columns: state.columns.map(column => column.map(item => ({ ...item }))), stock: state.stock.slice(), waste: state.waste.slice(), foundations: state.foundations.slice() };
+      const revealTop = column => { if (column.length && !column[column.length - 1].faceUp) column[column.length - 1].faceUp = true; };
       if (type === 0) {
-        const column = tableau[action[1]];
-        if (!column?.length) return false;
-        const card = column.at(-1);
-        return card.faceUp && cardNumber(card) === action[2] && foundations.some(pile => canPlaceOnFoundation(card, pile));
+        const column = next.columns[action[1]], card = column?.at(-1);
+        if (!card || !card.faceUp || card.n !== action[2]) return null;
+        const suitIndex = Math.floor(card.n / 13);
+        if (card.n % 13 !== next.foundations[suitIndex]) return null;
+        column.pop(); next.foundations[suitIndex]++; revealTop(column); return next;
       }
       if (type === 1) {
-        const card = waste.at(-1);
-        return Boolean(card) && cardNumber(card) === action[1] && foundations.some(pile => canPlaceOnFoundation(card, pile));
+        const n = next.waste.at(-1);
+        if (n === undefined || n !== action[1]) return null;
+        const suitIndex = Math.floor(n / 13);
+        if (n % 13 !== next.foundations[suitIndex]) return null;
+        next.waste.pop(); next.foundations[suitIndex]++; return next;
       }
       if (type === 2) {
-        const column = tableau[action[1]], startIndex = action[3], count = action[4];
-        if (!column || !Number.isInteger(startIndex) || !Number.isInteger(count) || startIndex < 0 || count < 1 || startIndex + count > column.length) return false;
-        const moving = column.slice(startIndex, startIndex + count);
-        return moving.every(item => item.faceUp) && validSequence(moving) && cardNumber(moving[0]) === action[5] && action[2] !== action[1] && canPlaceOnTableau(moving[0], tableau[action[2]]?.at(-1));
+        const column = next.columns[action[1]], start = action[3], count = action[4];
+        if (!column || action[2] === action[1] || start < 0 || count < 1 || start + count > column.length) return null;
+        const moving = column.slice(start, start + count);
+        if (!moving.every(item => item.faceUp) || moving[0].n !== action[5]) return null;
+        column.splice(start, count); next.columns[action[2]].push(...moving); revealTop(column); return next;
       }
       if (type === 3) {
-        const card = waste.at(-1);
-        return Boolean(card) && cardNumber(card) === action[2] && canPlaceOnTableau(card, tableau[action[1]]?.at(-1));
+        const n = next.waste.at(-1);
+        if (n === undefined || n !== action[2] || !next.columns[action[1]]) return null;
+        next.waste.pop(); next.columns[action[1]].push({ n, faceUp: true }); return next;
       }
-      if (type === 4) { const card = stock.at(-1); return Boolean(card) && cardNumber(card) === action[1]; }
-      if (type === 5) return stock.length === 0 && waste.length > 0;
-      return false;
-    }
-    function findSolutionAction() {
-      for (const solution of currentDeckSolutions) {
-        if (!Array.isArray(solution)) continue;
-        for (const action of solution) if (solutionActionMatches(action)) return action;
+      if (type === 4) {
+        const n = next.stock.at(-1);
+        if (n === undefined || n !== action[1]) return null;
+        next.stock.pop(); next.waste.push(n); return next;
+      }
+      if (type === 5) {
+        if (next.stock.length || !next.waste.length) return null;
+        next.stock = next.waste.slice().reverse(); next.waste = []; return next;
       }
       return null;
+    }
+    function findSolutionAction() {
+      if (!currentDeck.length) return null;
+      const target = currentSolutionState();
+      let best = null, bestProgress = -1;
+      for (const solution of currentDeckSolutions) {
+        if (!Array.isArray(solution) || !solution.length) continue;
+        let state = initialSolutionState(currentDeck);
+        for (let index = 0; index < solution.length; index++) {
+          if (solutionStatesMatch(state, target)) {
+            if (index > bestProgress) { bestProgress = index; best = solution[index]; }
+            break;
+          }
+          state = applySolutionAction(state, solution[index]);
+          if (!state) break;
+        }
+      }
+      return best;
     }
     // Markiert die nächste Karte eines gespeicherten Lösungswegs; der Ziehstapel
     // wird markiert, wenn als Nächstes gezogen oder neu ausgelegt werden muss.
