@@ -3,7 +3,10 @@
 
 Successful deals are appended to solvable-deals.json. Card IDs are integers
 0..51 (suit * 13 + rank), in the order used to deal the tableau and stock.
-Solutions are arrays of structured action objects with zero-based indices.
+Solutions use compact integer action arrays (column/card indices are zero-based):
+`[0, fromColumn, cardId]` tableau→foundation; `[1, cardId]` waste→foundation;
+`[2, fromColumn, toColumn, startIndex, count, cardId]` tableau→tableau;
+`[3, toColumn, cardId]` waste→tableau; `[4, cardId]` draw stock; `[5]` recycle waste.
 The script also writes solitaire-deals-with-solutions.json for consumers that
 need each deck order and several distinct complete solutions.
 """
@@ -62,7 +65,7 @@ def compatible_on_tableau(card: int, target: int | None) -> bool:
     return rank(target) == rank(card) + 1 and COLORS[suit(target)] != COLORS[suit(card)]
 
 
-def moves_from(state: State) -> Iterator[tuple[State, dict[str, int | str]]]:
+def moves_from(state: State) -> Iterator[tuple[State, list[int]]]:
     columns, stock, waste, foundations = state
 
     # Tableau top card to foundation.
@@ -82,7 +85,7 @@ def moves_from(state: State) -> Iterator[tuple[State, dict[str, int | str]]]:
             next_foundations[card_suit] += 1
             yield (
                 (tuple(next_columns), stock, waste, tuple(next_foundations)),
-                {"type": "tableau-to-foundation", "fromColumn": column_index, "cardId": card},
+                [0, column_index, card],
             )
 
     # Waste top card to foundation.
@@ -94,7 +97,7 @@ def moves_from(state: State) -> Iterator[tuple[State, dict[str, int | str]]]:
             next_foundations[card_suit] += 1
             yield (
                 (columns, stock, waste[:-1], tuple(next_foundations)),
-                {"type": "waste-to-foundation", "cardId": card},
+                [1, card],
             )
 
     # Move any valid face-up tableau sequence to another column.
@@ -121,7 +124,7 @@ def moves_from(state: State) -> Iterator[tuple[State, dict[str, int | str]]]:
                 next_columns[target_index] = (target_cards + moving, target_up + len(moving))
                 yield (
                     (tuple(next_columns), stock, waste, foundations),
-                    {"type": "tableau-to-tableau", "fromColumn": source_index, "toColumn": target_index, "startIndex": start, "cardId": card, "count": len(moving)},
+                    [2, source_index, target_index, start, len(moving), card],
                 )
 
     # Waste top card to tableau.
@@ -134,28 +137,28 @@ def moves_from(state: State) -> Iterator[tuple[State, dict[str, int | str]]]:
             next_columns[target_index] = (target_cards + (card,), target_up + 1)
             yield (
                 (tuple(next_columns), stock, waste[:-1], foundations),
-                {"type": "waste-to-tableau", "toColumn": target_index, "cardId": card},
+                [3, target_index, card],
             )
 
     # Draw one card, or recycle the waste pile when stock is empty.
     if stock:
         card = stock[-1]
-        yield (columns, stock[:-1], waste + (card,), foundations), {"type": "draw-stock", "cardId": card}
+        yield (columns, stock[:-1], waste + (card,), foundations), [4, card]
     elif waste:
-        yield (columns, tuple(reversed(waste)), (), foundations), {"type": "recycle-waste"}
+        yield (columns, tuple(reversed(waste)), (), foundations), [5]
 
 
-def solve(deck: list[int], max_states: int, solution_limit: int = 3) -> tuple[list[list[dict[str, int | str]]], int, bool]:
+def solve(deck: list[int], max_states: int, solution_limit: int = 3) -> tuple[list[list[list[int]]], int, bool]:
     start = initial_state(deck)
     # Nodes retain their own parent path so several routes to the same state
     # can be explored without overwriting each other.
-    nodes: list[tuple[State, int | None, dict[str, int | str] | None, int, int]] = [(start, None, None, 0, hash(()))]
+    nodes: list[tuple[State, int | None, list[int] | None, int, int]] = [(start, None, None, 0, hash(()))]
     queue: list[tuple[float, int, int, int]] = []
     sequence = 0
     heapq.heappush(queue, (priority(start, 0), sequence, 0, 0))
     paths_by_state: dict[State, set[int]] = {start: {hash(())}}
-    solutions: list[list[dict[str, int | str]]] = []
-    unique_solutions: set[tuple[tuple[tuple[str, int | str], ...], ...]] = set()
+    solutions: list[list[list[int]]] = []
+    unique_solutions: set[tuple[tuple[int, ...], ...]] = set()
     expanded = 0
     truncated = False
 
@@ -163,14 +166,14 @@ def solve(deck: list[int], max_states: int, solution_limit: int = 3) -> tuple[li
         _, _, depth, node_index = heapq.heappop(queue)
         state, _, _, _, path_hash = nodes[node_index]
         if all(count == 13 for count in state[3]):
-            reversed_solution: list[dict[str, int | str]] = []
+            reversed_solution: list[list[int]] = []
             current_index: int | None = node_index
             while current_index is not None:
                 _, parent_index, move, _, _ = nodes[current_index]
                 if move is not None:
                     reversed_solution.append(move)
                 current_index = parent_index
-            solution = tuple(tuple(sorted(move.items())) for move in reversed(reversed_solution))
+            solution = tuple(tuple(move) for move in reversed(reversed_solution))
             if solution not in unique_solutions:
                 unique_solutions.add(solution)
                 solutions.append(list(reversed(reversed_solution)))
@@ -193,8 +196,7 @@ def solve(deck: list[int], max_states: int, solution_limit: int = 3) -> tuple[li
             if is_ancestor:
                 continue
 
-            move_key = tuple(sorted(move.items()))
-            next_path_hash = hash((path_hash, move_key))
+            next_path_hash = hash((path_hash, tuple(move)))
             state_paths = paths_by_state.setdefault(next_state, set())
             if next_path_hash in state_paths or len(state_paths) >= solution_limit:
                 continue
@@ -234,15 +236,46 @@ def write_game_deals(path: Path, data: dict) -> None:
     write_json(path, [deal["deckOrder"] for deal in data["deals"]], compact=True)
 
 
-def structured_solutions(deal: dict) -> list[list[dict[str, int | str]]]:
+ACTION_LENGTHS = {0: 3, 1: 2, 2: 6, 3: 3, 4: 2, 5: 1}
+
+
+def compact_action(action: object) -> list[int] | None:
+    if isinstance(action, list):
+        if action and type(action[0]) is int and ACTION_LENGTHS.get(action[0]) == len(action) and all(type(value) is int for value in action):
+            return action
+        return None
+    if not isinstance(action, dict):
+        return None
+    fields = {
+        "tableau-to-foundation": (0, "fromColumn", "cardId"),
+        "waste-to-foundation": (1, "cardId"),
+        "tableau-to-tableau": (2, "fromColumn", "toColumn", "startIndex", "count", "cardId"),
+        "waste-to-tableau": (3, "toColumn", "cardId"),
+        "draw-stock": (4, "cardId"),
+        "recycle-waste": (5,),
+    }
+    spec = fields.get(action.get("type"))
+    if spec is None:
+        return None
+    try:
+        compact = [spec[0], *(action[field] for field in spec[1:])]
+    except KeyError:
+        return None
+    return compact if all(type(value) is int for value in compact) else None
+
+
+def structured_solutions(deal: dict) -> list[list[list[int]]]:
     candidates = deal.get("solutions")
     if not isinstance(candidates, list):
         candidates = [deal["solution"]] if isinstance(deal.get("solution"), list) else []
-    return [
-        solution for solution in candidates
-        if isinstance(solution, list)
-        and all(isinstance(action, dict) and isinstance(action.get("type"), str) for action in solution)
-    ]
+    compact_solutions = []
+    for solution in candidates:
+        if not isinstance(solution, list) or not solution:
+            continue
+        actions = [compact_action(action) for action in solution]
+        if all(action is not None for action in actions):
+            compact_solutions.append(actions)
+    return compact_solutions
 
 
 def remove_legacy_text_solutions(data: dict) -> None:
