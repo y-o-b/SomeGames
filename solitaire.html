@@ -126,7 +126,7 @@
       <div class="controls"><button class="undo" id="undo" type="button" disabled>↶ Rückgängig</button><button id="sameGame" class="undo" type="button">↻ Gleiches Deck</button><button id="autoFinish" type="button" hidden>▶ Fertigspielen</button><button id="solution" type="button">☷ Musterlösung</button><button id="newGame" type="button">Neues Spiel</button></div>
       <div class="heap" id="heap" aria-hidden="true"></div>
     </section>
-    <button class="version" data-version type="button" title="Klicken, um die Seite neu zu laden">Version 2.37</button>
+    <button class="version" data-version type="button" title="Klicken, um die Seite neu zu laden">Version 2.38</button>
     <script>const versionButton = document.querySelector('[data-version]'); versionButton.addEventListener('click', () => location.replace(`${location.pathname}?v=${Date.now()}`)); fetch(`VERSION?${Date.now()}`, { cache: 'no-store' }).then(response => response.text()).then(version => { versionButton.textContent = `Version ${version.trim()}`; }).catch(() => {});</script>
   </main>
   <script>
@@ -154,11 +154,12 @@
         const [gameResponse, solutionResponse] = await Promise.all([fetch('solitaire-deals.json', { cache: 'no-store' }), fetch('solvable-deals.json', { cache: 'no-store' })]);
         if (!gameResponse.ok || !solutionResponse.ok) throw new Error('Solitaire-JSON konnte nicht geladen werden.');
         const gameData = await gameResponse.json(), solutionData = await solutionResponse.json();
-        if (Array.isArray(gameData)) {
-          solvableDeals = gameData.filter(deck => Array.isArray(deck) && deck.length === 52 && new Set(deck).size === 52 && deck.every(id => Number.isInteger(id) && id >= 0 && id < 52));
-          dealCursor = Math.floor(Math.random() * solvableDeals.length);
-        }
-        solutionDeals = Array.isArray(solutionData?.deals) ? solutionData.deals.filter(deal => Array.isArray(deal?.deckOrder) && Array.isArray(deal.solution)) : [];
+        solutionDeals = Array.isArray(solutionData?.deals) ? solutionData.deals.filter(deal => Array.isArray(deal?.deckOrder) && deal.deckOrder.length === 52 && Array.isArray(deal.solution)) : [];
+        const solutionDecks = solutionDeals.map(deal => deal.deckOrder);
+        const gameDecks = Array.isArray(gameData) ? gameData.filter(deck => Array.isArray(deck) && deck.length === 52 && new Set(deck).size === 52 && deck.every(id => Number.isInteger(id) && id >= 0 && id < 52)) : [];
+        // Die vollständige Sammlung ist die Quelle für neue Spiele, damit jeder Decksatz einen Lösungsweg besitzt.
+        solvableDeals = solutionDecks.length ? solutionDecks : gameDecks;
+        dealCursor = Math.floor(Math.random() * solvableDeals.length);
       } catch (error) {
         console.info('Keine JSON-Decksammlung geladen.', error);
       }
