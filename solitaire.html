@@ -130,7 +130,7 @@
       <div class="controls"><button class="undo" id="undo" type="button" disabled>↶ Rückgängig</button><button id="sameGame" class="undo" type="button">↻ Gleiches Deck</button><button id="solutionHint" type="button">💡 Lösung: Aus</button><button id="autoFinish" type="button" hidden>▶ Fertigspielen</button><button id="newGame" type="button">Neues Spiel</button></div>
       <div class="heap" id="heap" aria-hidden="true"></div>
     </section>
-    <button class="version" data-version type="button" title="Klicken, um die Seite neu zu laden">Version 2.60</button>
+    <button class="version" data-version type="button" title="Klicken, um die Seite neu zu laden">Version 2.61</button>
     <script>const versionButton = document.querySelector('[data-version]'); versionButton.addEventListener('click', () => location.replace(`${location.pathname}?v=${Date.now()}`));</script>
   </main>
   <script>
@@ -353,7 +353,7 @@
     // Ziehstapel in Ziehreihenfolge): Wo er gerade aufgeschlagen ist, ist egal, weil sich jede Karte erblättern lässt.
     // Verdeckte Karten stehen als -(n + 1); die oberste Karte einer Spalte gilt immer als offen (sie wird erst
     // nach der Flug-Animation umgedreht).
-    const HINT_SEARCH_DEPTH = 5, HINT_SEARCH_LIMIT = 1000;
+    const HINT_SEARCH_LIMIT = 5000, HINT_SEARCH_SLICE = 8;
     const hintRed = n => { const suit = Math.floor(n / 13); return suit === 1 || suit === 2; };
     const hintLabel = n => names[n % 13] + suits[Math.floor(n / 13)] + '︎';
     const hintKey = state => state.cols.map(column => column.join(',')).join('|') + '#' + state.f.join(',') + '#' + state.t.join(',');
@@ -389,7 +389,7 @@
       else return null;
       return { cols, f, t };
     }
-    let hintCache = null, hintMemo = null, hint = null;
+    let hintCache = null, hintJob = null, hint = null;
     // Karte „Spielstand → nächster Zug" über alle Lösungswege; bei mehreren Wegen durch denselben Stand gewinnt der kürzeste Rest.
     // Ziehen (4) und Neuauslegen (5) werden übersprungen. Wege, die nicht regelgerecht bis zum Sieg führen, zählen nicht.
     function hintMap() {
@@ -410,7 +410,7 @@
         if (!state || !hintWon(state)) continue;
         steps.forEach(([key, action], index) => { const rest = steps.length - index, known = map.get(key); if (!known || rest < known.rest) map.set(key, { action, rest }); });
       }
-      hintCache = { deck, solutions: currentDeckSolutions, map };
+      hintCache = { deck, solutions: currentDeckSolutions, map, failed: new Set() };
       return map;
     }
     function hintMoves(state) {
@@ -430,41 +430,71 @@
       });
       return moves;
     }
-    // Abseits der gespeicherten Wege: Breitensuche über wenige Züge zurück auf einen bekannten Stand
-    // (fängt vor allem Züge in anderer Reihenfolge ab). Liefert den ersten Zug dorthin oder null.
-    function hintSearch(origin, map) {
-      const seen = new Set([hintKey(origin)]);
-      let layer = [[origin, null]];
-      for (let depth = 0; depth < HINT_SEARCH_DEPTH && layer.length; depth++) {
-        const next = [];
-        for (const [state, first] of layer) for (const action of hintMoves(state)) {
-          const after = hintApply(state, action);
-          if (!after) continue;
-          const key = hintKey(after);
-          if (seen.has(key)) continue;
-          if (map.has(key) || hintWon(after)) return first || action;
-          if (seen.size >= HINT_SEARCH_LIMIT) return null;
-          seen.add(key); next.push([after, first || action]);
+    // Abseits der bekannten Wege rechnet das Spiel selbst weiter: Bestensuche vom aktuellen Stand bis zum Sieg oder
+    // zurück auf einen bekannten Stand (gleiche Bewertung wie scripts/find-solvable-solitaire.py). Sie läuft in kurzen
+    // Scheiben, damit das Spiel bedienbar bleibt. Ein gefundener Weg kommt in die Karte, sodass die folgenden Tipps
+    // ohne neue Suche da sind; ein Stand ohne Fund wird gemerkt und nicht erneut durchsucht.
+    const hintPriority = (state, depth) => depth + (52 - state.f[0] - state.f[1] - state.f[2] - state.f[3]) * 2 + state.cols.reduce((sum, column) => sum + column.filter(n => n < 0).length, 0) * 8;
+    function hintSearch(origin, originKey, cache) {
+      const job = hintJob = { key: originKey, cache, done: false, later: false };
+      const parents = new Map([[originKey, null]]), heap = [];
+      const less = (a, b) => a[0] < b[0] || (a[0] === b[0] && a[1] < b[1]);
+      const push = entry => { let i = heap.push(entry) - 1; while (i > 0) { const up = (i - 1) >> 1; if (less(heap[up], heap[i])) break; [heap[up], heap[i]] = [heap[i], heap[up]]; i = up; } };
+      const pop = () => {
+        const top = heap[0], last = heap.pop();
+        if (heap.length) { heap[0] = last; for (let i = 0; ;) { const left = 2 * i + 1, right = left + 1; let min = i; if (left < heap.length && less(heap[left], heap[min])) min = left; if (right < heap.length && less(heap[right], heap[min])) min = right; if (min === i) break; [heap[min], heap[i]] = [heap[i], heap[min]]; i = min; } }
+        return top;
+      };
+      // Fertig: Kam das Ergebnis erst nach dem Bildaufbau, wird neu gezeichnet (der Tipp gilt dann für den aktuellen Stand).
+      const finish = () => { job.done = true; if (hintJob === job) hintJob = null; if (job.later && tableau) render(); };
+      let sequence = 0, expanded = 0;
+      push([hintPriority(origin, 0), 0, 0, origin, originKey]);
+      const slice = () => {
+        if (hintJob !== job) return;
+        const until = performance.now() + HINT_SEARCH_SLICE;
+        while (heap.length && expanded < HINT_SEARCH_LIMIT) {
+          const [, , depth, state, key] = pop();
+          if (depth && (hintWon(state) || cache.map.has(key))) {
+            const base = cache.map.get(key)?.rest || 0;
+            let rest = base;
+            for (let step = parents.get(key); step; step = parents.get(step.key)) { rest++; const known = cache.map.get(step.key); if (!known || rest < known.rest) cache.map.set(step.key, { action: step.action, rest }); }
+            return finish();
+          }
+          expanded++;
+          for (const action of hintMoves(state)) {
+            const after = hintApply(state, action);
+            if (!after) continue;
+            const afterKey = hintKey(after);
+            if (parents.has(afterKey)) continue;
+            parents.set(afterKey, { key, action });
+            push([hintPriority(after, depth + 1), ++sequence, depth + 1, after, afterKey]);
+          }
+          if (performance.now() >= until) { setTimeout(slice, 0); return; }
         }
-        layer = next;
-      }
-      return null;
+        cache.failed.add(originKey); finish();
+      };
+      slice();
+      job.later = true;
     }
-    // Nächster Zug für einen Spielstand: aus der Karte, sonst per Suche; null, wenn kein Weg bekannt ist.
+    // Nächster Zug für einen Spielstand: aus der Karte, sonst per Suche. Liefert den Zug, 'pending' (Suche läuft noch)
+    // oder null (kein Weg gefunden).
     function hintAction(state) {
-      const map = hintMap(), key = hintKey(state);
-      if (!hintMemo || hintMemo.map !== map || hintMemo.key !== key) hintMemo = { map, key, action: hintWon(state) ? null : map.get(key)?.action || hintSearch(state, map) };
-      return hintMemo.action;
+      if (hintWon(state)) return null;
+      hintMap();
+      const cache = hintCache, key = hintKey(state);
+      if (!cache.map.has(key) && !cache.failed.has(key) && (hintJob?.key !== key || hintJob.cache !== cache)) hintSearch(state, key, cache);
+      return cache.map.get(key)?.action || (cache.failed.has(key) ? null : 'pending');
     }
     // Übersetzt den nächsten Zug in das, was markiert wird: Quelle und Ziel, den Ziehstapel (die gesuchte Karte
-    // liegt noch nicht oben) oder – ohne bekannten Weg – „Rückgängig" bzw. „Gleiches Deck".
+    // liegt noch nicht oben) oder – ohne gefundenen Weg – „Rückgängig" bzw. „Gleiches Deck".
     function updateHint() {
       hint = null;
       if (!solutionMode || !tableau || heapMode || autoFinishing || dealing || gamePanel.classList.contains('victory') || !currentDeck.length || !currentDeckSolutions.length) return;
       const action = hintAction(hintStateOf({ tableau, stock, waste, foundations }));
+      if (action === 'pending') { hint = { pending: true, html: '<b>Ich suche einen Lösungsweg …</b>' }; return; }
       if (!action) {
         const map = hintMap(), back = history.some(state => map.has(hintKey(hintStateOf(state))));
-        hint = { lost: true, back, text: back ? 'Von hier ist kein gespeicherter Lösungsweg bekannt. „Rückgängig" führt zurück auf einen Weg.' : 'Von hier ist kein gespeicherter Lösungsweg bekannt. „Gleiches Deck" beginnt von vorn.' };
+        hint = { lost: true, back, html: '<b>Von hier finde ich keinen Lösungsweg.</b> ' + (back ? '„Rückgängig" führt zurück auf einen bekannten Weg.' : '„Gleiches Deck" beginnt von vorn.') };
         return;
       }
       const n = action[action.length - 1], column = action[0] === 2 ? action[2] : action[0] === 3 ? action[1] : null;
@@ -484,7 +514,8 @@
       const undoButton = document.getElementById('undo'), sameButton = document.getElementById('sameGame');
       [stockElement, undoButton, sameButton].forEach(element => element.classList.remove('solution-target'));
       if (!hint) return;
-      message.innerHTML = `<b>Tipp:</b> ${hint.text}`;
+      message.innerHTML = hint.html || `<b>Tipp:</b> ${hint.text}`;
+      if (hint.pending) return;
       if (hint.stock) stockElement.classList.add('solution-target');
       else if (hint.lost) (hint.back ? undoButton : sameButton).classList.add('solution-target');
       else if (hint.column !== null) { const area = tableauElement.children[hint.column]; (area?.lastElementChild || area)?.classList.add('solution-target'); }
