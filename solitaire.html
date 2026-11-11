@@ -127,10 +127,10 @@
       <div class="tableau" id="tableau" aria-label="Spielfeld"></div>
       <p class="message" id="message" aria-live="polite"><b>Los geht's!</b> Lege Karten in absteigender Reihenfolge und wechselnden Farben.</p>
       <div class="status"><span>Züge: <strong id="moves">0</strong></span><span>Zeit: <strong id="time">0:00</strong></span></div>
-      <div class="controls"><button class="undo" id="undo" type="button" disabled>↶ Rückgängig</button><button id="sameGame" class="undo" type="button">↻ Gleiches Deck</button><button id="solutionHint" type="button">💡 Lösung: Aus</button><button id="autoFinish" type="button" hidden>▶ Fertigspielen</button><button id="newGame" type="button">Neues Spiel</button></div>
+      <div class="controls"><button class="undo" id="undo" type="button" disabled>↶ Rückgängig</button><button id="sameGame" class="undo" type="button">↻ Gleiches Deck</button><button id="solutionHint" type="button">💡 Tipp: Aus</button><button id="autoFinish" type="button" hidden>▶ Fertigspielen</button><button id="newGame" type="button">Neues Spiel</button></div>
       <div class="heap" id="heap" aria-hidden="true"></div>
     </section>
-    <button class="version" data-version type="button" title="Klicken, um die Seite neu zu laden">Version 2.61</button>
+    <button class="version" data-version type="button" title="Klicken, um die Seite neu zu laden">Version 2.62</button>
     <script>const versionButton = document.querySelector('[data-version]'); versionButton.addEventListener('click', () => location.replace(`${location.pathname}?v=${Date.now()}`));</script>
   </main>
   <script>
@@ -700,7 +700,7 @@
     }
     onTap(document.getElementById('newGame'), () => startNewGame()); onTap(document.getElementById('sameGame'), () => startNewGame(currentDeck)); onTap(autoFinishButton, autoFinishGame);
     const solutionHintButton = document.getElementById('solutionHint');
-    onTap(solutionHintButton, () => { solutionMode = !solutionMode; solutionHintButton.textContent = `💡 Lösung: ${solutionMode ? 'An' : 'Aus'}`; solutionHintButton.classList.toggle('active', solutionMode); applySolutionMark(); if (solutionMode && !currentDeckSolutions.length) message.innerHTML = '<b>Kein Lösungsweg geladen.</b> Starte ein neues Spiel.'; else if (!solutionMode) message.innerHTML = '<b>Lösungstipps aus.</b> Du spielst wieder ohne Hilfe.'; });
+    onTap(solutionHintButton, () => { solutionMode = !solutionMode; solutionHintButton.textContent = `💡 Tipp: ${solutionMode ? 'An' : 'Aus'}`; solutionHintButton.classList.toggle('active', solutionMode); applySolutionMark(); if (solutionMode && !currentDeckSolutions.length) message.innerHTML = '<b>Kein Lösungsweg geladen.</b> Starte ein neues Spiel.'; else if (!solutionMode) message.innerHTML = '<b>Lösungstipps aus.</b> Du spielst wieder ohne Hilfe.'; });
     onTap(document.getElementById('undo'), undo);
     // Gespeichert wird bei jeder Zustandsänderung (updateStatus) sowie beim Verlassen oder Verbergen der Seite, nicht mehr im Sekundentakt.
     document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'hidden') persistGame(); });
