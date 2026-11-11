@@ -93,6 +93,8 @@
     .controls button[hidden] { display: none; }
     #solutionHint.active { color: var(--paper); background: var(--red); }
     #stock.solution-target { outline: calc(4 * var(--u)) solid var(--red); outline-offset: calc(2 * var(--u)); }
+    /* Ziel eines Lösungstipps: gestrichelt, die Quelle bleibt durchgezogen markiert. */
+    .column.solution-target, .card-back.solution-target, .foundation.solution-target, .playing-card.solution-target .card-face, .controls button.solution-target { outline: calc(4 * var(--u)) dashed var(--red); outline-offset: calc(2 * var(--u)); }
     button:focus-visible { outline: 3px solid var(--red); outline-offset: 2px; }
     .flight-back { position: relative; overflow: hidden; width: 100%; height: 100%; border: calc(3 * var(--u)) solid var(--ink); border-radius: calc(8 * var(--u)); background: var(--blue); box-shadow: calc(2 * var(--u)) calc(2 * var(--u)) 0 var(--ink); }
     button, .pile { -webkit-tap-highlight-color: transparent; }
@@ -128,7 +130,7 @@
       <div class="controls"><button class="undo" id="undo" type="button" disabled>↶ Rückgängig</button><button id="sameGame" class="undo" type="button">↻ Gleiches Deck</button><button id="solutionHint" type="button">💡 Lösung: Aus</button><button id="autoFinish" type="button" hidden>▶ Fertigspielen</button><button id="newGame" type="button">Neues Spiel</button></div>
       <div class="heap" id="heap" aria-hidden="true"></div>
     </section>
-    <button class="version" data-version type="button" title="Klicken, um die Seite neu zu laden">Version 2.56</button>
+    <button class="version" data-version type="button" title="Klicken, um die Seite neu zu laden">Version 2.57</button>
     <script>const versionButton = document.querySelector('[data-version]'); versionButton.addEventListener('click', () => location.replace(`${location.pathname}?v=${Date.now()}`));</script>
   </main>
   <script>
@@ -136,7 +138,7 @@
     const stockElement = document.getElementById('stock'), wasteElement = document.getElementById('waste'), tableauElement = document.getElementById('tableau'), foundationsElement = document.getElementById('foundations'), message = document.getElementById('message'), autoFinishButton = document.getElementById('autoFinish');
     const gamePanel = document.querySelector('.game');
     let tableau, stock, waste, foundations, selected = null, history = [], moves = 0, seconds = 0, timer, cardDrag = null, suppressClick = false, suppressClickUntil = 0, dragClickGuard = null, revealedCards = [], lastCardTap = null, lastStockTapAt = 0, revealTimer = null, revealClearTimer = null, animationToken = 0;
-    let deckIndex = [], deckCursor = 0, currentDeckSolutions = [], currentDeck = [], heapMode = false, solutionMode = false, solutionHintAction = null, solutionHintBoard = '';
+    let deckIndex = [], deckCursor = 0, currentDeckSolutions = [], currentDeck = [], heapMode = false, solutionMode = false;
     const STORAGE_KEY = 'y-o-b.solitaire.save.v2';
     // Nach einem verarbeiteten Touch-Tap erzeugt Safari noch einen Click. Hat sich das Layout inzwischen verschoben (z. B. wird ein Button ausgeblendet),
     // träfe er sonst ein anderes Element unter dem Finger. Solche Clicks werden deshalb kurz global verworfen.
@@ -225,8 +227,10 @@
     // Einheitliche Tap-Logik für Maus und Touch: zweiter Tap innerhalb von 500 ms = Automatikzug, sonst auswählen, verschieben oder abwählen.
     function tapCard(card, source, index, cardIndex) {
       const now = performance.now();
+      // Ein Tipp auf das markierte Ziel eines Lösungstipps führt den Tipp aus.
+      if ((source !== 'tableau' || cardIndex === tableau[index].length - 1) && hintAimsAt(source, index) && playHint()) { lastCardTap = null; return; }
       // Markieren per Einzelklick ist deaktiviert; nur Ziehen und Doppelklick (Automatikzug) bleiben.
-      if (lastCardTap?.id === card.id && now - lastCardTap.time < 500) { lastCardTap = null; selected = { source, index, cardIndex }; autoMove(); return; }
+      if (lastCardTap?.id === card.id && now - lastCardTap.time < 500) { lastCardTap = null; if (hint?.source === source && hint.index === index && (source === 'tableau' ? cardIndex >= hint.cardIndex : true) && playHint()) return; selected = { source, index, cardIndex }; autoMove(); return; }
       lastCardTap = { id: card.id, time: now };
     }
     function finishRevealForDrag(card) {
@@ -242,7 +246,8 @@
     }
     function cardButton(card, source, index, cardIndex = 0) {
       const button = document.createElement('button');
-      const isSelected = selected && selected.source === source && selected.index === index && (source === 'tableau' ? cardIndex >= selected.cardIndex : selected.cardIndex === cardIndex);
+      const marks = mark => Boolean(mark) && mark.source === source && mark.index === index && (source === 'tableau' ? cardIndex >= mark.cardIndex : mark.cardIndex === cardIndex);
+      const isSelected = marks(selected) || marks(hint);
       const isRevealed = revealedCards.includes(card);
       button.className = 'playing-card' + (isSelected ? ' selected' : '') + (isRevealed ? ' revealed' : '');
       button.type = 'button'; button.dataset.cardId = card.id; if (flyingIds.has(card.id)) button.style.visibility = 'hidden';
@@ -311,7 +316,8 @@
     }
     function render() {
       if (heapMode) return renderHeapView();
-      tableauElement.innerHTML = ''; tableau.forEach((column, columnIndex) => { const area = document.createElement('div'); area.className = 'column' + (column.length ? '' : ' empty'); area.dataset.column = columnIndex; if (!column.length) { area.tabIndex = 0; area.setAttribute('role', 'button'); area.setAttribute('aria-label', `Leere Spalte ${columnIndex + 1}`); area.addEventListener('keydown', event => { if ((event.key === 'Enter' || event.key === ' ') && event.target === area) { event.preventDefault(); moveToTableau(columnIndex); } }); } column.forEach((card, cardIndex) => { if (card.faceUp) area.appendChild(cardButton(card, 'tableau', columnIndex, cardIndex)); else { const back = document.createElement('div'); back.className = 'card-back'; const logo = document.createElement('img'); logo.className = 'card-logo'; logo.src = 'icons/solitaire.svg'; logo.alt = ''; back.appendChild(logo); back.setAttribute('role', 'img'); back.setAttribute('aria-label', 'Verdeckte Karte'); area.appendChild(back); } }); area.addEventListener('click', event => { if (event.target === area) moveToTableau(columnIndex); }); tableauElement.appendChild(area); });
+      updateHint();
+      tableauElement.innerHTML = ''; tableau.forEach((column, columnIndex) => { const area = document.createElement('div'); area.className = 'column' + (column.length ? '' : ' empty'); area.dataset.column = columnIndex; if (!column.length) { area.tabIndex = 0; area.setAttribute('role', 'button'); area.setAttribute('aria-label', `Leere Spalte ${columnIndex + 1}`); area.addEventListener('keydown', event => { if ((event.key === 'Enter' || event.key === ' ') && event.target === area) { event.preventDefault(); moveToTableau(columnIndex); } }); } column.forEach((card, cardIndex) => { if (card.faceUp) area.appendChild(cardButton(card, 'tableau', columnIndex, cardIndex)); else { const back = document.createElement('div'); back.className = 'card-back'; const logo = document.createElement('img'); logo.className = 'card-logo'; logo.src = 'icons/solitaire.svg'; logo.alt = ''; back.appendChild(logo); back.setAttribute('role', 'img'); back.setAttribute('aria-label', 'Verdeckte Karte'); area.appendChild(back); } }); area.addEventListener('click', event => { if (event.target === area && !(hintAimsAt('tableau', columnIndex) && playHint())) moveToTableau(columnIndex); }); tableauElement.appendChild(area); });
       stockElement.disabled = !stock.length && !waste.length; stockElement.classList.toggle('empty', !stock.length); wasteElement.classList.toggle('has-card', Boolean(waste.length)); wasteElement.innerHTML = ''; if (waste.length) { wasteElement.appendChild(underCard(waste.length > 1 ? waste[waste.length - 2] : null)); wasteElement.appendChild(cardButton(waste[waste.length - 1], 'waste', 0)); }
       foundationsElement.innerHTML = '';
       foundations.forEach((pile, pileIndex) => {
@@ -326,13 +332,14 @@
         } else area.tabIndex = 0;
         area.addEventListener('keydown', event => { if ((event.key === 'Enter' || event.key === ' ') && event.target === area) { event.preventDefault(); moveToFoundation(pileIndex); } });
         area.addEventListener('click', event => { if (!selected || (selected.source === 'foundation' && selected.index === pileIndex)) return; if (moveToFoundation(pileIndex)) { event.preventDefault(); event.stopPropagation(); } }, true);
-        area.addEventListener('click', event => { if (event.target === area) moveToFoundation(pileIndex); });
+        area.addEventListener('click', event => { if (event.target === area && !(hintAimsAt('foundation', pileIndex) && playHint())) moveToFoundation(pileIndex); });
         foundationsElement.appendChild(area);
       });
       const won = gamePanel.classList.contains('victory');
       autoFinishButton.hidden = hasHiddenCards() || won || foundations.every(pile => pile.length === 13);
       document.getElementById('undo').disabled = won || history.length === 0;
       document.getElementById('sameGame').disabled = won;
+      markHint();
     }
     function picked() { return selected?.source === 'waste' ? [waste[waste.length - 1]] : selected?.source === 'foundation' ? [foundations[selected.index].at(-1)] : selected ? tableau[selected.index].slice(selected.cardIndex) : []; }
     function removeSelected(reveal = true) { if (selected.source === 'waste') waste.pop(); else if (selected.source === 'foundation') foundations[selected.index].pop(); else { tableau[selected.index].splice(selected.cardIndex); if (reveal && tableau[selected.index].length) tableau[selected.index].at(-1).faceUp = true; } selected = null; }
@@ -341,130 +348,158 @@
     function canPlaceOnFoundation(card, pile) { const top = pile.at(-1); return top ? top.suit === card.suit && card.rank === top.rank + 1 : card.rank === 0; }
     const cardNumber = item => suits.indexOf(item.suit) * 13 + item.rank;
     const idToNumber = id => { const [suitIndex, rank] = id.split('-').map(Number); return suitIndex * 13 + rank; };
-    // Der Lösungsweg wird ab dem ursprünglichen Deck nachgespielt. Nur wenn der
-    // aktuelle Zustand exakt einem Präfix eines Weges entspricht, gibt es einen Hinweis.
-    function initialSolutionState(deckIds) {
-      const columns = [];
+    // Lösungstipps: Aus allen gespeicherten Lösungswegen eines Decks entsteht beim ersten Bedarf eine Karte
+    // „Spielstand → nächster Zug". Der Talon zählt darin nur als Kartenfolge (Abwurf von unten nach oben, dann
+    // Ziehstapel in Ziehreihenfolge): Wo er gerade aufgeschlagen ist, ist egal, weil sich jede Karte erblättern lässt.
+    // Verdeckte Karten stehen als -(n + 1); die oberste Karte einer Spalte gilt immer als offen (sie wird erst
+    // nach der Flug-Animation umgedreht).
+    const HINT_SEARCH_DEPTH = 5, HINT_SEARCH_LIMIT = 1000;
+    const hintRed = n => { const suit = Math.floor(n / 13); return suit === 1 || suit === 2; };
+    const hintLabel = n => names[n % 13] + suits[Math.floor(n / 13)] + '︎';
+    const hintKey = state => state.cols.map(column => column.join(',')).join('|') + '#' + state.f.join(',') + '#' + state.t.join(',');
+    const hintWon = state => state.f[0] + state.f[1] + state.f[2] + state.f[3] === 52;
+    const hintFits = (n, column) => { const top = column[column.length - 1]; return top === undefined ? n % 13 === 12 : top >= 0 && hintRed(top) !== hintRed(n) && top % 13 === n % 13 + 1; };
+    function hintInitialState(deckIds) {
+      const numbers = deckIds.map(idToNumber), cols = [];
       let offset = 0;
-      for (let size = 1; size <= 7; size++) {
-        columns.push(deckIds.slice(offset, offset + size).map((id, index) => ({ n: idToNumber(id), faceUp: index === size - 1 })));
-        offset += size;
-      }
-      return { columns, stock: deckIds.slice(offset).map(idToNumber), waste: [], foundations: [0, 0, 0, 0] };
+      for (let size = 1; size <= 7; size++) { cols.push(numbers.slice(offset, offset + size).map((n, index) => index === size - 1 ? n : -n - 1)); offset += size; }
+      return { cols, f: [0, 0, 0, 0], t: numbers.slice(offset).reverse() };
     }
-    function currentSolutionState() {
-      const counts = [0, 0, 0, 0];
-      foundations.forEach(pile => { if (pile.length) counts[suits.indexOf(pile[0].suit)] = pile.length; });
-      return {
-        columns: tableau.map(column => column.map(item => ({ n: cardNumber(item), faceUp: Boolean(item.faceUp) }))),
-        stock: stock.map(cardNumber), waste: waste.map(cardNumber), foundations: counts,
-      };
+    function hintStateOf(state) {
+      const f = [0, 0, 0, 0];
+      state.foundations.forEach(pile => { if (pile.length) f[suits.indexOf(pile[0].suit)] = pile.length; });
+      return { cols: state.tableau.map(column => column.map((item, index) => item.faceUp || index === column.length - 1 ? cardNumber(item) : -cardNumber(item) - 1)), f, t: [...state.waste, ...state.stock.slice().reverse()].map(cardNumber) };
     }
-    function solutionStatesMatch(first, second) {
-      if (first.stock.length !== second.stock.length || first.waste.length !== second.waste.length) return false;
-      for (let index = 0; index < 4; index++) if (first.foundations[index] !== second.foundations[index]) return false;
-      for (let column = 0; column < first.columns.length; column++) {
-        const a = first.columns[column], b = second.columns[column];
-        if (a.length !== b.length) return false;
-        for (let index = 0; index < a.length; index++) if (a[index].n !== b[index].n || a[index].faceUp !== b[index].faceUp) return false;
+    // Wendet einen Zug an (0 Spalte→Grundstapel, 1 Talon→Grundstapel, 2 Spalte→Spalte, 3 Talon→Spalte) und prüft ihn
+    // dabei gegen die Spielregeln; ein unzulässiger Zug liefert null.
+    function hintApply(state, action) {
+      const cols = state.cols.map(column => column.slice()), f = state.f.slice(), t = state.t.slice(), n = action[action.length - 1];
+      if (!Number.isInteger(n) || n < 0 || n > 51) return null;
+      const flip = column => { if (column.length && column[column.length - 1] < 0) column[column.length - 1] = -column[column.length - 1] - 1; };
+      const toFoundation = () => { const suit = Math.floor(n / 13); if (n % 13 !== f[suit]) return false; f[suit]++; return true; };
+      const fromTalon = () => { const index = t.indexOf(n); if (index < 0) return false; t.splice(index, 1); return true; };
+      if (action[0] === 0) { const column = cols[action[1]]; if (!column || column[column.length - 1] !== n || !toFoundation()) return null; column.pop(); flip(column); }
+      else if (action[0] === 1) { if (!fromTalon() || !toFoundation()) return null; }
+      else if (action[0] === 2) {
+        const from = cols[action[1]], to = cols[action[2]], start = action[3];
+        if (!from || !to || from === to || !Number.isInteger(start) || start < 0 || start >= from.length || from[start] !== n || action[4] !== from.length - start || !hintFits(n, to)) return null;
+        to.push(...from.splice(start)); flip(from);
       }
-      return first.stock.every((n, index) => n === second.stock[index]) && first.waste.every((n, index) => n === second.waste[index]);
+      else if (action[0] === 3) { const column = cols[action[1]]; if (!column || !fromTalon() || !hintFits(n, column)) return null; column.push(n); }
+      else return null;
+      return { cols, f, t };
     }
-    function applySolutionAction(state, action) {
-      const [type] = action;
-      const next = { columns: state.columns.map(column => column.map(item => ({ ...item }))), stock: state.stock.slice(), waste: state.waste.slice(), foundations: state.foundations.slice() };
-      const revealTop = column => { if (column.length && !column[column.length - 1].faceUp) column[column.length - 1].faceUp = true; };
-      if (type === 0) {
-        const column = next.columns[action[1]], card = column?.at(-1);
-        if (!card || !card.faceUp || card.n !== action[2]) return null;
-        const suitIndex = Math.floor(card.n / 13);
-        if (card.n % 13 !== next.foundations[suitIndex]) return null;
-        column.pop(); next.foundations[suitIndex]++; revealTop(column); return next;
+    let hintCache = null, hintMemo = null, hint = null;
+    // Karte „Spielstand → nächster Zug" über alle Lösungswege; bei mehreren Wegen durch denselben Stand gewinnt der kürzeste Rest.
+    // Ziehen (4) und Neuauslegen (5) werden übersprungen. Wege, die nicht regelgerecht bis zum Sieg führen, zählen nicht.
+    function hintMap() {
+      const deck = currentDeck.join();
+      if (hintCache && hintCache.deck === deck && hintCache.solutions === currentDeckSolutions) return hintCache.map;
+      const map = new Map();
+      for (const solution of currentDeckSolutions) {
+        if (!Array.isArray(solution)) continue;
+        const steps = [];
+        let state = hintInitialState(currentDeck);
+        for (const action of solution) {
+          if (!Array.isArray(action)) { state = null; break; }
+          if (action[0] === 4 || action[0] === 5) continue;
+          steps.push([hintKey(state), action]);
+          state = hintApply(state, action);
+          if (!state) break;
+        }
+        if (!state || !hintWon(state)) continue;
+        steps.forEach(([key, action], index) => { const rest = steps.length - index, known = map.get(key); if (!known || rest < known.rest) map.set(key, { action, rest }); });
       }
-      if (type === 1) {
-        const n = next.waste.at(-1);
-        if (n === undefined || n !== action[1]) return null;
-        const suitIndex = Math.floor(n / 13);
-        if (n % 13 !== next.foundations[suitIndex]) return null;
-        next.waste.pop(); next.foundations[suitIndex]++; return next;
-      }
-      if (type === 2) {
-        const column = next.columns[action[1]], start = action[3], count = action[4];
-        if (!column || action[2] === action[1] || start < 0 || count < 1 || start + count > column.length) return null;
-        const moving = column.slice(start, start + count);
-        if (!moving.every(item => item.faceUp) || moving[0].n !== action[5]) return null;
-        column.splice(start, count); next.columns[action[2]].push(...moving); revealTop(column); return next;
-      }
-      if (type === 3) {
-        const n = next.waste.at(-1);
-        if (n === undefined || n !== action[2] || !next.columns[action[1]]) return null;
-        next.waste.pop(); next.columns[action[1]].push({ n, faceUp: true }); return next;
-      }
-      if (type === 4) {
-        const n = next.stock.at(-1);
-        if (n === undefined || n !== action[1]) return null;
-        next.stock.pop(); next.waste.push(n); return next;
-      }
-      if (type === 5) {
-        if (next.stock.length || !next.waste.length) return null;
-        next.stock = next.waste.slice().reverse(); next.waste = []; return next;
+      hintCache = { deck, solutions: currentDeckSolutions, map };
+      return map;
+    }
+    function hintMoves(state) {
+      const moves = [];
+      state.cols.forEach((column, from) => {
+        const top = column[column.length - 1];
+        if (top === undefined) return;
+        if (top % 13 === state.f[Math.floor(top / 13)]) moves.push([0, from, top]);
+        for (let start = column.length - 1; start >= 0 && column[start] >= 0; start--) {
+          const n = column[start];
+          state.cols.forEach((target, to) => { if (to !== from && hintFits(n, target) && (start > 0 || target.length)) moves.push([2, from, to, start, column.length - start, n]); });
+        }
+      });
+      state.t.forEach(n => {
+        if (n % 13 === state.f[Math.floor(n / 13)]) moves.push([1, n]);
+        state.cols.forEach((target, to) => { if (hintFits(n, target)) moves.push([3, to, n]); });
+      });
+      return moves;
+    }
+    // Abseits der gespeicherten Wege: Breitensuche über wenige Züge zurück auf einen bekannten Stand
+    // (fängt vor allem Züge in anderer Reihenfolge ab). Liefert den ersten Zug dorthin oder null.
+    function hintSearch(origin, map) {
+      const seen = new Set([hintKey(origin)]);
+      let layer = [[origin, null]];
+      for (let depth = 0; depth < HINT_SEARCH_DEPTH && layer.length; depth++) {
+        const next = [];
+        for (const [state, first] of layer) for (const action of hintMoves(state)) {
+          const after = hintApply(state, action);
+          if (!after) continue;
+          const key = hintKey(after);
+          if (seen.has(key)) continue;
+          if (map.has(key) || hintWon(after)) return first || action;
+          if (seen.size >= HINT_SEARCH_LIMIT) return null;
+          seen.add(key); next.push([after, first || action]);
+        }
+        layer = next;
       }
       return null;
     }
-    function findSolutionAction() {
-      if (!currentDeck.length) return null;
-      const target = currentSolutionState();
-      let best = null, bestProgress = -1;
-      for (const solution of currentDeckSolutions) {
-        if (!Array.isArray(solution) || !solution.length) continue;
-        let state = initialSolutionState(currentDeck);
-        for (let index = 0; index < solution.length; index++) {
-          if (solutionStatesMatch(state, target)) {
-            if (index > bestProgress) { bestProgress = index; best = solution[index]; }
-            break;
-          }
-          state = applySolutionAction(state, solution[index]);
-          if (!state) break;
-        }
+    // Nächster Zug für einen Spielstand: aus der Karte, sonst per Suche; null, wenn kein Weg bekannt ist.
+    function hintAction(state) {
+      const map = hintMap(), key = hintKey(state);
+      if (!hintMemo || hintMemo.map !== map || hintMemo.key !== key) hintMemo = { map, key, action: hintWon(state) ? null : map.get(key)?.action || hintSearch(state, map) };
+      return hintMemo.action;
+    }
+    // Übersetzt den nächsten Zug in das, was markiert wird: Quelle und Ziel, den Ziehstapel (die gesuchte Karte
+    // liegt noch nicht oben) oder – ohne bekannten Weg – „Rückgängig" bzw. „Gleiches Deck".
+    function updateHint() {
+      hint = null;
+      if (!solutionMode || !tableau || heapMode || autoFinishing || dealing || gamePanel.classList.contains('victory') || !currentDeck.length || !currentDeckSolutions.length) return;
+      const action = hintAction(hintStateOf({ tableau, stock, waste, foundations }));
+      if (!action) {
+        const map = hintMap(), back = history.some(state => map.has(hintKey(hintStateOf(state))));
+        hint = { lost: true, back, text: back ? 'Von hier ist kein gespeicherter Lösungsweg bekannt. „Rückgängig" führt zurück auf einen Weg.' : 'Von hier ist kein gespeicherter Lösungsweg bekannt. „Gleiches Deck" beginnt von vorn.' };
+        return;
       }
-      return best;
+      const n = action[action.length - 1], column = action[0] === 2 ? action[2] : action[0] === 3 ? action[1] : null;
+      const goal = column === null ? 'auf den Grundstapel' : tableau[column].length ? `auf ${hintLabel(cardNumber(tableau[column].at(-1)))}` : 'in die leere Spalte';
+      if (action[0] === 0) hint = { source: 'tableau', index: action[1], cardIndex: tableau[action[1]].length - 1, column };
+      else if (action[0] === 2) hint = { source: 'tableau', index: action[1], cardIndex: action[3], column };
+      else if (waste.length && cardNumber(waste.at(-1)) === n) hint = { source: 'waste', index: 0, cardIndex: 0, column };
+      else { hint = { stock: true, text: stock.length ? `Ziehen, bis ${hintLabel(n)} oben liegt – dann ${goal}.` : `Stapel neu auslegen und ziehen, bis ${hintLabel(n)} oben liegt.` }; return; }
+      hint.text = `${hintLabel(n)} ${goal}.`;
     }
-    function solutionBoardSignature() {
-      const counts = [0, 0, 0, 0];
-      foundations.forEach(pile => { if (pile.length) counts[suits.indexOf(pile[0].suit)] = pile.length; });
-      return JSON.stringify({ columns: tableau.map(column => column.map(item => [cardNumber(item), Boolean(item.faceUp)])), foundations: counts });
+    const hintPile = card => foundations.findIndex(pile => canPlaceOnFoundation(card, pile));
+    const hintMoving = () => hint.source === 'waste' ? waste.at(-1) : tableau[hint.index][hint.cardIndex];
+    // Ist dieser Stapel das Ziel des aktuellen Tipps?
+    const hintAimsAt = (source, index) => Boolean(hint?.source) && (source === 'tableau' ? hint.column === index : source === 'foundation' && hint.column === null && index === hintPile(hintMoving()));
+    // Zeigt den Tipp an: Die Quelle markiert cardButton(), hier folgen Ziel und Text.
+    function markHint() {
+      const undoButton = document.getElementById('undo'), sameButton = document.getElementById('sameGame');
+      [stockElement, undoButton, sameButton].forEach(element => element.classList.remove('solution-target'));
+      if (!hint) return;
+      message.innerHTML = `<b>Tipp:</b> ${hint.text}`;
+      if (hint.stock) stockElement.classList.add('solution-target');
+      else if (hint.lost) (hint.back ? undoButton : sameButton).classList.add('solution-target');
+      else if (hint.column !== null) { const area = tableauElement.children[hint.column]; (area?.lastElementChild || area)?.classList.add('solution-target'); }
+      else foundationsElement.children[hintPile(hintMoving())]?.classList.add('solution-target');
     }
-    function solutionActionValid(action) {
-      return applySolutionAction(currentSolutionState(), action) !== null;
+    // Doppeltipp auf die markierte Karte oder ein Tipp auf das markierte Ziel führt genau den Zug des Tipps aus (nicht den erstbesten Automatikzug).
+    function playHint() {
+      if (!hint || !hint.source) return false;
+      selected = { source: hint.source, index: hint.index, cardIndex: hint.cardIndex };
+      if (hint.column !== null ? moveToTableau(hint.column) : moveToFoundation(hintPile(picked()[0]))) return true;
+      selected = null; return false;
     }
-    // Markiert die nächste Karte eines gespeicherten Lösungswegs; der Ziehstapel
-    // wird markiert, wenn als Nächstes gezogen oder neu ausgelegt werden muss.
-    function applySolutionMark() {
-      stockElement.classList.remove('solution-target');
-      if (!tableau) { selected = null; return; }
-      if (!solutionMode || heapMode || autoFinishing || dealing || gamePanel.classList.contains('victory')) {
-        selected = null; solutionHintAction = null; solutionHintBoard = ''; render(); return;
-      }
-      const board = solutionBoardSignature();
-      let action = findSolutionAction();
-      // Beim Weiterblättern im Talon ändern sich nur Stock und Abwurf. Solange
-      // das übrige Spielfeld gleich bleibt, bleibt die letzte Markierung stehen.
-      if (!action && solutionHintAction && solutionHintBoard === board) {
-        if (solutionActionValid(solutionHintAction)) action = solutionHintAction;
-        else if (stock.length) action = [4, cardNumber(stock.at(-1))];
-        else if (waste.length) action = [5];
-      }
-      solutionHintAction = action;
-      solutionHintBoard = action ? board : '';
-      if (!action) { selected = null; render(); return; }
-      if (action[0] === 0) selected = { source: 'tableau', index: action[1], cardIndex: tableau[action[1]].length - 1 };
-      else if (action[0] === 1 || action[0] === 3) selected = { source: 'waste', index: 0, cardIndex: 0 };
-      else if (action[0] === 2) selected = { source: 'tableau', index: action[1], cardIndex: action[3] };
-      else { selected = null; stockElement.classList.add('solution-target'); }
-      render();
-    }
+    function applySolutionMark() { if (tableau) render(); }
     function autoMove() { const moving = picked(); const card = moving[0]; if (!card) return false; if (moving.length === 1) { for (let pileIndex = 0; pileIndex < foundations.length; pileIndex++) if (canPlaceOnFoundation(card, foundations[pileIndex])) return moveToFoundation(pileIndex); } for (let destination = 0; destination < tableau.length; destination++) { if (selected.source === 'tableau' && selected.index === destination) continue; const target = tableau[destination].at(-1); if ((!target && card.rank === 12) || (target && target.red !== card.red && target.rank === card.rank + 1)) return moveToTableau(destination); } return false; }
-    function moveToTableau(destination, originsOverride = null) { const moving = picked(); const card = moving[0]; if (!card || !validSequence(moving) || (selected.source === 'tableau' && selected.index === destination)) return false; const sourceColumn = selected.source === 'tableau' ? selected.index : null; const revealCard = sourceColumn === null ? null : tableau[sourceColumn][selected.cardIndex - 1]; const origins = captureCardPositions(moving, originsOverride); const target = tableau[destination].at(-1); if ((!target && card.rank === 12) || (target && target.red !== card.red && target.rank === card.rank + 1)) { const token = animationToken; saveState(); removeSelected(false); tableau[destination].push(...moving); moves++; message.innerHTML = '<b>Guter Zug!</b> Wähle die nächste Karte.'; render(); if (solutionMode) applySolutionMark(); animateCardMoves(moving, origins).then(() => revealAfterMove(revealCard, token)); updateStatus(); return true; } return false; }
+    function moveToTableau(destination, originsOverride = null) { const moving = picked(); const card = moving[0]; if (!card || !validSequence(moving) || (selected.source === 'tableau' && selected.index === destination)) return false; const sourceColumn = selected.source === 'tableau' ? selected.index : null; const revealCard = sourceColumn === null ? null : tableau[sourceColumn][selected.cardIndex - 1]; const origins = captureCardPositions(moving, originsOverride); const target = tableau[destination].at(-1); if ((!target && card.rank === 12) || (target && target.red !== card.red && target.rank === card.rank + 1)) { const token = animationToken; saveState(); removeSelected(false); if (target) target.faceUp = true; tableau[destination].push(...moving); moves++; message.innerHTML = '<b>Guter Zug!</b> Wähle die nächste Karte.'; render(); if (solutionMode) applySolutionMark(); animateCardMoves(moving, origins).then(() => revealAfterMove(revealCard, token)); updateStatus(); return true; } return false; }
     function moveToFoundation(pileIndex, originsOverride = null) { const moving = picked(); const card = moving[0]; if (!card || moving.length !== 1 || !canPlaceOnFoundation(card, foundations[pileIndex])) return false; const sourceColumn = selected.source === 'tableau' ? selected.index : null; const revealCard = sourceColumn === null ? null : tableau[sourceColumn][selected.cardIndex - 1]; const origins = captureCardPositions(moving, originsOverride); const token = animationToken; saveState(); removeSelected(false); foundations[pileIndex].push(card); moves++; const won = foundations.every(pile => pile.length === 13); if (won) { clearInterval(timer); gamePanel.classList.add('victory'); } message.innerHTML = won ? '<b>Gewonnen!</b> Alle Karten liegen auf den Grundstapeln.' : '<b>Passt!</b> Baue weiter auf.'; render(); if (solutionMode) applySolutionMark(); animateCardMoves(moving, origins).then(() => { revealAfterMove(revealCard, token); if (won) later(startHeap, 300); }); updateStatus(); return true; }
     function animateStockDraw(card, origin) {
       const target = document.querySelector(`[data-card-id="${card.id}"]`); if (!target) return;
@@ -634,7 +669,7 @@
     }
     onTap(document.getElementById('newGame'), () => startNewGame()); onTap(document.getElementById('sameGame'), () => startNewGame(currentDeck)); onTap(autoFinishButton, autoFinishGame);
     const solutionHintButton = document.getElementById('solutionHint');
-    onTap(solutionHintButton, () => { solutionMode = !solutionMode; solutionHintButton.textContent = `💡 Lösung: ${solutionMode ? 'An' : 'Aus'}`; solutionHintButton.classList.toggle('active', solutionMode); if (solutionMode && !currentDeckSolutions.length) message.innerHTML = '<b>Kein Lösungsweg geladen.</b> Starte ein neues Spiel.'; applySolutionMark(); });
+    onTap(solutionHintButton, () => { solutionMode = !solutionMode; solutionHintButton.textContent = `💡 Lösung: ${solutionMode ? 'An' : 'Aus'}`; solutionHintButton.classList.toggle('active', solutionMode); applySolutionMark(); if (solutionMode && !currentDeckSolutions.length) message.innerHTML = '<b>Kein Lösungsweg geladen.</b> Starte ein neues Spiel.'; else if (!solutionMode) message.innerHTML = '<b>Lösungstipps aus.</b> Du spielst wieder ohne Hilfe.'; });
     onTap(document.getElementById('undo'), undo);
     // Gespeichert wird bei jeder Zustandsänderung (updateStatus) sowie beim Verlassen oder Verbergen der Seite, nicht mehr im Sekundentakt.
     document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'hidden') persistGame(); });
