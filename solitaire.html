@@ -94,7 +94,7 @@
     #solutionHint.active { color: var(--paper); background: var(--red); }
     #stock.solution-target { outline: calc(4 * var(--u)) solid var(--red); outline-offset: calc(2 * var(--u)); }
     /* Ziel eines Lösungstipps: gestrichelt, die Quelle bleibt durchgezogen markiert. */
-    .column.solution-target, .card-back.solution-target, .foundation.solution-target, .playing-card.solution-target .card-face, .controls button.solution-target { outline: calc(4 * var(--u)) dashed var(--red); outline-offset: calc(2 * var(--u)); }
+    .column.solution-target, .card-back.solution-target, .foundation.solution-target, .playing-card.solution-target .card-face, .controls button.solution-target { outline: calc(4 * var(--u)) dashed var(--red); outline-offset: 0; }
     button:focus-visible { outline: 3px solid var(--red); outline-offset: 2px; }
     .flight-back { position: relative; overflow: hidden; width: 100%; height: 100%; border: calc(3 * var(--u)) solid var(--ink); border-radius: calc(8 * var(--u)); background: var(--blue); box-shadow: calc(2 * var(--u)) calc(2 * var(--u)) 0 var(--ink); }
     button, .pile { -webkit-tap-highlight-color: transparent; }
@@ -130,7 +130,7 @@
       <div class="controls"><button class="undo" id="undo" type="button" disabled>↶ Rückgängig</button><button id="sameGame" class="undo" type="button">↻ Gleiches Deck</button><button id="solutionHint" type="button">💡 Lösung: Aus</button><button id="autoFinish" type="button" hidden>▶ Fertigspielen</button><button id="newGame" type="button">Neues Spiel</button></div>
       <div class="heap" id="heap" aria-hidden="true"></div>
     </section>
-    <button class="version" data-version type="button" title="Klicken, um die Seite neu zu laden">Version 2.57</button>
+    <button class="version" data-version type="button" title="Klicken, um die Seite neu zu laden">Version 2.58</button>
     <script>const versionButton = document.querySelector('[data-version]'); versionButton.addEventListener('click', () => location.replace(`${location.pathname}?v=${Date.now()}`));</script>
   </main>
   <script>
