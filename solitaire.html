@@ -130,7 +130,7 @@
       <div class="controls"><button class="undo" id="undo" type="button" disabled>↶ Rückgängig</button><button id="sameGame" class="undo" type="button">↻ Gleiches Deck</button><button id="solutionHint" type="button">💡 Lösung: Aus</button><button id="autoFinish" type="button" hidden>▶ Fertigspielen</button><button id="newGame" type="button">Neues Spiel</button></div>
       <div class="heap" id="heap" aria-hidden="true"></div>
     </section>
-    <button class="version" data-version type="button" title="Klicken, um die Seite neu zu laden">Version 2.58</button>
+    <button class="version" data-version type="button" title="Klicken, um die Seite neu zu laden">Version 2.59</button>
     <script>const versionButton = document.querySelector('[data-version]'); versionButton.addEventListener('click', () => location.replace(`${location.pathname}?v=${Date.now()}`));</script>
   </main>
   <script>
@@ -488,7 +488,7 @@
       if (hint.stock) stockElement.classList.add('solution-target');
       else if (hint.lost) (hint.back ? undoButton : sameButton).classList.add('solution-target');
       else if (hint.column !== null) { const area = tableauElement.children[hint.column]; (area?.lastElementChild || area)?.classList.add('solution-target'); }
-      else foundationsElement.children[hintPile(hintMoving())]?.classList.add('solution-target');
+      else { const pile = foundationsElement.children[hintPile(hintMoving())]; (pile?.querySelector('.playing-card') || pile)?.classList.add('solution-target'); }
     }
     // Doppeltipp auf die markierte Karte oder ein Tipp auf das markierte Ziel führt genau den Zug des Tipps aus (nicht den erstbesten Automatikzug).
     function playHint() {
