@@ -160,7 +160,7 @@
         <div class="stat"><strong id="mines">0</strong><span>Minen übrig</span></div>
         <div class="stat"><strong id="moves">0</strong><span>Felder offen</span></div>
         <div class="stat"><strong id="time">0:00</strong><span>Zeit</span></div>
-        <p class="message" id="message" aria-live="polite"><b>Bereit?</b> Der erste Zug ist immer sicher.</p>
+        <p class="message" id="message" aria-live="polite"><b>Bereit?</b> Der erste Zug ist immer sicher. Flagge setzen: lange drücken oder rechte Maustaste.</p>
       </div>
       <div class="board" id="board" role="grid" aria-label="Minenfeld"></div>
       <div class="metal-detector" id="metalDetector" aria-hidden="true"><svg viewBox="0 0 64 64"><rect x="7" y="5" width="29" height="13" rx="4" fill="#EF4B3F" stroke="#171717" stroke-width="3"/><rect x="12" y="8" width="9" height="5" rx="1" fill="#FFFFFF"/><path d="M30 17 48 47" fill="none" stroke="#171717" stroke-width="6" stroke-linecap="round"/><path d="M31 19 46 44" fill="none" stroke="#4B8ED8" stroke-width="2"/><ellipse cx="49" cy="53" rx="12" ry="6" transform="rotate(-28 49 53)" fill="none" stroke="#171717" stroke-width="4"/></svg></div>
@@ -204,9 +204,9 @@
         </div>
       </div>
       <button class="settings-done" id="settingsDone" type="button">Spiel starten</button>
-      <button class="version" data-version type="button" title="Klicken, um die Seite neu zu laden">Version 2.62</button>
+      <button class="version" data-version type="button" title="Klicken, um die Seite neu zu laden">Version 2.63</button>
     </dialog>
-    <button class="version" data-version type="button" title="Klicken, um die Seite neu zu laden">Version 2.62</button>
+    <button class="version" data-version type="button" title="Klicken, um die Seite neu zu laden">Version 2.63</button>
     <script>document.querySelectorAll('[data-version]').forEach(versionButton => { versionButton.addEventListener('click', () => location.replace(`${location.pathname}?v=${Date.now()}`)); });</script>
   </main>
   <script>
@@ -505,7 +505,7 @@
       fitAndLayout();
       document.getElementById('time').textContent = `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, '0')}`;
       if (over) message.innerHTML = openCount === grid.length - config().mines ? `<b>Gewonnen!</b> Alle Minen gefunden in ${document.getElementById('time').textContent}.` : '<b>Boom!</b> Eine Mine wurde ausgelöst. Versuche es noch einmal.';
-      else message.innerHTML = savedState ? '<b>Spielstand geladen.</b> Du kannst weiterspielen.' : '<b>Bereit?</b> Der erste Zug ist immer sicher.';
+      else message.innerHTML = savedState ? '<b>Spielstand geladen.</b> Du kannst weiterspielen.' : '<b>Bereit?</b> Der erste Zug ist immer sicher. Flagge setzen: lange drücken oder rechte Maustaste.';
       if (placed && !over) startTimer();
       updateStats();
     }
