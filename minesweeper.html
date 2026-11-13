@@ -45,21 +45,31 @@
     body.board-view-mode .overlay-hint { display: grid; top: calc(max(8px, env(safe-area-inset-top)) + 2px); bottom: auto; width: 44px; height: 44px; right: max(10px, env(safe-area-inset-right)); }
     body.board-view-mode .game.finished .new-game { top: 50%; bottom: auto; width: min(calc(100% - 32px), 300px); transform: translate(-50%, -50%); }
     body.board-view-mode .game.finished .overlay-hint { display: none; }
-    /* Querformat: Statistik, Meldung und Knöpfe bilden rechts eine Spalte; das Brett nutzt die linke Fläche. */
+    /* Querformat: rechte Spalte mit Zurück und Hinweis, Überschrift, Statistik, Meldung und „Neues Spiel“; das Brett nutzt die linke Fläche. */
     @media (orientation: landscape) {
-      body.board-view-mode { --side-right: max(10px, env(safe-area-inset-right)); --side-width: clamp(180px, 24vw, 240px); }
+      body.board-view-mode { --side-right: max(10px, env(safe-area-inset-right)); --side-width: clamp(180px, 24vw, 240px); --side-top: calc(max(8px, env(safe-area-inset-top)) + 2px); }
       body.board-view-mode::after { content: ''; position: fixed; z-index: 1; top: 0; right: 0; bottom: 0; width: calc(var(--side-right) + var(--side-width) + 12px); background: rgba(23,23,23,.09); border-left: 3px dashed rgba(23,23,23,.55); pointer-events: none; }
-      body.board-view-mode header { left: auto; right: var(--side-right); width: var(--side-width); height: auto; padding: 0; display: flex; align-items: center; justify-content: space-between; gap: 8px; }
-      body.board-view-mode header h1 { font-size: clamp(1.1rem, 2.4vw, 1.45rem); letter-spacing: -.04em; white-space: nowrap; }
-      body.board-view-mode .back-button { position: static; margin: 0; }
+      body.board-view-mode header { position: fixed; left: auto; right: var(--side-right); top: calc(var(--side-top) + 52px); width: var(--side-width); height: auto; margin: 0; padding: 0; }
+      body.board-view-mode header h1 { font-size: clamp(1.25rem, 4.5vw, 1.75rem); line-height: 1.1; }
+      body.board-view-mode .back-button { position: fixed; left: auto; right: calc(var(--side-right) + var(--side-width) - 44px); top: var(--side-top); margin: 0; }
       body.board-view-mode .game.wrap-mode .board.wrap { right: calc(var(--side-right) + var(--side-width) + 12px); width: auto; }
-      body.board-view-mode .game .stats { left: auto; right: var(--side-right); top: max(64px, calc(env(safe-area-inset-top) + 58px)); width: var(--side-width); transform: none; grid-template-columns: 1fr; }
-      body.board-view-mode .game .stat { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; padding: 2px 4px; text-align: left; }
-      body.board-view-mode .game .stat strong { font-size: .95rem; }
-      body.board-view-mode .game .stat span { font-size: .62rem; white-space: nowrap; }
-      body.board-view-mode .overlay-hint { top: auto; bottom: max(12px, env(safe-area-inset-bottom)); right: var(--side-right); }
-      body.board-view-mode .game .new-game { left: auto; right: calc(var(--side-right) + 54px); transform: none; width: calc(var(--side-width) - 54px); font-size: .92rem; }
+      body.board-view-mode .game .stats { display: flex; flex-direction: column; gap: 0; left: auto; right: var(--side-right); top: calc(var(--side-top) + 90px); width: var(--side-width); max-height: calc(100vh - var(--side-top) - 164px); overflow-y: auto; transform: none; }
+      body.board-view-mode .game .stat { display: flex; align-items: baseline; justify-content: space-between; gap: 6px; padding: 3px 4px; text-align: left; }
+      body.board-view-mode .game .stat + .stat { border-top: 1px solid rgba(23,23,23,.15); }
+      body.board-view-mode .game .stat span { order: -1; font-size: .7rem; white-space: nowrap; }
+      body.board-view-mode .game .stats .message { margin: 4px 4px 0; text-align: left; }
+      body.board-view-mode .game .new-game,
       body.board-view-mode .game.finished .new-game { left: auto; right: var(--side-right); top: auto; bottom: max(12px, env(safe-area-inset-bottom)); transform: none; width: var(--side-width); }
+    }
+    /* Sehr flache Querformate: Überschrift, Statistik und Meldung etwas enger setzen, damit der Hinweistext vollständig sichtbar bleibt. */
+    @media (orientation: landscape) and (max-height: 340px) {
+      body.board-view-mode header { top: calc(var(--side-top) + 46px); }
+      body.board-view-mode header h1 { font-size: 1.15rem; }
+      body.board-view-mode .game .stats { top: calc(var(--side-top) + 78px); max-height: calc(100vh - var(--side-top) - 150px); }
+      body.board-view-mode .game .stat { padding: 2px 4px; }
+      body.board-view-mode .game .stats .message { font-size: .68rem; }
+      body.board-view-mode .game .new-game,
+      body.board-view-mode .game.finished .new-game { padding: 9px; }
     }
     .overlay-corner { display: none; place-items: center; position: fixed; z-index: 2; top: max(64px, calc(env(safe-area-inset-top) + 58px)); width: 48px; height: 48px; padding: 0; border: 3px solid #171717; border-radius: 50%; color: #171717; background: #FFFFFF; box-shadow: 3px 3px 0 #171717; font-size: 1.35rem; line-height: 1; -webkit-tap-highlight-color: transparent; transition: transform .12s, box-shadow .12s; }
     .overlay-corner:active { transform: translate(2px, 2px); box-shadow: 1px 1px 0 #171717; }
@@ -220,9 +230,9 @@
         </div>
       </div>
       <button class="settings-done" id="settingsDone" type="button">Spiel starten</button>
-      <button class="version" data-version type="button" title="Klicken, um die Seite neu zu laden">Version 2.67</button>
+      <button class="version" data-version type="button" title="Klicken, um die Seite neu zu laden">Version 2.68</button>
     </dialog>
-    <button class="version" data-version type="button" title="Klicken, um die Seite neu zu laden">Version 2.67</button>
+    <button class="version" data-version type="button" title="Klicken, um die Seite neu zu laden">Version 2.68</button>
     <script>document.querySelectorAll('[data-version]').forEach(versionButton => { versionButton.addEventListener('click', () => location.replace(`${location.pathname}?v=${Date.now()}`)); });</script>
   </main>
   <script>
