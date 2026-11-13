@@ -47,11 +47,12 @@
     body.board-view-mode .game.finished .overlay-hint { display: none; }
     /* Querformat: Statistik, Meldung und Knöpfe bilden rechts eine Spalte; das Brett nutzt die linke Fläche. */
     @media (orientation: landscape) {
-      body.board-view-mode { --side-right: max(10px, env(safe-area-inset-right)); --side-width: clamp(210px, 32vw, 300px); }
+      body.board-view-mode { --side-right: max(10px, env(safe-area-inset-right)); --side-width: clamp(180px, 24vw, 240px); }
       body.board-view-mode::after { content: ''; position: fixed; z-index: 1; top: 0; right: 0; bottom: 0; width: calc(var(--side-right) + var(--side-width) + 12px); background: rgba(23,23,23,.09); border-left: 3px dashed rgba(23,23,23,.55); pointer-events: none; }
       body.board-view-mode header { right: calc(var(--side-right) + var(--side-width) + 12px); width: auto; }
       body.board-view-mode .game.wrap-mode .board.wrap { right: calc(var(--side-right) + var(--side-width) + 12px); width: auto; }
       body.board-view-mode .game .stats { left: auto; right: var(--side-right); top: max(64px, calc(env(safe-area-inset-top) + 58px)); width: var(--side-width); transform: none; }
+      body.board-view-mode .game .stat span { font-size: .58rem; white-space: nowrap; }
       body.board-view-mode .game .new-game { left: auto; right: var(--side-right); transform: none; width: var(--side-width); }
       body.board-view-mode .game.finished .new-game { left: auto; right: var(--side-right); transform: translateY(-50%); width: var(--side-width); }
     }
@@ -214,9 +215,9 @@
         </div>
       </div>
       <button class="settings-done" id="settingsDone" type="button">Spiel starten</button>
-      <button class="version" data-version type="button" title="Klicken, um die Seite neu zu laden">Version 2.65</button>
+      <button class="version" data-version type="button" title="Klicken, um die Seite neu zu laden">Version 2.66</button>
     </dialog>
-    <button class="version" data-version type="button" title="Klicken, um die Seite neu zu laden">Version 2.65</button>
+    <button class="version" data-version type="button" title="Klicken, um die Seite neu zu laden">Version 2.66</button>
     <script>document.querySelectorAll('[data-version]').forEach(versionButton => { versionButton.addEventListener('click', () => location.replace(`${location.pathname}?v=${Date.now()}`)); });</script>
   </main>
   <script>
