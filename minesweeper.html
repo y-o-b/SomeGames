@@ -45,11 +45,15 @@
     body.board-view-mode .overlay-hint { display: grid; top: calc(max(8px, env(safe-area-inset-top)) + 2px); bottom: auto; width: 44px; height: 44px; right: max(10px, env(safe-area-inset-right)); }
     body.board-view-mode .game.finished .new-game { top: 50%; bottom: auto; width: min(calc(100% - 32px), 300px); transform: translate(-50%, -50%); }
     body.board-view-mode .game.finished .overlay-hint { display: none; }
-    /* Querformat: Statistik mit Meldung sowie die Knöpfe liegen am rechten Rand; das Brett bleibt bildschirmfüllend. */
+    /* Querformat: Statistik, Meldung und Knöpfe bilden rechts eine Spalte; das Brett nutzt die linke Fläche. */
     @media (orientation: landscape) {
-      body.board-view-mode .game .stats { left: auto; right: max(10px, env(safe-area-inset-right)); width: min(calc(100% - 24px), 360px); transform: none; }
-      body.board-view-mode .game .new-game { left: auto; right: max(10px, env(safe-area-inset-right)); transform: none; width: min(calc(100% - 32px), 240px); }
-      body.board-view-mode .game.finished .new-game { left: auto; right: max(10px, env(safe-area-inset-right)); transform: translateY(-50%); }
+      body.board-view-mode { --side-right: max(10px, env(safe-area-inset-right)); --side-width: clamp(210px, 32vw, 300px); }
+      body.board-view-mode::after { content: ''; position: fixed; z-index: 1; top: 0; right: 0; bottom: 0; width: calc(var(--side-right) + var(--side-width) + 12px); background: rgba(23,23,23,.09); border-left: 3px dashed rgba(23,23,23,.55); pointer-events: none; }
+      body.board-view-mode header { right: calc(var(--side-right) + var(--side-width) + 12px); width: auto; }
+      body.board-view-mode .game.wrap-mode .board.wrap { right: calc(var(--side-right) + var(--side-width) + 12px); width: auto; }
+      body.board-view-mode .game .stats { left: auto; right: var(--side-right); top: max(64px, calc(env(safe-area-inset-top) + 58px)); width: var(--side-width); transform: none; }
+      body.board-view-mode .game .new-game { left: auto; right: var(--side-right); transform: none; width: var(--side-width); }
+      body.board-view-mode .game.finished .new-game { left: auto; right: var(--side-right); transform: translateY(-50%); width: var(--side-width); }
     }
     .overlay-corner { display: none; place-items: center; position: fixed; z-index: 2; top: max(64px, calc(env(safe-area-inset-top) + 58px)); width: 48px; height: 48px; padding: 0; border: 3px solid #171717; border-radius: 50%; color: #171717; background: #FFFFFF; box-shadow: 3px 3px 0 #171717; font-size: 1.35rem; line-height: 1; -webkit-tap-highlight-color: transparent; transition: transform .12s, box-shadow .12s; }
     .overlay-corner:active { transform: translate(2px, 2px); box-shadow: 1px 1px 0 #171717; }
@@ -210,9 +214,9 @@
         </div>
       </div>
       <button class="settings-done" id="settingsDone" type="button">Spiel starten</button>
-      <button class="version" data-version type="button" title="Klicken, um die Seite neu zu laden">Version 2.64</button>
+      <button class="version" data-version type="button" title="Klicken, um die Seite neu zu laden">Version 2.65</button>
     </dialog>
-    <button class="version" data-version type="button" title="Klicken, um die Seite neu zu laden">Version 2.64</button>
+    <button class="version" data-version type="button" title="Klicken, um die Seite neu zu laden">Version 2.65</button>
     <script>document.querySelectorAll('[data-version]').forEach(versionButton => { versionButton.addEventListener('click', () => location.replace(`${location.pathname}?v=${Date.now()}`)); });</script>
   </main>
   <script>
