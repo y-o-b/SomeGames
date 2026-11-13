@@ -230,9 +230,9 @@
         </div>
       </div>
       <button class="settings-done" id="settingsDone" type="button">Spiel starten</button>
-      <button class="version" data-version type="button" title="Klicken, um die Seite neu zu laden">Version 2.68</button>
+      <button class="version" data-version type="button" title="Klicken, um die Seite neu zu laden">Version 2.69</button>
     </dialog>
-    <button class="version" data-version type="button" title="Klicken, um die Seite neu zu laden">Version 2.68</button>
+    <button class="version" data-version type="button" title="Klicken, um die Seite neu zu laden">Version 2.69</button>
     <script>document.querySelectorAll('[data-version]').forEach(versionButton => { versionButton.addEventListener('click', () => location.replace(`${location.pathname}?v=${Date.now()}`)); });</script>
   </main>
   <script>
@@ -430,6 +430,8 @@
     }
     // Einpassen und zeichnen; ragt die Seite danach noch über den Bildschirm (Schatten, Rundungen), einmal nachkorrigieren.
     function fitAndLayout() {
+      // Nach dem Drehen würde das alte Seitenverhältnis die Breite des Bretts vorgeben; darum zuerst zurücksetzen und neu messen.
+      boardElement.style.aspectRatio = 'auto';
       fitWrapWindow();
       if (wrapZoom < minimumZoom()) { wrapZoom = minimumZoom(); persistGameState(); }
       ensureGhostCapacity(); layoutCells();
