@@ -182,7 +182,7 @@
         <button id="standButton" type="button" hidden>Halten</button>
       </div>
     </section>
-    <button class="version" data-version type="button" title="Klicken, um die Seite neu zu laden">Version 2.77</button>
+    <button class="version" data-version type="button" title="Klicken, um die Seite neu zu laden">Version 2.78</button>
     <script>const versionButton = document.querySelector('[data-version]'); versionButton.addEventListener('click', () => location.replace(`${location.pathname}?v=${Date.now()}`));</script>
   </main>
 
@@ -195,7 +195,7 @@
     const message = document.getElementById('message'), bankrollElement = document.getElementById('bankroll'), betValueElement = document.getElementById('betValue'), roundsElement = document.getElementById('rounds');
     const dealerCards = document.getElementById('dealerCards'), playerCards = document.getElementById('playerCards'), dealerScore = document.getElementById('dealerScore'), playerScore = document.getElementById('playerScore');
     const dealButton = document.getElementById('dealButton'), hitButton = document.getElementById('hitButton'), standButton = document.getElementById('standButton'), splitButton = document.getElementById('splitButton'), controls = document.querySelector('.controls');
-    const betMinus = document.getElementById('betMinus'), betPlus = document.getElementById('betPlus'), betOutput = document.getElementById('betOutput'), betControls = document.querySelector('.bet-controls'), deckElement = document.getElementById('deck'), gameElement = document.querySelector('.game');
+    const betMinus = document.getElementById('betMinus'), betPlus = document.getElementById('betPlus'), betOutput = document.getElementById('betOutput'), betControls = document.querySelector('.bet-controls'), deckElement = document.getElementById('deck');
     let bankroll = START_BANKROLL, bet = 10, rounds = 0, deck = [], playerHands = [[]], activeHand = 0, handDone = [], handCounts = [], handResults = [], dealer = [], phase = 'bet', holeHidden = false;
 
     try {
@@ -259,17 +259,14 @@
       if (reduceMotion()) { element.animate([{ opacity: 0 }, { opacity: 1 }], { duration: 160, delay, fill: 'backwards' }); return; }
       const fromX = deckRect.left + deckRect.width / 2 - (rect.left + rect.width / 2);
       const fromY = deckRect.top + deckRect.height / 2 - (rect.top + rect.height / 2);
-      const panelRect = gameElement.getBoundingClientRect(), panelX = panelRect.left + panelRect.width / 2, panelY = panelRect.top + panelRect.height / 2;
-      const toX = panelX - (rect.left + rect.width / 2);
-      const toY = panelY - (rect.top + rect.height / 2);
       element.classList.add('dealing');
+      // Auf dem Ziehstapel aufdecken, kurz halten und erst dann an den Platz gleiten.
       const animation = element.animate([
-        { transform: `translate(${fromX}px, ${fromY}px) scale(.65)`, opacity: 0 },
-        { transform: `translate(${fromX}px, ${fromY}px) scale(.8)`, opacity: 1, offset: .15 },
-        { transform: `translate(${toX}px, ${toY}px) scale(1.12)`, opacity: 1, offset: .38 },
-        { transform: `translate(${toX}px, ${toY}px) scale(1)`, opacity: 1, offset: .62 },
+        { transform: `translate(${fromX}px, ${fromY}px) scale(.7)`, opacity: 0 },
+        { transform: `translate(${fromX}px, ${fromY}px) scale(1)`, opacity: 1, offset: .12 },
+        { transform: `translate(${fromX}px, ${fromY}px) scale(1)`, opacity: 1, offset: .45 },
         { transform: 'none', opacity: 1 }
-      ], { duration: 680, delay, easing: 'ease-in-out', fill: 'backwards' });
+      ], { duration: 700, delay, easing: 'ease-in-out', fill: 'backwards' });
       animation.addEventListener('finish', () => element.classList.remove('dealing'));
     }
     function animateNewCards() {
