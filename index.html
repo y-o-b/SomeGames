@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <meta name="theme-color" content="#4B8ED8" />
-  <meta name="description" content="Kleine Spiele für zwischendurch: Tic Tac Toe, Memory, Solitär und Detektor." />
+  <meta name="description" content="Kleine Spiele für zwischendurch: Tic Tac Toe, Memory, Solitär, Detektor und Blackjack." />
   <link rel="manifest" href="manifest.webmanifest" />
   <meta name="application-name" content="Spiele" />
   <meta name="mobile-web-app-capable" content="yes" />
@@ -82,9 +82,15 @@
         <p>Finde Minen auf Quadraten oder Sechsecken.</p>
         <a href="minesweeper.html">Detektor spielen&nbsp; →</a>
       </div>
+      <div class="card">
+        <img class="game-icon" src="icons/blackjack.svg" width="72" height="72" alt="" />
+        <h2>Blackjack</h2>
+        <p>Fordere den Dealer heraus und komm nah an 21.</p>
+        <a href="blackjack.html">Blackjack spielen&nbsp; →</a>
+      </div>
     </div>
     <footer>Eine kleine Spielpause gefällig?</footer>
-      <button class="version" data-version type="button" title="Klicken, um die Seite neu zu laden">Version 2.70</button>
+      <button class="version" data-version type="button" title="Klicken, um die Seite neu zu laden">Version 2.71</button>
     <script>const versionButton = document.querySelector('[data-version]'); versionButton.addEventListener('click', () => location.replace(`${location.pathname}?v=${Date.now()}`));</script>
   </main>
   <script>if ('serviceWorker' in navigator) addEventListener('load', () => navigator.serviceWorker.register('sw.js').catch(() => {}));</script>

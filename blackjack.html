@@ -1,0 +1,309 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="theme-color" content="#4B8ED8" />
+  <meta name="description" content="Blackjack gegen den Dealer: Karte nehmen, halten und möglichst nah an 21 kommen." />
+  <link rel="manifest" href="manifest.webmanifest" />
+  <meta name="application-name" content="Spiele" />
+  <meta name="mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-title" content="Spiele" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+  <link rel="icon" href="icons/blackjack.svg" type="image/svg+xml" />
+  <link rel="apple-touch-icon" href="icons/blackjack-180.png" />
+  <title>Blackjack</title>
+  <style>
+    /* Spiele: kein Markieren von Text, auch kein Lupen- oder Kopiermenü beim langen Drücken; Eingabefelder ausgenommen. */
+    html { -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; }
+    :root { --bg: #4B8ED8; --panel: #FFFFFF; --text: #171717; --muted: rgba(23,23,23,.7); --red: #EF4B3F; --card-red: #D13B30; }
+    * { box-sizing: border-box; }
+    body { min-height: 100vh; margin: 0; padding: 24px 16px 30px; display: grid; justify-items: center; align-content: start; color: var(--text); background: var(--bg); font: 16px/1.5 Arial, Helvetica, sans-serif; }
+    .app { width: min(100%, 620px); }
+    header { position: relative; display: flex; align-items: center; justify-content: center; text-align: center; margin-bottom: 24px; }
+    h1 { margin: 0; font-size: clamp(2.2rem, 9vw, 4rem); line-height: .95; letter-spacing: -.07em; }
+    .back-button { display: grid; place-items: center; width: 44px; height: 44px; position: absolute; left: 0; top: 50%; margin-top: -22px; border: 3px solid #171717; border-radius: 50%; color: #171717; background: #FFFFFF; box-shadow: 3px 3px 0 #171717; text-decoration: none; -webkit-tap-highlight-color: transparent; transition: transform .12s, box-shadow .12s; }
+    .back-button svg { display: block; width: 24px; height: 24px; margin-right: 2px; fill: none; stroke: currentColor; stroke-width: 3.2; stroke-linecap: round; stroke-linejoin: round; }
+    .back-button:active { transform: translate(2px, 2px); box-shadow: 1px 1px 0 #171717; }
+    .back-button:focus-visible { outline: 3px solid #EF4B3F; outline-offset: 3px; }
+    .version { display: block; margin: 14px auto 0; padding: 0; border: 0; color: var(--muted); background: transparent; font: inherit; font-size: .72rem; cursor: pointer; }
+    .version:focus-visible { outline: 3px solid #171717; outline-offset: 3px; }
+    .game { padding: clamp(14px, 4vw, 26px); border: 3px solid #171717; border-radius: 18px; background: var(--panel); box-shadow: 7px 7px 0 #171717; }
+    button { border: 0; color: inherit; font: inherit; cursor: pointer; }
+    .stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-bottom: 14px; text-align: center; }
+    .stat { padding: 6px 3px; border: 2px solid #171717; border-radius: 10px; }
+    .stat strong { display: block; font-size: 1.3rem; line-height: 1.1; }
+    .stat span { color: var(--muted); font-size: .7rem; }
+    .hands { display: grid; gap: 14px; margin-bottom: 12px; }
+    .hand-head { display: flex; align-items: baseline; justify-content: space-between; margin-bottom: 6px; color: var(--muted); font-size: .76rem; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; }
+    .hand-head strong { color: var(--text); font-size: 1rem; letter-spacing: 0; }
+    .cards { display: flex; flex-wrap: wrap; align-content: flex-start; gap: 6px; min-height: 94px; }
+    .card { position: relative; flex: 0 0 auto; width: 64px; height: 92px; border: 3px solid #171717; border-radius: 9px; background: #FFFFFF; box-shadow: 3px 3px 0 #171717; }
+    .card.red { color: var(--card-red); }
+    .card .corner { position: absolute; top: 3px; left: 5px; display: flex; flex-direction: column; align-items: center; font-size: .78rem; font-weight: 800; line-height: .85; }
+    .card .corner i { font-style: normal; font-size: .9rem; }
+    .card .pip { position: absolute; inset: 0; display: grid; place-items: center; font-size: 2rem; line-height: 1; }
+    .card.back { background: repeating-linear-gradient(45deg, var(--red) 0 7px, #171717 7px 14px); }
+    .card.back::after { content: '♠'; position: absolute; inset: 5px; display: grid; place-items: center; border-radius: 5px; background: #FFFFFF; color: #171717; font-size: 1.5rem; }
+    @keyframes dealIn { from { opacity: 0; transform: translateY(-10px) scale(.92) rotate(-2deg); } to { opacity: 1; transform: none; } }
+    .card.new { animation: dealIn .2s ease-out; }
+    @media (prefers-reduced-motion: reduce) { .card.new { animation: none; } }
+    .message { min-height: 44px; margin: 0 0 12px; padding: 8px 10px; border: 2px solid rgba(23,23,23,.16); border-radius: 10px; color: var(--muted); font-size: .88rem; line-height: 1.35; }
+    .message b { color: var(--text); }
+    .bet-controls { display: flex; align-items: center; justify-content: center; gap: 10px; margin-bottom: 10px; color: var(--muted); font-size: .85rem; }
+    .bet-controls .chip { width: 40px; height: 40px; border: 3px solid #171717; border-radius: 50%; background: #FFD166; font-size: 1.35rem; font-weight: 800; line-height: 1; box-shadow: 3px 3px 0 #171717; }
+    .bet-controls .chip:active:not(:disabled) { transform: translate(2px, 2px); box-shadow: 1px 1px 0 #171717; }
+    .bet-controls .chip:disabled { opacity: .4; cursor: default; }
+    .bet-controls output { min-width: 2.4em; color: var(--text); font-size: 1.2rem; font-weight: 800; text-align: center; }
+    .controls { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+    .controls button { padding: 13px; border: 3px solid #171717; border-radius: 10px; font-weight: 800; box-shadow: 4px 4px 0 #171717; }
+    .controls button:active:not(:disabled) { transform: translate(2px, 2px); box-shadow: 2px 2px 0 #171717; }
+    .controls button:disabled { opacity: .45; cursor: default; }
+    .controls button[hidden] { display: none; }
+    #dealButton { grid-column: 1 / -1; color: #FFFFFF; background: var(--red); }
+    #hitButton { color: #FFFFFF; background: var(--red); }
+    #standButton { background: #FFD166; }
+    @media (max-width: 600px) {
+      body { min-height: 100vh; min-height: 100svh; padding: max(18px, env(safe-area-inset-top)) 14px max(14px, env(safe-area-inset-bottom)); }
+      header { margin-bottom: 18px; }
+      h1 { font-size: clamp(2rem, 9vw, 3rem); }
+      .game { padding: 16px; }
+      .stats { margin-bottom: 12px; }
+      .stat strong { font-size: 1.15rem; }
+      .cards { gap: 5px; min-height: 86px; }
+      .card { width: 56px; height: 82px; }
+      .card .pip { font-size: 1.75rem; }
+      .message { font-size: .84rem; }
+      .controls button { padding: 12px; }
+    }
+    @media (max-width: 390px) {
+      .game { padding: 13px; }
+      .card { width: 50px; height: 74px; }
+      .card .pip { font-size: 1.5rem; }
+      .card .corner { font-size: .68rem; }
+    }
+    /* Querformat auf flachen Bildschirmen: Dealer und Spieler liegen nebeneinander, damit alles ohne Scrollen passt. */
+    @media (orientation: landscape) and (max-height: 520px) {
+      body { padding: 10px 16px; }
+      .app { width: min(100%, 760px); }
+      header { margin-bottom: 10px; }
+      h1 { font-size: clamp(1.8rem, 5vw, 2.6rem); }
+      .game { padding: 13px 18px; }
+      .stats { margin-bottom: 8px; }
+      .stat { padding: 3px; }
+      .stat strong { font-size: 1.05rem; }
+      .stat span { font-size: .64rem; }
+      .hands { grid-template-columns: 1fr 1fr; gap: 14px; margin-bottom: 8px; }
+      .cards { gap: 4px; min-height: 68px; }
+      .card { width: 46px; height: 66px; border-width: 2px; border-radius: 7px; box-shadow: 2px 2px 0 #171717; }
+      .card .pip { font-size: 1.35rem; }
+      .card .corner { font-size: .62rem; }
+      .card .corner i { font-size: .7rem; }
+      .card.back::after { inset: 3px; font-size: 1rem; }
+      .message { min-height: 34px; margin-bottom: 8px; padding: 5px 8px; font-size: .8rem; }
+      .bet-controls { margin-bottom: 6px; }
+      .bet-controls .chip { width: 32px; height: 32px; font-size: 1rem; }
+      .controls button { padding: 9px; }
+    }
+    /* Sehr flache Querformate: noch kompakter, damit auch der Aktionsknopf sichtbar bleibt. */
+    @media (orientation: landscape) and (max-height: 360px) {
+      body { padding: 6px 12px; }
+      .app { width: min(100%, 720px); }
+      header { margin-bottom: 4px; }
+      h1 { font-size: 1.55rem; }
+      .game { padding: 8px 12px; border-width: 2px; border-radius: 14px; box-shadow: 4px 4px 0 #171717; }
+      .stats { gap: 5px; margin-bottom: 5px; }
+      .stat { padding: 1px; }
+      .stat strong { font-size: .95rem; }
+      .stat span { font-size: .58rem; }
+      .hands { gap: 10px; margin-bottom: 4px; }
+      .hand-head { margin-bottom: 2px; font-size: .66rem; }
+      .cards { min-height: 58px; gap: 3px; }
+      .card { width: 40px; height: 56px; border-width: 2px; border-radius: 6px; box-shadow: 1px 1px 0 #171717; }
+      .card .pip { font-size: 1.05rem; }
+      .card .corner { top: 2px; left: 3px; font-size: .54rem; }
+      .card .corner i { font-size: .6rem; }
+      .card.back::after { inset: 2px; font-size: .8rem; }
+      .message { min-height: 28px; margin-bottom: 5px; padding: 3px 7px; font-size: .74rem; }
+      .bet-controls { margin-bottom: 4px; }
+      .bet-controls .chip { width: 28px; height: 28px; font-size: 1rem; box-shadow: 2px 2px 0 #171717; }
+      .bet-controls output { font-size: 1rem; }
+      .controls { gap: 6px; }
+      .controls button { padding: 7px; }
+    }
+  </style>
+</head>
+<body>
+  <main class="app">
+    <header>
+      <a class="back-button" href="index.html" aria-label="Zur Startseite" title="Zur Startseite"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 4 7 12l8 8"/></svg></a>
+      <h1>Blackjack</h1>
+    </header>
+
+    <section class="game" aria-label="Blackjack-Spiel">
+      <div class="stats" aria-label="Spielstand">
+        <div class="stat"><strong id="bankroll">100</strong><span>Guthaben</span></div>
+        <div class="stat"><strong id="betValue">10</strong><span>Einsatz</span></div>
+        <div class="stat"><strong id="rounds">0</strong><span>Runden</span></div>
+      </div>
+      <div class="hands">
+        <div class="hand">
+          <div class="hand-head"><span>Dealer</span><strong id="dealerScore">0</strong></div>
+          <div class="cards" id="dealerCards" aria-label="Karten des Dealers"></div>
+        </div>
+        <div class="hand">
+          <div class="hand-head"><span>Du</span><strong id="playerScore">0</strong></div>
+          <div class="cards" id="playerCards" aria-label="Deine Karten"></div>
+        </div>
+      </div>
+      <p class="message" id="message" aria-live="polite"><b>Willkommen!</b> Komm näher an 21 als der Dealer, ohne zu überkaufen. Ein Blackjack zahlt 3:2. Lege deinen Einsatz fest und gib die Karten.</p>
+      <div class="bet-controls" aria-label="Einsatz wählen">
+        <button class="chip" id="betMinus" type="button" aria-label="Einsatz verringern">−</button>
+        <output id="betOutput" aria-label="Aktueller Einsatz">10</output>
+        <button class="chip" id="betPlus" type="button" aria-label="Einsatz erhöhen">+</button>
+      </div>
+      <div class="controls">
+        <button id="dealButton" type="button">Karten geben</button>
+        <button id="hitButton" type="button" hidden>Karte nehmen</button>
+        <button id="standButton" type="button" hidden>Halten</button>
+      </div>
+    </section>
+    <button class="version" data-version type="button" title="Klicken, um die Seite neu zu laden">Version 2.71</button>
+    <script>const versionButton = document.querySelector('[data-version]'); versionButton.addEventListener('click', () => location.replace(`${location.pathname}?v=${Date.now()}`));</script>
+  </main>
+
+  <script>
+    const STORAGE_KEY = 'y-o-b.blackjack.save.v1', MIN_BET = 5, BET_STEP = 5, START_BANKROLL = 100;
+    const SUITS = [{ symbol: '♠', name: 'Pik', red: false }, { symbol: '♥', name: 'Herz', red: true }, { symbol: '♦', name: 'Karo', red: true }, { symbol: '♣', name: 'Kreuz', red: false }];
+    const RANKS = ['A', '2', '3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K'];
+    const RANK_NAMES = { A: 'Ass', J: 'Bube', Q: 'Dame', K: 'König' };
+    const cardValue = rank => rank === 'A' ? 11 : ['J', 'Q', 'K'].includes(rank) ? 10 : Number(rank);
+    const message = document.getElementById('message'), bankrollElement = document.getElementById('bankroll'), betValueElement = document.getElementById('betValue'), roundsElement = document.getElementById('rounds');
+    const dealerCards = document.getElementById('dealerCards'), playerCards = document.getElementById('playerCards'), dealerScore = document.getElementById('dealerScore'), playerScore = document.getElementById('playerScore');
+    const dealButton = document.getElementById('dealButton'), hitButton = document.getElementById('hitButton'), standButton = document.getElementById('standButton');
+    const betMinus = document.getElementById('betMinus'), betPlus = document.getElementById('betPlus'), betOutput = document.getElementById('betOutput'), betControls = document.querySelector('.bet-controls');
+    let bankroll = START_BANKROLL, bet = 10, rounds = 0, deck = [], player = [], dealer = [], phase = 'bet', holeHidden = false;
+
+    try {
+      const saved = JSON.parse(localStorage.getItem(STORAGE_KEY) || 'null');
+      if (saved && Number.isFinite(saved.bankroll) && saved.bankroll >= 0) {
+        bankroll = Math.round(saved.bankroll);
+        if (Number.isFinite(saved.rounds) && saved.rounds >= 0) rounds = Math.round(saved.rounds);
+        if (Number.isFinite(saved.bet) && saved.bet >= MIN_BET) bet = Math.round(saved.bet / BET_STEP) * BET_STEP;
+      }
+    } catch (error) { console.warn('Blackjack-Spielstand konnte nicht geladen werden.', error); }
+    const maxBet = () => Math.max(MIN_BET, bankroll);
+    bet = Math.min(Math.max(MIN_BET, bet), maxBet());
+
+    function save() { try { localStorage.setItem(STORAGE_KEY, JSON.stringify({ bankroll, bet, rounds })); } catch (error) { console.warn('Blackjack-Spielstand konnte nicht gespeichert werden.', error); } }
+    function setMessage(html) { message.innerHTML = html; }
+    function handValue(cards) { let total = cards.reduce((sum, card) => sum + card.value, 0), aces = cards.filter(card => card.rank === 'A').length; while (total > 21 && aces > 0) { total -= 10; aces -= 1; } return total; }
+    const isBlackjack = cards => cards.length === 2 && handValue(cards) === 21;
+    function newDeck() {
+      const cards = [];
+      SUITS.forEach(suit => RANKS.forEach(rank => cards.push({ rank, suit: suit.symbol, suitName: suit.name, red: suit.red, value: cardValue(rank) })));
+      for (let i = cards.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [cards[i], cards[j]] = [cards[j], cards[i]]; }
+      return cards;
+    }
+    function cardElement(card, hidden) {
+      const element = document.createElement('div');
+      element.setAttribute('role', 'img');
+      if (hidden) { element.className = 'card back'; element.setAttribute('aria-label', 'Verdeckte Karte'); return element; }
+      element.className = 'card' + (card.red ? ' red' : '');
+      element.setAttribute('aria-label', `${card.suitName} ${RANK_NAMES[card.rank] || card.rank}`);
+      const corner = document.createElement('span'); corner.className = 'corner'; corner.textContent = card.rank;
+      const suit = document.createElement('i'); suit.textContent = card.suit; corner.appendChild(suit);
+      const pip = document.createElement('span'); pip.className = 'pip'; pip.textContent = card.suit;
+      element.append(corner, pip);
+      return element;
+    }
+    function drawHand(container, cards, hideHole = false) {
+      const previous = Number(container.dataset.count || 0);
+      container.replaceChildren();
+      cards.forEach((card, index) => {
+        const element = cardElement(card, hideHole && index === 1);
+        if (index >= previous) element.classList.add('new');
+        container.appendChild(element);
+      });
+      container.dataset.count = String(cards.length);
+    }
+    function render() {
+      bankrollElement.textContent = bankroll;
+      betValueElement.textContent = bet;
+      roundsElement.textContent = rounds;
+      betOutput.textContent = bet;
+      drawHand(dealerCards, dealer, holeHidden);
+      drawHand(playerCards, player, false);
+      dealerScore.textContent = dealer.length ? (holeHidden ? '?' : String(handValue(dealer))) : '0';
+      playerScore.textContent = player.length ? String(handValue(player)) : '0';
+      const busy = phase === 'player' || phase === 'dealer', broke = bankroll < MIN_BET;
+      betMinus.disabled = busy || broke || bet <= MIN_BET;
+      betPlus.disabled = busy || broke || bet + BET_STEP > bankroll;
+      betControls.classList.toggle('disabled', busy);
+      dealButton.hidden = busy;
+      hitButton.hidden = phase !== 'player';
+      standButton.hidden = phase !== 'player';
+      dealButton.textContent = broke ? 'Guthaben auffüllen' : phase === 'done' ? 'Neue Runde' : 'Karten geben';
+      dealerCards.setAttribute('aria-label', dealer.length ? `Karten des Dealers: ${holeHidden ? 'eine verdeckte Karte' : handValue(dealer)}` : 'Noch keine Karten des Dealers');
+      playerCards.setAttribute('aria-label', player.length ? `Deine Karten: ${handValue(player)}` : 'Noch keine Karten');
+    }
+    function finishRound() {
+      if (phase === 'done') return;
+      phase = 'done'; holeHidden = false; rounds += 1;
+      const playerTotal = handValue(player), dealerTotal = handValue(dealer), playerBlackjack = isBlackjack(player), dealerBlackjack = isBlackjack(dealer);
+      let payout = 0, text;
+      if (playerTotal > 21) text = `<b>Überkauft!</b> ${playerTotal} ist zu viel – der Dealer gewinnt.`;
+      else if (playerBlackjack && dealerBlackjack) { payout = bet; text = '<b>Beide Blackjack.</b> Unentschieden – dein Einsatz bleibt.'; }
+      else if (playerBlackjack) { payout = bet + Math.floor(bet * 1.5); text = `<b>Blackjack!</b> Du gewinnst ${Math.floor(bet * 1.5)} Guthaben dazu.`; }
+      else if (dealerBlackjack) text = '<b>Blackjack beim Dealer.</b> Diesmal verlierst du.';
+      else if (dealerTotal > 21) { payout = bet * 2; text = `<b>Gewonnen!</b> Der Dealer überkauft sich mit ${dealerTotal}.`; }
+      else if (playerTotal > dealerTotal) { payout = bet * 2; text = `<b>Gewonnen!</b> ${playerTotal} gegen ${dealerTotal}.`; }
+      else if (playerTotal === dealerTotal) { payout = bet; text = `<b>Unentschieden.</b> ${playerTotal} gegen ${dealerTotal} – dein Einsatz bleibt.`; }
+      else text = `<b>Verloren.</b> ${playerTotal} gegen ${dealerTotal}.`;
+      bankroll += payout; if (bankroll >= MIN_BET) bet = Math.min(bet, bankroll); save(); render(); setMessage(text);
+    }
+    function dealerTurn() {
+      phase = 'dealer'; holeHidden = false; render();
+      const draw = () => {
+        if (handValue(dealer) < 17) { dealer.push(deck.pop()); render(); setTimeout(draw, 450); }
+        else finishRound();
+      };
+      setTimeout(draw, 450);
+    }
+    function startRound() {
+      if (phase === 'player' || phase === 'dealer') return;
+      if (bankroll < MIN_BET) {
+        bankroll = START_BANKROLL; bet = 10; save(); render();
+        setMessage(`<b>Neues Guthaben.</b> Du startest wieder mit ${START_BANKROLL} Chips.`);
+        return;
+      }
+      bet = Math.min(bet, bankroll);
+      bankroll -= bet; deck = newDeck(); player = []; dealer = [];
+      dealerCards.dataset.count = '0'; playerCards.dataset.count = '0';
+      player.push(deck.pop()); dealer.push(deck.pop()); player.push(deck.pop()); dealer.push(deck.pop());
+      holeHidden = true; phase = 'player'; render();
+      if (isBlackjack(player) || isBlackjack(dealer)) {
+        phase = 'dealer'; render();
+        setTimeout(() => { holeHidden = false; finishRound(); }, 600);
+      } else setMessage('<b>Du bist am Zug.</b> Karte nehmen oder halten?');
+    }
+    function hit() {
+      if (phase !== 'player') return;
+      player.push(deck.pop()); render();
+      const total = handValue(player);
+      if (total > 21) { phase = 'dealer'; render(); setMessage(`<b>Überkauft!</b> ${total} ist zu viel.`); setTimeout(() => { holeHidden = false; finishRound(); }, 600); }
+      else if (total === 21) { setMessage('<b>21!</b> Der Dealer ist dran.'); dealerTurn(); }
+      else setMessage('<b>Noch eine Karte?</b> Nehmen oder halten.');
+    }
+    function stand() { if (phase !== 'player') return; dealerTurn(); }
+    betMinus.addEventListener('click', () => { if (phase === 'player' || phase === 'dealer') return; bet = Math.max(MIN_BET, bet - BET_STEP); save(); render(); });
+    betPlus.addEventListener('click', () => { if (phase === 'player' || phase === 'dealer') return; bet = Math.min(bankroll, bet + BET_STEP); save(); render(); });
+    dealButton.addEventListener('click', startRound);
+    hitButton.addEventListener('click', hit);
+    standButton.addEventListener('click', stand);
+    render();
+  </script>
+  <script>if ('serviceWorker' in navigator) addEventListener('load', () => navigator.serviceWorker.register('sw.js').catch(() => {}));</script>
+</body>
+</html>

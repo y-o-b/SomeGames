@@ -2,8 +2,8 @@
   "id": "./",
   "name": "LittleGames",
   "short_name": "Spiele",
-  "version": "2.70",
-  "description": "Kleine Spiele für zwischendurch: Tic Tac Toe, Memory, Solitär und Detektor.",
+  "version": "2.71",
+  "description": "Kleine Spiele für zwischendurch: Tic Tac Toe, Memory, Solitär, Detektor und Blackjack.",
   "lang": "de",
   "dir": "ltr",
   "start_url": "./",
@@ -75,6 +75,17 @@
       "icons": [
         {
           "src": "icons/minesweeper-180.png",
+          "sizes": "180x180",
+          "type": "image/png"
+        }
+      ]
+    },
+    {
+      "name": "Blackjack",
+      "url": "blackjack.html",
+      "icons": [
+        {
+          "src": "icons/blackjack-180.png",
           "sizes": "180x180",
           "type": "image/png"
         }
