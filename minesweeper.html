@@ -77,6 +77,20 @@
     .overlay-corner svg { display: block; width: 24px; height: 24px; fill: none; stroke: currentColor; stroke-width: 3; stroke-linecap: round; stroke-linejoin: round; }
     .overlay-hint { right: max(10px, env(safe-area-inset-right)); background: #FFD166; }
     body.board-view-mode .overlay-corner { display: grid; }
+    /* Querformat: rechte Spalte über den Knopf in der oberen Reihe ein- und ausklappen. */
+    body.board-view-mode .side-toggle { display: none; }
+    @media (orientation: landscape) {
+      body.board-view-mode .side-toggle { display: grid; top: var(--side-top); right: calc(var(--side-right) + var(--side-width) / 2 - 22px); width: 44px; height: 44px; }
+      body.board-view-mode.side-collapsed::after { display: none; }
+      body.board-view-mode.side-collapsed header,
+      body.board-view-mode.side-collapsed .back-button,
+      body.board-view-mode.side-collapsed .overlay-hint,
+      body.board-view-mode.side-collapsed .game .stats,
+      body.board-view-mode.side-collapsed .game .new-game { display: none; }
+      body.board-view-mode.side-collapsed .game.wrap-mode .board.wrap { right: 0; }
+      body.board-view-mode.side-collapsed .side-toggle { right: var(--side-right); }
+      body.board-view-mode.side-collapsed .side-toggle svg { transform: rotate(180deg); }
+    }
     .back-button { display: grid; place-items: center; width: 44px; height: 44px; position: absolute; left: 0; top: 50%; margin-top: -22px; border: 3px solid #171717; border-radius: 50%; color: #171717; background: #FFFFFF; box-shadow: 3px 3px 0 #171717; text-decoration: none; -webkit-tap-highlight-color: transparent; transition: transform .12s, box-shadow .12s; }
     .back-button svg { display: block; width: 24px; height: 24px; margin-right: 2px; fill: none; stroke: currentColor; stroke-width: 3.2; stroke-linecap: round; stroke-linejoin: round; }
     .back-button:active { transform: translate(2px, 2px); box-shadow: 1px 1px 0 #171717; }
@@ -195,6 +209,7 @@
         <button class="hint-button" id="hintButton" type="button">💡 Hinweis</button>
       </div>
       <button class="overlay-corner overlay-hint" id="overlayHint" type="button" aria-label="Hinweis anzeigen" title="Hinweis anzeigen">💡</button>
+      <button class="overlay-corner side-toggle" id="sideToggle" type="button" aria-label="Spalte einklappen" aria-expanded="true" title="Spalte einklappen"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 5l7 7-7 7"/></svg></button>
     </section>
     <dialog class="settings-dialog" id="settingsDialog" aria-labelledby="settingsTitle">
       <h2 id="settingsTitle" tabindex="-1" autofocus>Neues Spiel</h2>
@@ -230,9 +245,9 @@
         </div>
       </div>
       <button class="settings-done" id="settingsDone" type="button">Spiel starten</button>
-      <button class="version" data-version type="button" title="Klicken, um die Seite neu zu laden">Version 2.69</button>
+      <button class="version" data-version type="button" title="Klicken, um die Seite neu zu laden">Version 2.70</button>
     </dialog>
-    <button class="version" data-version type="button" title="Klicken, um die Seite neu zu laden">Version 2.69</button>
+    <button class="version" data-version type="button" title="Klicken, um die Seite neu zu laden">Version 2.70</button>
     <script>document.querySelectorAll('[data-version]').forEach(versionButton => { versionButton.addEventListener('click', () => location.replace(`${location.pathname}?v=${Date.now()}`)); });</script>
   </main>
   <script>
@@ -810,6 +825,23 @@
     addEventListener('resize', () => { cancelAnimationFrame(fitFrame); fitFrame = requestAnimationFrame(fitAndLayout); });
     document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'hidden') flushGameState(); });
     addEventListener('pagehide', flushGameState);
+    // Querformat: rechte Spalte ein- und ausklappen; der Zustand bleibt gespeichert.
+    const SIDE_COLLAPSED_KEY = 'y-o-b.minesweeper.side-collapsed.v1', sideToggle = document.getElementById('sideToggle');
+    function updateSideToggle(collapsed) {
+      document.body.classList.toggle('side-collapsed', collapsed);
+      const label = collapsed ? 'Spalte ausklappen' : 'Spalte einklappen';
+      sideToggle.setAttribute('aria-expanded', String(!collapsed));
+      sideToggle.setAttribute('aria-label', label); sideToggle.title = label;
+    }
+    function setSideCollapsed(collapsed, refit = true) {
+      updateSideToggle(collapsed);
+      try { localStorage.setItem(SIDE_COLLAPSED_KEY, collapsed ? 'on' : 'off'); } catch (error) { console.warn('Detektor: Spaltenzustand konnte nicht gespeichert werden.', error); }
+      if (refit) fitAndLayout();
+    }
+    let sideCollapsed = false;
+    try { sideCollapsed = localStorage.getItem(SIDE_COLLAPSED_KEY) === 'on'; } catch (error) { console.warn('Detektor: Spaltenzustand konnte nicht geladen werden.', error); }
+    updateSideToggle(sideCollapsed);
+    sideToggle.addEventListener('click', () => setSideCollapsed(!document.body.classList.contains('side-collapsed')));
     start(restoreGameState());
     // Beim ersten Aufbau stehen Schrift und Kopf noch nicht endgültig; nach dem Laden noch einmal einpassen.
     addEventListener('load', () => fitAndLayout());
