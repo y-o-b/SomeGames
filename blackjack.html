@@ -17,7 +17,7 @@
   <style>
     /* Spiele: kein Markieren von Text, auch kein Lupen- oder Kopiermenü beim langen Drücken; Eingabefelder ausgenommen. */
     html { -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; }
-    :root { --bg: #4B8ED8; --panel: #FFFFFF; --text: #171717; --muted: rgba(23,23,23,.7); --red: #EF4B3F; }
+    :root { --bg: #4B8ED8; --panel: #FFFFFF; --text: #171717; --muted: rgba(23,23,23,.7); --red: #EF4B3F; --card-w: 64px; --u: calc(var(--card-w) / 53); }
     * { box-sizing: border-box; }
     body { min-height: 100vh; margin: 0; padding: 24px 16px 30px; display: grid; justify-items: center; align-content: start; color: var(--text); background: var(--bg); font: 16px/1.5 Arial, Helvetica, sans-serif; }
     .app { width: min(100%, 620px); }
@@ -36,9 +36,15 @@
     .stat strong { display: block; font-size: 1.3rem; line-height: 1.1; }
     .stat span { color: var(--muted); font-size: .7rem; }
     .hands { display: grid; gap: 14px; margin-bottom: 12px; }
+    .hand { position: relative; }
     .hand-head { display: flex; align-items: baseline; justify-content: space-between; margin-bottom: 6px; color: var(--muted); font-size: .76rem; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; }
     .hand-head strong { color: var(--text); font-size: 1rem; letter-spacing: 0; }
-    .cards { display: flex; flex-wrap: wrap; align-content: flex-start; gap: 6px; min-height: 94px; }
+    .cards { position: relative; z-index: 1; display: flex; flex-wrap: wrap; align-content: flex-start; gap: 6px; min-height: 94px; }
+    .deck { position: absolute; z-index: 0; top: 24px; right: 0; width: var(--card-w); height: calc(var(--card-w) * 1.4); pointer-events: none; }
+    .deck::after { content: 'Stapel'; position: absolute; top: calc(100% + 2px); left: 0; right: 0; color: var(--muted); font-size: .56rem; font-weight: 800; letter-spacing: .06em; text-align: center; text-transform: uppercase; }
+    .deck-back { position: absolute; inset: 0; border: calc(3 * var(--u)) solid #171717; border-radius: calc(8 * var(--u)); background: #4B8ED8; box-shadow: calc(2 * var(--u)) calc(2 * var(--u)) 0 #171717; }
+    .deck-back:nth-child(1) { transform: translate(calc(2.5 * var(--u)), calc(2.5 * var(--u))); }
+    .deck-back:nth-child(2) { transform: translate(calc(1.2 * var(--u)), calc(1.2 * var(--u))); }
     .player-hands { display: flex; flex-wrap: wrap; align-items: flex-start; gap: 8px; min-height: 94px; }
     .hand-group { display: flex; flex-direction: column; gap: 4px; padding: 4px; border: 2px solid transparent; border-radius: 10px; }
     .hand-group.split { background: rgba(23,23,23,.05); border-color: rgba(23,23,23,.16); }
@@ -49,7 +55,7 @@
     .hand-group.lose { opacity: .55; }
     .hand-badge { color: var(--muted); font-size: .68rem; font-weight: 800; line-height: 1.2; }
     .hand-badge b { color: var(--text); }
-    .card { --card-w: 64px; --u: calc(var(--card-w) / 53); position: relative; flex: 0 0 auto; width: var(--card-w); height: calc(var(--card-w) * 1.4); padding: calc(3 * var(--u)); border: calc(2 * var(--u)) solid #171717; border-radius: calc(8 * var(--u)); background: #FFFFFF; box-shadow: calc(2 * var(--u)) calc(2 * var(--u)) 0 #171717; font-family: Arial, Helvetica, sans-serif; font-weight: 900; font-variant-emoji: text; }
+    .card { position: relative; z-index: 1; flex: 0 0 auto; width: var(--card-w); height: calc(var(--card-w) * 1.4); padding: calc(3 * var(--u)); border: calc(2 * var(--u)) solid #171717; border-radius: calc(8 * var(--u)); background: #FFFFFF; box-shadow: calc(2 * var(--u)) calc(2 * var(--u)) 0 #171717; font-family: Arial, Helvetica, sans-serif; font-weight: 900; font-variant-emoji: text; }
     .card.red { color: var(--red); }
     .card .corner { position: absolute; font-size: calc(16.8 * var(--u)); line-height: 1; }
     .card .top-left { top: calc(4 * var(--u)); left: calc(5 * var(--u)); }
@@ -58,9 +64,7 @@
     .card .center-suit { top: 60%; font-size: calc(46.4 * var(--u)); transform: translate(-50%, -50%); }
     .card.back { overflow: hidden; padding: 0; border-width: calc(3 * var(--u)); background: #4B8ED8; }
     .card-logo { position: absolute; inset: 1%; display: block; width: 98%; height: 98%; opacity: .48; object-fit: contain; pointer-events: none; }
-    @keyframes dealIn { from { opacity: 0; transform: translateY(-10px) scale(.92) rotate(-2deg); } to { opacity: 1; transform: none; } }
-    .card.new { animation: dealIn .2s ease-out; }
-    @media (prefers-reduced-motion: reduce) { .card.new { animation: none; } }
+    .card.dealing { z-index: 50; }
     .message { min-height: 44px; margin: 0 0 12px; padding: 8px 10px; border: 2px solid rgba(23,23,23,.16); border-radius: 10px; color: var(--muted); font-size: .88rem; line-height: 1.35; }
     .message b { color: var(--text); }
     .bet-controls { display: flex; align-items: center; justify-content: center; gap: 10px; margin-bottom: 10px; color: var(--muted); font-size: .85rem; }
@@ -87,13 +91,13 @@
       .stat strong { font-size: 1.15rem; }
       .cards { gap: 5px; min-height: 86px; }
       .player-hands { gap: 6px; min-height: 86px; }
-      .card { --card-w: 56px; }
+      :root { --card-w: 56px; }
       .message { font-size: .84rem; }
       .controls button { padding: 12px; }
     }
     @media (max-width: 390px) {
       .game { padding: 13px; }
-      .card { --card-w: 50px; }
+      :root { --card-w: 50px; }
     }
     /* Querformat auf flachen Bildschirmen: Dealer und Spieler liegen nebeneinander, damit alles ohne Scrollen passt. */
     @media (orientation: landscape) and (max-height: 520px) {
@@ -109,7 +113,7 @@
       .hands { grid-template-columns: 1fr 1fr; gap: 14px; margin-bottom: 8px; }
       .cards { gap: 4px; min-height: 68px; }
       .player-hands { gap: 6px; min-height: 68px; }
-      .card { --card-w: 46px; }
+      :root { --card-w: 46px; }
       .message { min-height: 34px; margin-bottom: 8px; padding: 5px 8px; font-size: .8rem; }
       .bet-controls { margin-bottom: 6px; }
       .bet-controls .chip { width: 32px; height: 32px; font-size: 1rem; }
@@ -130,7 +134,8 @@
       .hand-head { margin-bottom: 2px; font-size: .66rem; }
       .cards { min-height: 58px; gap: 3px; }
       .player-hands { min-height: 58px; gap: 4px; }
-      .card { --card-w: 40px; }
+      :root { --card-w: 40px; }
+      .deck { top: 18px; }
       .message { min-height: 28px; margin-bottom: 5px; padding: 3px 7px; font-size: .74rem; }
       .bet-controls { margin-bottom: 4px; }
       .bet-controls .chip { width: 28px; height: 28px; font-size: 1rem; box-shadow: 2px 2px 0 #171717; }
@@ -154,9 +159,10 @@
         <div class="stat"><strong id="rounds">0</strong><span>Runden</span></div>
       </div>
       <div class="hands">
-        <div class="hand">
+        <div class="hand dealer">
           <div class="hand-head"><span>Dealer</span><strong id="dealerScore">0</strong></div>
           <div class="cards" id="dealerCards" aria-label="Karten des Dealers"></div>
+          <div class="deck" id="deck" aria-hidden="true"><span class="deck-back"></span><span class="deck-back"></span><span class="deck-back"><img class="card-logo" src="icons/blackjack.svg" alt="" /></span></div>
         </div>
         <div class="hand">
           <div class="hand-head"><span>Du</span><strong id="playerScore">0</strong></div>
@@ -176,7 +182,7 @@
         <button id="standButton" type="button" hidden>Halten</button>
       </div>
     </section>
-    <button class="version" data-version type="button" title="Klicken, um die Seite neu zu laden">Version 2.74</button>
+    <button class="version" data-version type="button" title="Klicken, um die Seite neu zu laden">Version 2.75</button>
     <script>const versionButton = document.querySelector('[data-version]'); versionButton.addEventListener('click', () => location.replace(`${location.pathname}?v=${Date.now()}`));</script>
   </main>
 
@@ -189,7 +195,7 @@
     const message = document.getElementById('message'), bankrollElement = document.getElementById('bankroll'), betValueElement = document.getElementById('betValue'), roundsElement = document.getElementById('rounds');
     const dealerCards = document.getElementById('dealerCards'), playerCards = document.getElementById('playerCards'), dealerScore = document.getElementById('dealerScore'), playerScore = document.getElementById('playerScore');
     const dealButton = document.getElementById('dealButton'), hitButton = document.getElementById('hitButton'), standButton = document.getElementById('standButton'), splitButton = document.getElementById('splitButton'), controls = document.querySelector('.controls');
-    const betMinus = document.getElementById('betMinus'), betPlus = document.getElementById('betPlus'), betOutput = document.getElementById('betOutput'), betControls = document.querySelector('.bet-controls');
+    const betMinus = document.getElementById('betMinus'), betPlus = document.getElementById('betPlus'), betOutput = document.getElementById('betOutput'), betControls = document.querySelector('.bet-controls'), deckElement = document.getElementById('deck');
     let bankroll = START_BANKROLL, bet = 10, rounds = 0, deck = [], playerHands = [[]], activeHand = 0, handDone = [], handCounts = [], handResults = [], dealer = [], phase = 'bet', holeHidden = false;
 
     try {
@@ -244,6 +250,30 @@
       });
       container.dataset.count = String(cards.length);
     }
+    const reduceMotion = () => matchMedia('(prefers-reduced-motion: reduce)').matches;
+    // Neue Karten vom Ziehstapel über die Bildschirmmitte an ihren Platz fliegen lassen.
+    function animateDeal(element, delay = 0) {
+      if (!deckElement) return;
+      const rect = element.getBoundingClientRect(), deckRect = deckElement.getBoundingClientRect();
+      if (!rect.width || !deckRect.width) return;
+      if (reduceMotion()) { element.animate([{ opacity: 0 }, { opacity: 1 }], { duration: 160, delay, fill: 'backwards' }); return; }
+      const fromX = deckRect.left + deckRect.width / 2 - (rect.left + rect.width / 2);
+      const fromY = deckRect.top + deckRect.height / 2 - (rect.top + rect.height / 2);
+      const toX = innerWidth / 2 - (rect.left + rect.width / 2);
+      const toY = innerHeight / 2 - (rect.top + rect.height / 2);
+      element.classList.add('dealing');
+      const animation = element.animate([
+        { transform: `translate(${fromX}px, ${fromY}px) scale(.65)`, opacity: 0 },
+        { transform: `translate(${fromX}px, ${fromY}px) scale(.8)`, opacity: 1, offset: .15 },
+        { transform: `translate(${toX}px, ${toY}px) scale(1.12)`, opacity: 1, offset: .38 },
+        { transform: `translate(${toX}px, ${toY}px) scale(1)`, opacity: 1, offset: .62 },
+        { transform: 'none', opacity: 1 }
+      ], { duration: 680, delay, easing: 'ease-in-out', fill: 'backwards' });
+      animation.addEventListener('finish', () => element.classList.remove('dealing'));
+    }
+    function animateNewCards() {
+      document.querySelectorAll('.card.new').forEach((card, index) => { card.classList.remove('new'); animateDeal(card, index * 190); });
+    }
     function drawPlayerHands() {
       playerCards.replaceChildren();
       const split = playerHands.length > 1;
@@ -275,7 +305,7 @@
       const activeCards = playerHands[activeHand] || [];
       dealerScore.textContent = dealer.length ? (holeHidden ? '?' : String(handValue(dealer))) : '0';
       playerScore.textContent = activeCards.length ? String(handValue(activeCards)) : '0';
-      const busy = phase === 'player' || phase === 'dealer', broke = bankroll < MIN_BET;
+      const busy = phase === 'player' || phase === 'dealer' || phase === 'dealing', broke = bankroll < MIN_BET;
       betMinus.disabled = busy || broke || bet <= MIN_BET;
       betPlus.disabled = busy || broke || bet + BET_STEP > bankroll;
       betControls.classList.toggle('disabled', busy);
@@ -291,6 +321,7 @@
       dealerCards.setAttribute('aria-label', dealer.length ? `Karten des Dealers: ${holeHidden ? 'eine verdeckte Karte' : handValue(dealer)}` : 'Noch keine Karten des Dealers');
       const handText = playerHands.map((cards, index) => `${playerHands.length > 1 ? `Hand ${index + 1}: ` : ''}${cards.length ? handValue(cards) : 'leer'}`).join(', ');
       playerCards.setAttribute('aria-label', playerHands.some(cards => cards.length) ? `Deine Karten – ${handText}` : 'Noch keine Karten');
+      animateNewCards();
     }
     function finishRound() {
       if (phase === 'done') return;
@@ -330,13 +361,13 @@
     function dealerTurn() {
       phase = 'dealer'; holeHidden = false; render();
       const draw = () => {
-        if (handValue(dealer) < 17) { dealer.push(deck.pop()); render(); setTimeout(draw, 450); }
+        if (handValue(dealer) < 17) { dealer.push(deck.pop()); render(); setTimeout(draw, 700); }
         else finishRound();
       };
-      setTimeout(draw, 450);
+      setTimeout(draw, 550);
     }
     function startRound() {
-      if (phase === 'player' || phase === 'dealer') return;
+      if (phase === 'player' || phase === 'dealer' || phase === 'dealing') return;
       if (bankroll < MIN_BET) {
         bankroll = START_BANKROLL; bet = 10; save(); render();
         setMessage(`<b>Neues Guthaben.</b> Du startest wieder mit ${START_BANKROLL} Chips.`);
@@ -347,11 +378,19 @@
       playerHands = [[]]; activeHand = 0; handDone = [false]; handCounts = [0]; handResults = [];
       dealerCards.dataset.count = '0';
       playerHands[0].push(deck.pop()); dealer.push(deck.pop()); playerHands[0].push(deck.pop()); dealer.push(deck.pop());
-      holeHidden = true; phase = 'player'; render();
-      if (isBlackjack(playerHands[0]) || isBlackjack(dealer)) {
-        phase = 'dealer'; render();
-        setTimeout(() => { holeHidden = false; finishRound(); }, 600);
-      } else setMessage(canSplit() ? '<b>Du bist am Zug.</b> Karte nehmen, splitten oder halten?' : '<b>Du bist am Zug.</b> Karte nehmen oder halten?');
+      holeHidden = true; phase = 'dealing'; render();
+      setMessage('<b>Karten werden gegeben …</b>');
+      // Erst nach der Deal-Animation entscheiden, ob es weitergeht.
+      setTimeout(() => {
+        if (phase !== 'dealing') return;
+        if (isBlackjack(playerHands[0]) || isBlackjack(dealer)) {
+          phase = 'dealer'; render();
+          setTimeout(() => { holeHidden = false; finishRound(); }, 600);
+        } else {
+          phase = 'player'; render();
+          setMessage(canSplit() ? '<b>Du bist am Zug.</b> Karte nehmen, splitten oder halten?' : '<b>Du bist am Zug.</b> Karte nehmen oder halten?');
+        }
+      }, 1300);
     }
     // Nach einer fertigen Hand zur nächsten offenen wechseln; sind alle fertig, zieht der Dealer.
     function advance() {
@@ -365,7 +404,7 @@
     // Kurze Pause, damit die letzte Karte sichtbar bleibt, dann zur nächsten Hand.
     function finishActiveHand() {
       phase = 'dealer'; render();
-      setTimeout(() => { phase = 'player'; advance(); }, 650);
+      setTimeout(() => { phase = 'player'; advance(); }, 750);
     }
     function hit() {
       if (phase !== 'player') return;
@@ -396,8 +435,8 @@
       if (handValue(cards) === 21) { handDone[activeHand] = true; finishActiveHand(); return; }
       render();
     }
-    betMinus.addEventListener('click', () => { if (phase === 'player' || phase === 'dealer') return; bet = Math.max(MIN_BET, bet - BET_STEP); save(); render(); });
-    betPlus.addEventListener('click', () => { if (phase === 'player' || phase === 'dealer') return; bet = Math.min(bankroll, bet + BET_STEP); save(); render(); });
+    betMinus.addEventListener('click', () => { if (phase === 'player' || phase === 'dealer' || phase === 'dealing') return; bet = Math.max(MIN_BET, bet - BET_STEP); save(); render(); });
+    betPlus.addEventListener('click', () => { if (phase === 'player' || phase === 'dealer' || phase === 'dealing') return; bet = Math.min(bankroll, bet + BET_STEP); save(); render(); });
     dealButton.addEventListener('click', startRound);
     hitButton.addEventListener('click', hit);
     standButton.addEventListener('click', stand);
