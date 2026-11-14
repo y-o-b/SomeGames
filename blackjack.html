@@ -29,6 +29,10 @@
     .back-button:focus-visible { outline: 3px solid #EF4B3F; outline-offset: 3px; }
     .version { display: block; margin: 14px auto 0; padding: 0; border: 0; color: var(--muted); background: transparent; font: inherit; font-size: .72rem; cursor: pointer; }
     .version:focus-visible { outline: 3px solid #171717; outline-offset: 3px; }
+    .rules-link { margin: 12px 0 0; text-align: center; }
+    .rules-link a { display: inline-block; padding: 8px 15px; border: 2px solid #171717; border-radius: 8px; color: #171717; background: #FFD166; font-size: .85rem; font-weight: 800; text-decoration: none; box-shadow: 3px 3px 0 #171717; }
+    .rules-link a:active { transform: translate(2px, 2px); box-shadow: 1px 1px 0 #171717; }
+    .rules-link a:focus-visible { outline: 3px solid #EF4B3F; outline-offset: 3px; }
     .game { padding: clamp(14px, 4vw, 26px); border: 3px solid #171717; border-radius: 18px; background: var(--panel); box-shadow: 7px 7px 0 #171717; }
     button { border: 0; color: inherit; font: inherit; cursor: pointer; }
     .stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-bottom: 14px; text-align: center; }
@@ -182,7 +186,8 @@
         <button id="standButton" type="button" hidden>Halten</button>
       </div>
     </section>
-    <button class="version" data-version type="button" title="Klicken, um die Seite neu zu laden">Version 2.78</button>
+    <p class="rules-link"><a href="blackjack-regeln.html">Spielregeln</a></p>
+    <button class="version" data-version type="button" title="Klicken, um die Seite neu zu laden">Version 2.79</button>
     <script>const versionButton = document.querySelector('[data-version]'); versionButton.addEventListener('click', () => location.replace(`${location.pathname}?v=${Date.now()}`));</script>
   </main>
 
