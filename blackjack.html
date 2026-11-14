@@ -163,7 +163,7 @@
           <div class="player-hands" id="playerCards" aria-label="Deine Karten"></div>
         </div>
       </div>
-      <p class="message" id="message" aria-live="polite"><b>Willkommen!</b> Komm näher an 21 als der Dealer, ohne zu überkaufen. Ein Blackjack zahlt 3:2, gleiche Karten kannst du splitten. Lege deinen Einsatz fest und gib die Karten.</p>
+      <p class="message" id="message" aria-live="polite"><b>Willkommen!</b> Komm näher an 21 als der Dealer, ohne zu überkaufen. Ein Blackjack zahlt 3:2. Lege deinen Einsatz fest und gib die Karten.</p>
       <div class="bet-controls" aria-label="Einsatz wählen">
         <button class="chip" id="betMinus" type="button" aria-label="Einsatz verringern">−</button>
         <output id="betOutput" aria-label="Aktueller Einsatz">10</output>
@@ -176,7 +176,7 @@
         <button id="standButton" type="button" hidden>Halten</button>
       </div>
     </section>
-    <button class="version" data-version type="button" title="Klicken, um die Seite neu zu laden">Version 2.73</button>
+    <button class="version" data-version type="button" title="Klicken, um die Seite neu zu laden">Version 2.74</button>
     <script>const versionButton = document.querySelector('[data-version]'); versionButton.addEventListener('click', () => location.replace(`${location.pathname}?v=${Date.now()}`));</script>
   </main>
 
@@ -207,6 +207,11 @@
     function setMessage(html) { message.innerHTML = html; }
     function handValue(cards) { let total = cards.reduce((sum, card) => sum + card.value, 0), aces = cards.filter(card => card.rank === 'A').length; while (total > 21 && aces > 0) { total -= 10; aces -= 1; } return total; }
     const isBlackjack = cards => cards.length === 2 && handValue(cards) === 21;
+    // Splitten geht nur mit zwei gleichwertigen Karten, freiem Guthaben und höchstens vier Händen.
+    function canSplit() {
+      const cards = playerHands[activeHand] || [];
+      return phase === 'player' && playerHands.length < 4 && cards.length === 2 && cards[0].value === cards[1].value && bankroll >= bet;
+    }
     function newDeck() {
       const cards = [];
       SUITS.forEach(suit => RANKS.forEach(rank => cards.push({ rank, suit: suit.symbol, suitName: suit.name, red: suit.red, value: cardValue(rank) })));
@@ -280,7 +285,7 @@
       const pair = activeCards.length === 2 && activeCards[0].value === activeCards[1].value;
       const splitVisible = phase === 'player' && pair;
       splitButton.hidden = !splitVisible;
-      splitButton.disabled = !splitVisible || playerHands.length >= 4 || bankroll < bet;
+      splitButton.disabled = !canSplit();
       controls.classList.toggle('with-split', splitVisible);
       dealButton.textContent = broke ? 'Guthaben auffüllen' : phase === 'done' ? 'Neue Runde' : 'Karten geben';
       dealerCards.setAttribute('aria-label', dealer.length ? `Karten des Dealers: ${holeHidden ? 'eine verdeckte Karte' : handValue(dealer)}` : 'Noch keine Karten des Dealers');
@@ -346,7 +351,7 @@
       if (isBlackjack(playerHands[0]) || isBlackjack(dealer)) {
         phase = 'dealer'; render();
         setTimeout(() => { holeHidden = false; finishRound(); }, 600);
-      } else setMessage('<b>Du bist am Zug.</b> Karte nehmen, splitten oder halten?');
+      } else setMessage(canSplit() ? '<b>Du bist am Zug.</b> Karte nehmen, splitten oder halten?' : '<b>Du bist am Zug.</b> Karte nehmen oder halten?');
     }
     // Nach einer fertigen Hand zur nächsten offenen wechseln; sind alle fertig, zieht der Dealer.
     function advance() {
@@ -369,12 +374,12 @@
       const total = handValue(cards);
       if (total > 21) { handDone[activeHand] = true; setMessage(`<b>Überkauft!</b> ${total} ist zu viel.`); finishActiveHand(); }
       else if (total === 21) { handDone[activeHand] = true; setMessage('<b>21!</b> Die Hand steht.'); finishActiveHand(); }
-      else setMessage(cards.length === 2 && cards[0].value === cards[1].value ? '<b>Noch eine Karte?</b> Nehmen, splitten oder halten.' : '<b>Noch eine Karte?</b> Nehmen oder halten.');
+      else setMessage(canSplit() ? '<b>Noch eine Karte?</b> Nehmen, splitten oder halten.' : '<b>Noch eine Karte?</b> Nehmen oder halten.');
     }
     function stand() { if (phase !== 'player') return; handDone[activeHand] = true; finishActiveHand(); }
     function split() {
+      if (!canSplit()) return;
       const cards = playerHands[activeHand];
-      if (phase !== 'player' || playerHands.length >= 4 || cards.length !== 2 || cards[0].value !== cards[1].value || bankroll < bet) return;
       bankroll -= bet;
       const aces = cards[0].rank === 'A', moved = cards.pop(), newIndex = activeHand + 1;
       playerHands.splice(newIndex, 0, [moved]);
