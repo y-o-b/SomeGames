@@ -71,13 +71,24 @@
     .card.dealing { z-index: 50; }
     .message { min-height: 44px; margin: 0 0 12px; padding: 8px 10px; border: 2px solid rgba(23,23,23,.16); border-radius: 10px; color: var(--muted); font-size: .88rem; line-height: 1.35; }
     .message b { color: var(--text); }
+    .insurance { margin: 0 0 12px; padding: 10px 12px; border: 2px dashed #171717; border-radius: 10px; background: #FFF4CC; text-align: center; }
+    .insurance-actions { display: flex; justify-content: center; gap: 8px; }
+    .insurance-actions button { padding: 9px 14px; border: 2px solid #171717; border-radius: 8px; font-weight: 800; box-shadow: 3px 3px 0 #171717; }
+    .insurance-actions button:active:not(:disabled) { transform: translate(2px, 2px); box-shadow: 1px 1px 0 #171717; }
+    .insurance-actions button:disabled { opacity: .45; cursor: default; }
+    #insureButton { color: #FFFFFF; background: #4B8ED8; }
+    #declineInsuranceButton { background: #FFFFFF; }
+    .doubled-tag { display: inline-block; margin-left: 4px; padding: 0 5px; border: 1px solid #171717; border-radius: 5px; background: #FFD166; color: #171717; font-size: .62rem; letter-spacing: 0; vertical-align: 1px; }
+    .doubled-tag[hidden] { display: none; }
     .bet-controls { display: flex; align-items: center; justify-content: center; gap: 10px; margin-bottom: 10px; color: var(--muted); font-size: .85rem; }
     .bet-controls .chip { width: 40px; height: 40px; border: 3px solid #171717; border-radius: 50%; background: #FFD166; font-size: 1.35rem; font-weight: 800; line-height: 1; box-shadow: 3px 3px 0 #171717; }
     .bet-controls .chip:active:not(:disabled) { transform: translate(2px, 2px); box-shadow: 1px 1px 0 #171717; }
     .bet-controls .chip:disabled { opacity: .4; cursor: default; }
     .bet-controls output { min-width: 2.4em; color: var(--text); font-size: 1.2rem; font-weight: 800; text-align: center; }
     .controls { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
-    .controls.with-split { grid-template-columns: repeat(3, 1fr); }
+    .controls.with-split, .controls.with-double { grid-template-columns: repeat(3, 1fr); }
+    .controls.with-split.with-double { grid-template-columns: repeat(4, 1fr); }
+    .controls.with-split.with-double button { padding: 11px 6px; font-size: .82rem; }
     .controls button { padding: 13px; border: 3px solid #171717; border-radius: 10px; font-weight: 800; box-shadow: 4px 4px 0 #171717; }
     .controls button:active:not(:disabled) { transform: translate(2px, 2px); box-shadow: 2px 2px 0 #171717; }
     .controls button:disabled { opacity: .45; cursor: default; }
@@ -86,6 +97,7 @@
     #hitButton { color: #FFFFFF; background: var(--red); }
     #standButton { background: #FFD166; }
     #splitButton { background: #FFFFFF; }
+    #doubleButton { color: #FFFFFF; background: #4B8ED8; }
     @media (max-width: 600px) {
       body { min-height: 100vh; min-height: 100svh; padding: max(18px, env(safe-area-inset-top)) 14px max(14px, env(safe-area-inset-bottom)); }
       header { margin-bottom: 18px; }
@@ -169,11 +181,17 @@
           <div class="deck" id="deck" aria-hidden="true"><span class="deck-back"></span><span class="deck-back"></span><span class="deck-back"><img class="card-logo" src="icons/blackjack.svg" alt="" /></span></div>
         </div>
         <div class="hand">
-          <div class="hand-head"><span>Du</span><strong id="playerScore">0</strong></div>
+          <div class="hand-head"><span>Du <span class="doubled-tag" id="doubledTag" hidden>×2</span></span><strong id="playerScore">0</strong></div>
           <div class="player-hands" id="playerCards" aria-label="Deine Karten"></div>
         </div>
       </div>
       <p class="message" id="message" aria-live="polite"><b>Willkommen!</b> Komm näher an 21 als der Dealer, ohne zu überkaufen. Ein Blackjack zahlt 3:2. Lege deinen Einsatz fest und gib die Karten.</p>
+      <div class="insurance" id="insuranceControls" hidden>
+        <div class="insurance-actions">
+          <button id="insureButton" type="button">Versichern (<span id="insuranceAmount">5</span>)</button>
+          <button id="declineInsuranceButton" type="button">Nein danke</button>
+        </div>
+      </div>
       <div class="bet-controls" aria-label="Einsatz wählen">
         <button class="chip" id="betMinus" type="button" aria-label="Einsatz verringern">−</button>
         <output id="betOutput" aria-label="Aktueller Einsatz">10</output>
@@ -182,12 +200,13 @@
       <div class="controls">
         <button id="dealButton" type="button">Karten geben</button>
         <button id="splitButton" type="button" aria-label="Hand splitten" hidden>Splitten</button>
+        <button id="doubleButton" type="button" aria-label="Einsatz verdoppeln" hidden>Verdoppeln</button>
         <button id="hitButton" type="button" aria-label="Karte nehmen" hidden>Karte</button>
         <button id="standButton" type="button" hidden>Halten</button>
       </div>
     </section>
     <p class="rules-link"><a href="blackjack-regeln.html">Spielregeln</a></p>
-    <button class="version" data-version type="button" title="Klicken, um die Seite neu zu laden">Version 2.79</button>
+    <button class="version" data-version type="button" title="Klicken, um die Seite neu zu laden">Version 2.80</button>
     <script>const versionButton = document.querySelector('[data-version]'); versionButton.addEventListener('click', () => location.replace(`${location.pathname}?v=${Date.now()}`));</script>
   </main>
 
@@ -199,9 +218,10 @@
     const cardValue = rank => rank === 'A' ? 11 : ['J', 'Q', 'K'].includes(rank) ? 10 : Number(rank);
     const message = document.getElementById('message'), bankrollElement = document.getElementById('bankroll'), betValueElement = document.getElementById('betValue'), roundsElement = document.getElementById('rounds');
     const dealerCards = document.getElementById('dealerCards'), playerCards = document.getElementById('playerCards'), dealerScore = document.getElementById('dealerScore'), playerScore = document.getElementById('playerScore');
-    const dealButton = document.getElementById('dealButton'), hitButton = document.getElementById('hitButton'), standButton = document.getElementById('standButton'), splitButton = document.getElementById('splitButton'), controls = document.querySelector('.controls');
+    const dealButton = document.getElementById('dealButton'), hitButton = document.getElementById('hitButton'), standButton = document.getElementById('standButton'), splitButton = document.getElementById('splitButton'), doubleButton = document.getElementById('doubleButton'), controls = document.querySelector('.controls');
     const betMinus = document.getElementById('betMinus'), betPlus = document.getElementById('betPlus'), betOutput = document.getElementById('betOutput'), betControls = document.querySelector('.bet-controls'), deckElement = document.getElementById('deck');
-    let bankroll = START_BANKROLL, bet = 10, rounds = 0, deck = [], playerHands = [[]], activeHand = 0, handDone = [], handCounts = [], handResults = [], dealer = [], phase = 'bet', holeHidden = false;
+    const insuranceControls = document.getElementById('insuranceControls'), insureButton = document.getElementById('insureButton'), declineInsuranceButton = document.getElementById('declineInsuranceButton'), insuranceAmountElement = document.getElementById('insuranceAmount'), doubledTag = document.getElementById('doubledTag');
+    let bankroll = START_BANKROLL, bet = 10, rounds = 0, deck = [], playerHands = [[]], activeHand = 0, handDone = [], handCounts = [], handStakes = [], handDoubled = [], handResults = [], dealer = [], phase = 'bet', holeHidden = false, insurance = 0, insuranceBet = 0;
 
     try {
       const saved = JSON.parse(localStorage.getItem(STORAGE_KEY) || 'null');
@@ -222,6 +242,18 @@
     function canSplit() {
       const cards = playerHands[activeHand] || [];
       return phase === 'player' && playerHands.length < 4 && cards.length === 2 && cards[0].value === cards[1].value && bankroll >= bet;
+    }
+    // Verdoppeln geht nur mit den ersten zwei Karten und genug Guthaben für den zweiten Einsatz.
+    function canDouble() {
+      const cards = playerHands[activeHand] || [];
+      return phase === 'player' && cards.length === 2 && bankroll >= bet;
+    }
+    // Mögliche Aktionen nur nennen, wenn sie gerade ausführbar sind.
+    function actionsText() {
+      const actions = ['Karte nehmen'];
+      if (canSplit()) actions.push('splitten');
+      if (canDouble()) actions.push('verdoppeln');
+      return `${actions.join(', ')} oder halten?`;
     }
     function newDeck() {
       const cards = [];
@@ -286,7 +318,7 @@
         if (phase === 'player' && index === activeHand) group.classList.add('active');
         else if (phase === 'done' && handResults[index]) group.classList.add(handResults[index]);
         else if (handDone[index]) group.classList.add('done');
-        if (split) { const badge = document.createElement('span'); badge.className = 'hand-badge'; badge.innerHTML = `Hand ${index + 1} · <b>${cards.length ? handValue(cards) : '–'}</b>`; group.appendChild(badge); }
+        if (split) { const badge = document.createElement('span'); badge.className = 'hand-badge'; badge.innerHTML = `Hand ${index + 1} · <b>${cards.length ? handValue(cards) : '–'}</b>${handDoubled[index] ? ' ×2' : ''}`; group.appendChild(badge); }
         const row = document.createElement('div'); row.className = 'cards';
         cards.forEach((card, cardIndex) => {
           const element = cardElement(card, false);
@@ -308,18 +340,26 @@
       const activeCards = playerHands[activeHand] || [];
       dealerScore.textContent = dealer.length ? (holeHidden ? '?' : String(handValue(dealer))) : '0';
       playerScore.textContent = activeCards.length ? String(handValue(activeCards)) : '0';
-      const busy = phase === 'player' || phase === 'dealer' || phase === 'dealing', broke = bankroll < MIN_BET;
+      doubledTag.hidden = !handDoubled[activeHand];
+      const busy = phase === 'player' || phase === 'dealer' || phase === 'dealing' || phase === 'insurance', broke = bankroll < MIN_BET;
       betMinus.disabled = busy || broke || bet <= MIN_BET;
       betPlus.disabled = busy || broke || bet + BET_STEP > bankroll;
       betControls.classList.toggle('disabled', busy);
       dealButton.hidden = busy;
       hitButton.hidden = phase !== 'player';
       standButton.hidden = phase !== 'player';
+      insuranceControls.hidden = phase !== 'insurance';
+      insureButton.disabled = bankroll < insuranceBet;
+      insuranceAmountElement.textContent = insuranceBet;
       const pair = activeCards.length === 2 && activeCards[0].value === activeCards[1].value;
       const splitVisible = phase === 'player' && pair;
       splitButton.hidden = !splitVisible;
       splitButton.disabled = !canSplit();
+      const doubleVisible = phase === 'player' && activeCards.length === 2 && bankroll >= bet;
+      doubleButton.hidden = !doubleVisible;
+      doubleButton.disabled = !canDouble();
       controls.classList.toggle('with-split', splitVisible);
+      controls.classList.toggle('with-double', doubleVisible);
       dealButton.textContent = broke ? 'Guthaben auffüllen' : phase === 'done' ? 'Neue Runde' : 'Karten geben';
       dealerCards.setAttribute('aria-label', dealer.length ? `Karten des Dealers: ${holeHidden ? 'eine verdeckte Karte' : handValue(dealer)}` : 'Noch keine Karten des Dealers');
       const handText = playerHands.map((cards, index) => `${playerHands.length > 1 ? `Hand ${index + 1}: ` : ''}${cards.length ? handValue(cards) : 'leer'}`).join(', ');
@@ -332,19 +372,20 @@
       const dealerTotal = handValue(dealer), dealerBlackjack = isBlackjack(dealer);
       const naturalBlackjack = playerHands.length === 1 && isBlackjack(playerHands[0]);
       let payout = 0;
-      handResults = playerHands.map(cards => {
-        const total = handValue(cards);
+      handResults = playerHands.map((cards, index) => {
+        const stake = handStakes[index] ?? bet, total = handValue(cards);
         if (total > 21) return 'lose';
-        if (naturalBlackjack) { if (dealerBlackjack) { payout += bet; return 'push'; } payout += bet + Math.floor(bet * 1.5); return 'blackjack'; }
+        if (naturalBlackjack) { if (dealerBlackjack) { payout += stake; return 'push'; } payout += stake + Math.floor(stake * 1.5); return 'blackjack'; }
         if (dealerBlackjack) return 'lose';
-        if (dealerTotal > 21 || total > dealerTotal) { payout += bet * 2; return 'win'; }
-        if (total === dealerTotal) { payout += bet; return 'push'; }
+        if (dealerTotal > 21 || total > dealerTotal) { payout += stake * 2; return 'win'; }
+        if (total === dealerTotal) { payout += stake; return 'push'; }
         return 'lose';
       });
+      if (insurance > 0 && dealerBlackjack) payout += insurance * 3;
       const firstTotal = handValue(playerHands[0]);
       let text;
       if (playerHands.length === 1) {
-        if (naturalBlackjack) text = dealerBlackjack ? '<b>Beide Blackjack.</b> Unentschieden – dein Einsatz bleibt.' : `<b>Blackjack!</b> Du gewinnst ${Math.floor(bet * 1.5)} Guthaben dazu.`;
+        if (naturalBlackjack) text = dealerBlackjack ? '<b>Beide Blackjack.</b> Unentschieden – dein Einsatz bleibt.' : `<b>Blackjack!</b> Du gewinnst ${Math.floor(handStakes[0] * 1.5)} Guthaben dazu.`;
         else if (firstTotal > 21) text = `<b>Überkauft!</b> ${firstTotal} ist zu viel – der Dealer gewinnt.`;
         else if (dealerBlackjack) text = '<b>Blackjack beim Dealer.</b> Diesmal verlierst du.';
         else if (dealerTotal > 21) text = `<b>Gewonnen!</b> Der Dealer überkauft sich mit ${dealerTotal}.`;
@@ -359,7 +400,8 @@
         else if (wins === 0 && pushes === 0) text = `<b>Alle Hände verloren.</b> ${note}`;
         else text = `<b>${wins} von ${playerHands.length} Händen gewonnen.</b> ${pushes ? `${pushes} unentschieden. ` : ''}${note}`;
       }
-      bankroll += payout; if (bankroll >= MIN_BET) bet = Math.min(bet, bankroll); save(); render(); setMessage(text);
+      if (insurance > 0) text += dealerBlackjack ? ` <b>Versicherung:</b> +${insurance * 2} Guthaben.` : ' <b>Versicherung verloren.</b>';
+      bankroll += payout; insurance = 0; if (bankroll >= MIN_BET) bet = Math.min(bet, bankroll); save(); render(); setMessage(text);
     }
     function dealerTurn() {
       phase = 'dealer'; holeHidden = false; render();
@@ -370,7 +412,7 @@
       setTimeout(draw, 550);
     }
     function startRound() {
-      if (phase === 'player' || phase === 'dealer' || phase === 'dealing') return;
+      if (phase === 'player' || phase === 'dealer' || phase === 'dealing' || phase === 'insurance') return;
       if (bankroll < MIN_BET) {
         bankroll = START_BANKROLL; bet = 10; save(); render();
         setMessage(`<b>Neues Guthaben.</b> Du startest wieder mit ${START_BANKROLL} Chips.`);
@@ -378,7 +420,8 @@
       }
       bet = Math.min(bet, bankroll);
       bankroll -= bet; deck = newDeck(); dealer = [];
-      playerHands = [[]]; activeHand = 0; handDone = [false]; handCounts = [0]; handResults = [];
+      playerHands = [[]]; activeHand = 0; handDone = [false]; handCounts = [0]; handStakes = [bet]; handDoubled = [false]; handResults = [];
+      insurance = 0; insuranceBet = Math.floor(bet / 2);
       dealerCards.dataset.count = '0';
       playerHands[0].push(deck.pop()); dealer.push(deck.pop()); playerHands[0].push(deck.pop()); dealer.push(deck.pop());
       holeHidden = true; phase = 'dealing';
@@ -387,14 +430,35 @@
       // Erst nach der Deal-Animation entscheiden, ob es weitergeht.
       setTimeout(() => {
         if (phase !== 'dealing') return;
-        if (isBlackjack(playerHands[0]) || isBlackjack(dealer)) {
-          phase = 'dealer'; render();
-          setTimeout(() => { holeHidden = false; finishRound(); }, 600);
-        } else {
-          phase = 'player'; render();
-          setMessage(canSplit() ? '<b>Du bist am Zug.</b> Karte nehmen, splitten oder halten?' : '<b>Du bist am Zug.</b> Karte nehmen oder halten?');
+        if (dealer[0]?.rank === 'A') {
+          phase = 'insurance'; render();
+          setMessage(bankroll >= insuranceBet ? `<b>Der Dealer zeigt ein Ass.</b> Versicherung für ${insuranceBet} Chips?` : '<b>Der Dealer zeigt ein Ass.</b> Für eine Versicherung fehlt das Guthaben.');
+          return;
         }
+        resolveAfterDeal();
       }, 1300);
+    }
+    function resolveAfterDeal() {
+      if (isBlackjack(playerHands[0]) || isBlackjack(dealer)) {
+        phase = 'dealer'; render();
+        setTimeout(() => { holeHidden = false; finishRound(); }, 600);
+      } else {
+        phase = 'player'; render();
+        setMessage(`<b>Du bist am Zug.</b> ${actionsText()}`);
+      }
+    }
+    function decideInsurance(buy) {
+      if (phase !== 'insurance') return;
+      if (buy && bankroll >= insuranceBet) { bankroll -= insuranceBet; insurance = insuranceBet; }
+      const dealerBlackjack = isBlackjack(dealer);
+      if (dealerBlackjack || isBlackjack(playerHands[0])) {
+        phase = 'dealer'; render();
+        setTimeout(() => { holeHidden = false; finishRound(); }, 600);
+        return;
+      }
+      phase = 'player'; render();
+      const lost = insurance > 0 ? '<b>Versicherung verloren.</b> ' : '';
+      setMessage(`${lost}<b>Du bist am Zug.</b> ${actionsText()}`);
     }
     // Nach einer fertigen Hand zur nächsten offenen wechseln; sind alle fertig, zieht der Dealer.
     function advance() {
@@ -432,6 +496,8 @@
       playerHands.splice(newIndex, 0, [moved]);
       handDone.splice(newIndex, 0, false);
       handCounts.splice(newIndex, 0, 1);
+      handStakes.splice(newIndex, 0, bet);
+      handDoubled.splice(newIndex, 0, false);
       handCounts[activeHand] = 1;
       cards.push(deck.pop()); playerHands[newIndex].push(deck.pop());
       setMessage(`<b>Gespalten!</b> Deine ${playerHands.length} Hände spielen um je ${bet} Chips.`);
@@ -443,12 +509,26 @@
       if (handValue(cards) === 21) { handDone[activeHand] = true; finishActiveHand(); return; }
       render();
     }
-    betMinus.addEventListener('click', () => { if (phase === 'player' || phase === 'dealer' || phase === 'dealing') return; bet = Math.max(MIN_BET, bet - BET_STEP); save(); render(); });
-    betPlus.addEventListener('click', () => { if (phase === 'player' || phase === 'dealer' || phase === 'dealing') return; bet = Math.min(bankroll, bet + BET_STEP); save(); render(); });
+    function doubleDown() {
+      if (!canDouble()) return;
+      bankroll -= bet; handStakes[activeHand] += bet; handDoubled[activeHand] = true;
+      const cards = playerHands[activeHand];
+      cards.push(deck.pop());
+      const total = handValue(cards);
+      setMessage(total > 21 ? `<b>Überkauft!</b> ${total} ist zu viel.` : '<b>Verdoppelt!</b> Eine Karte, dann steht die Hand.');
+      render();
+      handDone[activeHand] = true;
+      finishActiveHand();
+    }
+    betMinus.addEventListener('click', () => { if (phase === 'player' || phase === 'dealer' || phase === 'dealing' || phase === 'insurance') return; bet = Math.max(MIN_BET, bet - BET_STEP); save(); render(); });
+    betPlus.addEventListener('click', () => { if (phase === 'player' || phase === 'dealer' || phase === 'dealing' || phase === 'insurance') return; bet = Math.min(bankroll, bet + BET_STEP); save(); render(); });
     dealButton.addEventListener('click', startRound);
     hitButton.addEventListener('click', hit);
     standButton.addEventListener('click', stand);
     splitButton.addEventListener('click', split);
+    doubleButton.addEventListener('click', doubleDown);
+    insureButton.addEventListener('click', () => decideInsurance(true));
+    declineInsuranceButton.addEventListener('click', () => decideInsurance(false));
     render();
   </script>
   <script>if ('serviceWorker' in navigator) addEventListener('load', () => navigator.serviceWorker.register('sw.js').catch(() => {}));</script>

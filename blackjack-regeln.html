@@ -36,7 +36,6 @@
     li::marker { color: var(--red); }
     b { color: var(--text); }
     .steps { margin: 0; padding-left: 22px; }
-    .note { margin: 18px 0 0; padding: 10px 12px; border: 2px solid #171717; border-radius: 10px; background: #FFF4CC; font-size: .92rem; }
     .play { display: block; margin: 20px 0 0; padding: 13px; border: 3px solid #171717; border-radius: 10px; color: #FFFFFF; background: var(--red); font-weight: 800; text-align: center; text-decoration: none; box-shadow: 4px 4px 0 #171717; }
     .play:active { transform: translate(2px, 2px); box-shadow: 2px 2px 0 #171717; }
     .version { display: block; margin: 14px auto 0; padding: 0; border: 0; color: var(--muted); background: transparent; font: inherit; font-size: .72rem; cursor: pointer; }
@@ -71,7 +70,7 @@
       <ol class="steps">
         <li>Einsatz in 5er-Schritten wählen und „Karten geben“ antippen.</li>
         <li>Du und der Dealer erhalten je zwei Karten. Eine Dealer-Karte bleibt verdeckt.</li>
-        <li><b>Karte</b> gibt dir eine weitere Karte, <b>Halten</b> beendet deine Hand.</li>
+        <li><b>Karte</b> gibt dir eine weitere Karte, <b>Halten</b> beendet deine Hand. Mit <b>Verdoppeln</b> setzt du den doppelten Einsatz und bekommst genau eine Karte. Zeigt der Dealer ein Ass, kannst du vorher eine <b>Versicherung</b> abschließen.</li>
         <li>Danach deckt der Dealer auf und zieht so lange, bis er mindestens 17 hat. Ab 17 hält er.</li>
         <li>Wer näher an 21 liegt, gewinnt. Bei Gleichstand bleibt der Einsatz erhalten.</li>
       </ol>
@@ -84,6 +83,16 @@
         <li><b>Niederlage:</b> Der Einsatz ist verloren. Über 21 verliert man sofort.</li>
       </ul>
 
+      <h2>Versichern</h2>
+      <p>Zeigt der Dealer als offene Karte ein Ass, kannst du vor deinem Zug eine Versicherung in Höhe des halben Einsatzes kaufen.</p>
+      <ul>
+        <li>Hat der Dealer einen Blackjack, zahlt die Versicherung 2:1.</li>
+        <li>Ohne Dealer-Blackjack ist der Versicherungseinsatz verloren.</li>
+      </ul>
+
+      <h2>Verdoppeln</h2>
+      <p>Mit den ersten zwei Karten kannst du deinen Einsatz verdoppeln, sofern genug Guthaben vorhanden ist. Du erhältst genau eine weitere Karte, danach steht die Hand automatisch. Verdoppeln ist auch nach einem Split möglich.</p>
+
       <h2>Splitten</h2>
       <p>Zwei Karten mit gleichem Wert lassen sich splitten, sofern genug Guthaben für einen zweiten Einsatz vorhanden ist. Es sind bis zu vier Hände möglich, die nacheinander gespielt werden.</p>
       <ul>
@@ -95,12 +104,10 @@
       <h2>Guthaben und Runden</h2>
       <p>Du startest mit <b>100 Chips</b>. Guthaben, Einsatz und Rundenzahl bleiben gespeichert. Bei 0 Chips kannst du das Guthaben über den Knopf wieder auffüllen.</p>
 
-      <p class="note"><b>Hinweis:</b> Versicherung und Verdoppeln gibt es in dieser Variante nicht.</p>
-
       <a class="play" href="blackjack.html">Blackjack spielen&nbsp; →</a>
     </section>
 
-    <button class="version" data-version type="button" title="Klicken, um die Seite neu zu laden">Version 2.79</button>
+    <button class="version" data-version type="button" title="Klicken, um die Seite neu zu laden">Version 2.80</button>
     <script>const versionButton = document.querySelector('[data-version]'); versionButton.addEventListener('click', () => location.replace(`${location.pathname}?v=${Date.now()}`));</script>
   </main>
   <script>if ('serviceWorker' in navigator) addEventListener('load', () => navigator.serviceWorker.register('sw.js').catch(() => {}));</script>
