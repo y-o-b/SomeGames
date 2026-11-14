@@ -17,7 +17,7 @@
   <style>
     /* Spiele: kein Markieren von Text, auch kein Lupen- oder Kopiermenü beim langen Drücken; Eingabefelder ausgenommen. */
     html { -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; }
-    :root { --bg: #4B8ED8; --panel: #FFFFFF; --text: #171717; --muted: rgba(23,23,23,.7); --red: #EF4B3F; --card-red: #D13B30; }
+    :root { --bg: #4B8ED8; --panel: #FFFFFF; --text: #171717; --muted: rgba(23,23,23,.7); --red: #EF4B3F; }
     * { box-sizing: border-box; }
     body { min-height: 100vh; margin: 0; padding: 24px 16px 30px; display: grid; justify-items: center; align-content: start; color: var(--text); background: var(--bg); font: 16px/1.5 Arial, Helvetica, sans-serif; }
     .app { width: min(100%, 620px); }
@@ -49,13 +49,15 @@
     .hand-group.lose { opacity: .55; }
     .hand-badge { color: var(--muted); font-size: .68rem; font-weight: 800; line-height: 1.2; }
     .hand-badge b { color: var(--text); }
-    .card { position: relative; flex: 0 0 auto; width: 64px; height: 92px; border: 3px solid #171717; border-radius: 9px; background: #FFFFFF; box-shadow: 3px 3px 0 #171717; }
-    .card.red { color: var(--card-red); }
-    .card .corner { position: absolute; top: 3px; left: 5px; display: flex; flex-direction: column; align-items: center; font-size: .78rem; font-weight: 800; line-height: .85; }
-    .card .corner i { font-style: normal; font-size: .9rem; }
-    .card .pip { position: absolute; inset: 0; display: grid; place-items: center; font-size: 2rem; line-height: 1; }
-    .card.back { background: repeating-linear-gradient(45deg, var(--red) 0 7px, #171717 7px 14px); }
-    .card.back::after { content: '♠'; position: absolute; inset: 5px; display: grid; place-items: center; border-radius: 5px; background: #FFFFFF; color: #171717; font-size: 1.5rem; }
+    .card { --card-w: 64px; --u: calc(var(--card-w) / 53); position: relative; flex: 0 0 auto; width: var(--card-w); height: calc(var(--card-w) * 1.4); padding: calc(3 * var(--u)); border: calc(2 * var(--u)) solid #171717; border-radius: calc(8 * var(--u)); background: #FFFFFF; box-shadow: calc(2 * var(--u)) calc(2 * var(--u)) 0 #171717; font-family: Arial, Helvetica, sans-serif; font-weight: 900; font-variant-emoji: text; }
+    .card.red { color: var(--red); }
+    .card .corner { position: absolute; font-size: calc(16.8 * var(--u)); line-height: 1; }
+    .card .top-left { top: calc(4 * var(--u)); left: calc(5 * var(--u)); }
+    .card .top-right { top: calc(3 * var(--u)); right: calc(4 * var(--u)); font-size: calc(23.2 * var(--u)); }
+    .card .suit { position: absolute; left: 50%; line-height: 1; transform: translateX(-50%); }
+    .card .center-suit { top: 60%; font-size: calc(46.4 * var(--u)); transform: translate(-50%, -50%); }
+    .card.back { overflow: hidden; padding: 0; border-width: calc(3 * var(--u)); background: #4B8ED8; }
+    .card-logo { position: absolute; inset: 1%; display: block; width: 98%; height: 98%; opacity: .48; object-fit: contain; pointer-events: none; }
     @keyframes dealIn { from { opacity: 0; transform: translateY(-10px) scale(.92) rotate(-2deg); } to { opacity: 1; transform: none; } }
     .card.new { animation: dealIn .2s ease-out; }
     @media (prefers-reduced-motion: reduce) { .card.new { animation: none; } }
@@ -85,16 +87,13 @@
       .stat strong { font-size: 1.15rem; }
       .cards { gap: 5px; min-height: 86px; }
       .player-hands { gap: 6px; min-height: 86px; }
-      .card { width: 56px; height: 82px; }
-      .card .pip { font-size: 1.75rem; }
+      .card { --card-w: 56px; }
       .message { font-size: .84rem; }
       .controls button { padding: 12px; }
     }
     @media (max-width: 390px) {
       .game { padding: 13px; }
-      .card { width: 50px; height: 74px; }
-      .card .pip { font-size: 1.5rem; }
-      .card .corner { font-size: .68rem; }
+      .card { --card-w: 50px; }
     }
     /* Querformat auf flachen Bildschirmen: Dealer und Spieler liegen nebeneinander, damit alles ohne Scrollen passt. */
     @media (orientation: landscape) and (max-height: 520px) {
@@ -110,11 +109,7 @@
       .hands { grid-template-columns: 1fr 1fr; gap: 14px; margin-bottom: 8px; }
       .cards { gap: 4px; min-height: 68px; }
       .player-hands { gap: 6px; min-height: 68px; }
-      .card { width: 46px; height: 66px; border-width: 2px; border-radius: 7px; box-shadow: 2px 2px 0 #171717; }
-      .card .pip { font-size: 1.35rem; }
-      .card .corner { font-size: .62rem; }
-      .card .corner i { font-size: .7rem; }
-      .card.back::after { inset: 3px; font-size: 1rem; }
+      .card { --card-w: 46px; }
       .message { min-height: 34px; margin-bottom: 8px; padding: 5px 8px; font-size: .8rem; }
       .bet-controls { margin-bottom: 6px; }
       .bet-controls .chip { width: 32px; height: 32px; font-size: 1rem; }
@@ -135,11 +130,7 @@
       .hand-head { margin-bottom: 2px; font-size: .66rem; }
       .cards { min-height: 58px; gap: 3px; }
       .player-hands { min-height: 58px; gap: 4px; }
-      .card { width: 40px; height: 56px; border-width: 2px; border-radius: 6px; box-shadow: 1px 1px 0 #171717; }
-      .card .pip { font-size: 1.05rem; }
-      .card .corner { top: 2px; left: 3px; font-size: .54rem; }
-      .card .corner i { font-size: .6rem; }
-      .card.back::after { inset: 2px; font-size: .8rem; }
+      .card { --card-w: 40px; }
       .message { min-height: 28px; margin-bottom: 5px; padding: 3px 7px; font-size: .74rem; }
       .bet-controls { margin-bottom: 4px; }
       .bet-controls .chip { width: 28px; height: 28px; font-size: 1rem; box-shadow: 2px 2px 0 #171717; }
@@ -185,7 +176,7 @@
         <button id="standButton" type="button" hidden>Halten</button>
       </div>
     </section>
-    <button class="version" data-version type="button" title="Klicken, um die Seite neu zu laden">Version 2.72</button>
+    <button class="version" data-version type="button" title="Klicken, um die Seite neu zu laden">Version 2.73</button>
     <script>const versionButton = document.querySelector('[data-version]'); versionButton.addEventListener('click', () => location.replace(`${location.pathname}?v=${Date.now()}`));</script>
   </main>
 
@@ -225,13 +216,17 @@
     function cardElement(card, hidden) {
       const element = document.createElement('div');
       element.setAttribute('role', 'img');
-      if (hidden) { element.className = 'card back'; element.setAttribute('aria-label', 'Verdeckte Karte'); return element; }
+      if (hidden) {
+        element.className = 'card back'; element.setAttribute('aria-label', 'Verdeckte Karte');
+        const logo = document.createElement('img'); logo.className = 'card-logo'; logo.src = 'icons/blackjack.svg'; logo.alt = '';
+        element.appendChild(logo);
+        return element;
+      }
       element.className = 'card' + (card.red ? ' red' : '');
       element.setAttribute('aria-label', `${card.suitName} ${RANK_NAMES[card.rank] || card.rank}`);
-      const corner = document.createElement('span'); corner.className = 'corner'; corner.textContent = card.rank;
-      const suit = document.createElement('i'); suit.textContent = card.suit; corner.appendChild(suit);
-      const pip = document.createElement('span'); pip.className = 'pip'; pip.textContent = card.suit;
-      element.append(corner, pip);
+      [['corner top-left', card.rank], ['corner top-right', card.suit + '\uFE0E'], ['suit center-suit', card.suit + '\uFE0E']].forEach(([className, text]) => {
+        const span = document.createElement('span'); span.className = className; span.textContent = text; element.appendChild(span);
+      });
       return element;
     }
     function drawHand(container, cards, hideHole = false) {
