@@ -29,10 +29,9 @@
     .back-button:focus-visible { outline: 3px solid #EF4B3F; outline-offset: 3px; }
     .version { display: block; margin: 14px auto 0; padding: 0; border: 0; color: var(--muted); background: transparent; font: inherit; font-size: .72rem; cursor: pointer; }
     .version:focus-visible { outline: 3px solid #171717; outline-offset: 3px; }
-    .rules-link { margin: 12px 0 0; text-align: center; }
-    .rules-link button { display: inline-block; padding: 8px 15px; border: 2px solid #171717; border-radius: 8px; color: #171717; background: #FFD166; font-size: .85rem; font-weight: 800; box-shadow: 3px 3px 0 #171717; }
-    .rules-link button:active { transform: translate(2px, 2px); box-shadow: 1px 1px 0 #171717; }
-    .rules-link button:focus-visible { outline: 3px solid #EF4B3F; outline-offset: 3px; }
+    .rules-corner { display: grid; place-items: center; position: absolute; right: 0; top: 50%; width: 44px; height: 44px; margin-top: -22px; padding: 0; border: 3px solid #171717; border-radius: 50%; color: #171717; background: #FFD166; font-size: 1.4rem; font-weight: 800; line-height: 1; box-shadow: 3px 3px 0 #171717; }
+    .rules-corner:active { transform: translate(2px, 2px); box-shadow: 1px 1px 0 #171717; }
+    .rules-corner:focus-visible { outline: 3px solid #EF4B3F; outline-offset: 3px; }
     .rules-dialog { width: min(100% - 32px, 560px); max-width: none; max-height: min(90vh, 780px); padding: 0; border: 3px solid #171717; border-radius: 18px; color: var(--text); background: var(--panel); box-shadow: 7px 7px 0 #171717; }
     .rules-dialog::backdrop { background: rgba(23,23,23,.45); }
     .rules-dialog h2 { margin: 0; padding: 16px 58px 8px 18px; font-size: 1.35rem; letter-spacing: -.03em; outline: none; }
@@ -170,6 +169,7 @@
     <header>
       <a class="back-button" href="index.html" aria-label="Zur Startseite" title="Zur Startseite"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 4 7 12l8 8"/></svg></a>
       <h1>Blackjack</h1>
+      <button class="rules-corner" id="rulesButton" type="button" aria-label="Spielregeln anzeigen" title="Spielregeln">?</button>
     </header>
 
     <section class="game" aria-label="Blackjack-Spiel">
@@ -204,8 +204,7 @@
         <button id="standButton" type="button" hidden>Halten</button>
       </div>
     </section>
-    <p class="rules-link"><button id="rulesButton" type="button">Spielregeln</button></p>
-    <button class="version" data-version type="button" title="Klicken, um die Seite neu zu laden">Version 2.84</button>
+    <button class="version" data-version type="button" title="Klicken, um die Seite neu zu laden">Version 2.85</button>
     <script>const versionButton = document.querySelector('[data-version]'); versionButton.addEventListener('click', () => location.replace(`${location.pathname}?v=${Date.now()}`));</script>
 
     <dialog class="rules-dialog" id="rulesDialog" aria-labelledby="rulesTitle">
