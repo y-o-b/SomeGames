@@ -30,9 +30,22 @@
     .version { display: block; margin: 14px auto 0; padding: 0; border: 0; color: var(--muted); background: transparent; font: inherit; font-size: .72rem; cursor: pointer; }
     .version:focus-visible { outline: 3px solid #171717; outline-offset: 3px; }
     .rules-link { margin: 12px 0 0; text-align: center; }
-    .rules-link a { display: inline-block; padding: 8px 15px; border: 2px solid #171717; border-radius: 8px; color: #171717; background: #FFD166; font-size: .85rem; font-weight: 800; text-decoration: none; box-shadow: 3px 3px 0 #171717; }
-    .rules-link a:active { transform: translate(2px, 2px); box-shadow: 1px 1px 0 #171717; }
-    .rules-link a:focus-visible { outline: 3px solid #EF4B3F; outline-offset: 3px; }
+    .rules-link button { display: inline-block; padding: 8px 15px; border: 2px solid #171717; border-radius: 8px; color: #171717; background: #FFD166; font-size: .85rem; font-weight: 800; box-shadow: 3px 3px 0 #171717; }
+    .rules-link button:active { transform: translate(2px, 2px); box-shadow: 1px 1px 0 #171717; }
+    .rules-link button:focus-visible { outline: 3px solid #EF4B3F; outline-offset: 3px; }
+    .rules-dialog { width: min(100% - 32px, 560px); max-width: none; max-height: min(90vh, 780px); padding: 0; border: 3px solid #171717; border-radius: 18px; color: var(--text); background: var(--panel); box-shadow: 7px 7px 0 #171717; }
+    .rules-dialog::backdrop { background: rgba(23,23,23,.45); }
+    .rules-dialog h2 { margin: 0; padding: 16px 18px 8px; font-size: 1.35rem; letter-spacing: -.03em; outline: none; }
+    .rules-content { max-height: calc(90vh - 130px); padding: 0 18px 6px; overflow-y: auto; font-size: .92rem; line-height: 1.45; }
+    .rules-content h3 { margin: 14px 0 4px; font-size: 1rem; letter-spacing: -.01em; }
+    .rules-content p { margin: 0 0 8px; }
+    .rules-content ul, .rules-content ol { margin: 0 0 6px; padding-left: 20px; }
+    .rules-content li { margin-bottom: 4px; }
+    .rules-content li::marker { color: var(--red); }
+    .rules-content b { color: var(--text); }
+    .dialog-close { display: block; width: calc(100% - 36px); margin: 10px 18px 16px; padding: 11px; border: 3px solid #171717; border-radius: 10px; color: #FFFFFF; background: var(--red); font-weight: 800; box-shadow: 4px 4px 0 #171717; }
+    .dialog-close:active { transform: translate(2px, 2px); box-shadow: 2px 2px 0 #171717; }
+    .dialog-close:focus-visible { outline: 3px solid #EF4B3F; outline-offset: 3px; }
     .game { padding: clamp(14px, 4vw, 26px); border: 3px solid #171717; border-radius: 18px; background: var(--panel); box-shadow: 7px 7px 0 #171717; }
     button { border: 0; color: inherit; font: inherit; cursor: pointer; }
     .stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-bottom: 14px; text-align: center; }
@@ -205,9 +218,63 @@
         <button id="standButton" type="button" hidden>Halten</button>
       </div>
     </section>
-    <p class="rules-link"><a href="blackjack-regeln.html">Spielregeln</a></p>
-    <button class="version" data-version type="button" title="Klicken, um die Seite neu zu laden">Version 2.80</button>
+    <p class="rules-link"><button id="rulesButton" type="button">Spielregeln</button></p>
+    <button class="version" data-version type="button" title="Klicken, um die Seite neu zu laden">Version 2.81</button>
     <script>const versionButton = document.querySelector('[data-version]'); versionButton.addEventListener('click', () => location.replace(`${location.pathname}?v=${Date.now()}`));</script>
+
+    <dialog class="rules-dialog" id="rulesDialog" aria-labelledby="rulesTitle">
+      <h2 id="rulesTitle" tabindex="-1" autofocus>Blackjack-Regeln</h2>
+      <div class="rules-content">
+        <p>Ziel ist es, mit den eigenen Karten näher an 21 zu kommen als der Dealer – ohne 21 zu überschreiten.</p>
+
+        <h3>Kartenwerte</h3>
+        <ul>
+          <li><b>2 bis 10:</b> der aufgedruckte Wert.</li>
+          <li><b>Bube, Dame, König:</b> jeweils 10.</li>
+          <li><b>Ass:</b> 11 oder 1 – es zählt automatisch als 1, wenn die Hand sonst über 21 käme.</li>
+          <li><b>Blackjack:</b> 21 mit den ersten zwei Karten, also Ass plus 10 oder Bildkarte.</li>
+        </ul>
+
+        <h3>Spielablauf</h3>
+        <ol>
+          <li>Einsatz in 5er-Schritten wählen und „Karten geben“ antippen.</li>
+          <li>Du und der Dealer erhalten je zwei Karten. Eine Dealer-Karte bleibt verdeckt.</li>
+          <li><b>Karte</b> gibt dir eine weitere Karte, <b>Halten</b> beendet deine Hand. Mit <b>Verdoppeln</b> setzt du den doppelten Einsatz und bekommst genau eine Karte. Zeigt der Dealer ein Ass, kannst du vorher eine <b>Versicherung</b> abschließen.</li>
+          <li>Danach deckt der Dealer auf und zieht so lange, bis er mindestens 17 hat. Ab 17 hält er.</li>
+          <li>Wer näher an 21 liegt, gewinnt. Bei Gleichstand bleibt der Einsatz erhalten.</li>
+        </ol>
+
+        <h3>Auszahlung</h3>
+        <ul>
+          <li><b>Sieg:</b> 1:1 – Einsatz plus gleicher Gewinn.</li>
+          <li><b>Blackjack:</b> 3:2 – Einsatz plus das Eineinhalbfache.</li>
+          <li><b>Unentschieden:</b> Der Einsatz geht zurück.</li>
+          <li><b>Niederlage:</b> Der Einsatz ist verloren. Über 21 verliert man sofort.</li>
+        </ul>
+
+        <h3>Versichern</h3>
+        <p>Zeigt der Dealer als offene Karte ein Ass, kannst du vor deinem Zug eine Versicherung in Höhe des halben Einsatzes kaufen.</p>
+        <ul>
+          <li>Hat der Dealer einen Blackjack, zahlt die Versicherung 2:1.</li>
+          <li>Ohne Dealer-Blackjack ist der Versicherungseinsatz verloren.</li>
+        </ul>
+
+        <h3>Verdoppeln</h3>
+        <p>Mit den ersten zwei Karten kannst du deinen Einsatz verdoppeln, sofern genug Guthaben vorhanden ist. Du erhältst genau eine weitere Karte, danach steht die Hand automatisch. Verdoppeln ist auch nach einem Split möglich.</p>
+
+        <h3>Splitten</h3>
+        <p>Zwei Karten mit gleichem Wert lassen sich splitten, sofern genug Guthaben für einen zweiten Einsatz vorhanden ist. Es sind bis zu vier Hände möglich, die nacheinander gespielt werden.</p>
+        <ul>
+          <li>Gesplittete Asse erhalten nur eine weitere Karte.</li>
+          <li>Ein 21 nach dem Split zählt 1:1 und nicht als Blackjack.</li>
+          <li>Ein Splitten-Knopf erscheint nur, wenn es gerade möglich ist.</li>
+        </ul>
+
+        <h3>Guthaben und Runden</h3>
+        <p>Du startest mit <b>100 Chips</b>. Guthaben, Einsatz und Rundenzahl bleiben gespeichert. Bei 0 Chips kannst du das Guthaben über den Knopf wieder auffüllen.</p>
+      </div>
+      <button class="dialog-close" id="rulesClose" type="button">Verstanden</button>
+    </dialog>
   </main>
 
   <script>
@@ -221,6 +288,7 @@
     const dealButton = document.getElementById('dealButton'), hitButton = document.getElementById('hitButton'), standButton = document.getElementById('standButton'), splitButton = document.getElementById('splitButton'), doubleButton = document.getElementById('doubleButton'), controls = document.querySelector('.controls');
     const betMinus = document.getElementById('betMinus'), betPlus = document.getElementById('betPlus'), betOutput = document.getElementById('betOutput'), betControls = document.querySelector('.bet-controls'), deckElement = document.getElementById('deck');
     const insuranceControls = document.getElementById('insuranceControls'), insureButton = document.getElementById('insureButton'), declineInsuranceButton = document.getElementById('declineInsuranceButton'), insuranceAmountElement = document.getElementById('insuranceAmount'), doubledTag = document.getElementById('doubledTag');
+    const rulesButton = document.getElementById('rulesButton'), rulesDialog = document.getElementById('rulesDialog'), rulesClose = document.getElementById('rulesClose');
     let bankroll = START_BANKROLL, bet = 10, rounds = 0, deck = [], playerHands = [[]], activeHand = 0, handDone = [], handCounts = [], handStakes = [], handDoubled = [], handResults = [], dealer = [], phase = 'bet', holeHidden = false, insurance = 0, insuranceBet = 0;
 
     try {
@@ -529,6 +597,9 @@
     doubleButton.addEventListener('click', doubleDown);
     insureButton.addEventListener('click', () => decideInsurance(true));
     declineInsuranceButton.addEventListener('click', () => decideInsurance(false));
+    rulesButton.addEventListener('click', () => rulesDialog.showModal());
+    rulesClose.addEventListener('click', () => rulesDialog.close());
+    rulesDialog.addEventListener('click', event => { if (event.target === rulesDialog) rulesDialog.close(); });
     render();
   </script>
   <script>if ('serviceWorker' in navigator) addEventListener('load', () => navigator.serviceWorker.register('sw.js').catch(() => {}));</script>
