@@ -245,9 +245,9 @@
         </div>
       </div>
       <button class="settings-done" id="settingsDone" type="button">Spiel starten</button>
-      <button class="version" data-version type="button" title="Klicken, um die Seite neu zu laden">Version 2.91</button>
+      <button class="version" data-version type="button" title="Klicken, um die Seite neu zu laden">Version 2.92</button>
     </dialog>
-    <button class="version" data-version type="button" title="Klicken, um die Seite neu zu laden">Version 2.91</button>
+    <button class="version" data-version type="button" title="Klicken, um die Seite neu zu laden">Version 2.92</button>
     <script>document.querySelectorAll('[data-version]').forEach(versionButton => { versionButton.addEventListener('click', () => location.replace(`${location.pathname}?v=${Date.now()}`)); });</script>
   </main>
   <script>
@@ -262,7 +262,7 @@
     // auf dem Bildschirm (fitWrapWindow), höchstens WRAP_VIEW_ROWS_MAX.
     // Spielfeldgröße 14–30; ältere Spielstände ab 9 laden weiter. Minen als Anteil der Felder, 5–50 %.
     const WRAP_BOARD_MIN = 14, WRAP_BOARD_MAX = 30, WRAP_BOARD_LEGACY_MIN = 9, MINE_PERCENT_MIN = 10, MINE_PERCENT_MAX = 50, WRAP_VIEW_COLS = 12, WRAP_VIEW_ROWS_MAX = 30, ZOOM_MIN = .1, ZOOM_PORTRAIT_MIN = .75, ZOOM_MAX = 2;
-    let wrapZoom = 1, zoomTimer = null, pinch = null, wrapViewRows = 18;
+    let wrapZoom = 1, zoomTimer = null, pinch = null, wrapViewRows = 18, wrapMetrics = null;
     const activePointers = new Map();
     let makeCellForGame = null;
     const viewCols = () => WRAP_VIEW_COLS / wrapZoom, viewRows = () => wrapViewRows / wrapZoom;
@@ -359,7 +359,8 @@
       if (!grid.length || !activeConfig || settingsDialog.open) return;
       try {
         const { cols, rows, mines } = config();
-        localStorage.setItem(GAME_STATE_KEY, JSON.stringify({ version: 1, boardShape, boardWrap, wrapBoardSize, boardSize, mineCount, cols, rows, mines, grid, over, placed, seconds, openCount, flagCount, offsetX, offsetY, wrapZoom }));
+        // mineCount folgt dem laufenden Spiel (mines), nicht dem Regler: Ein älterer Spielstand mit fester Minenzahl bleibt so ladbar.
+        localStorage.setItem(GAME_STATE_KEY, JSON.stringify({ version: 1, boardShape, boardWrap, wrapBoardSize, boardSize, mineCount: mines, cols, rows, mines, grid, over, placed, seconds, openCount, flagCount, offsetX, offsetY, wrapZoom }));
       } catch (error) { console.warn('Detektor-Spielstand konnte nicht gespeichert werden.', error); }
     }
     function persistGameState() {
@@ -384,6 +385,8 @@
         if (![saved.offsetX, saved.offsetY, saved.wrapZoom].every(Number.isFinite) || saved.wrapZoom < ZOOM_MIN || saved.wrapZoom > ZOOM_MAX) return null;
         boardShape = saved.boardShape; boardWrap = saved.boardWrap; wrapBoardSize = saved.wrapBoardSize; boardSize = saved.boardSize; mineCount = mines; minePercent = percentForMines(cols * rows, mines);
         updateMineControl(); updateSizeButtons(); updateWrapBoardSizeControl();
+        // updateMineControl rechnet die Minenzahl aus dem gerundeten Anteil neu; das geladene Spiel behält die Zahl, die im Feld liegt.
+        mineCount = mines;
         document.querySelectorAll('[data-shape]').forEach(button => button.classList.toggle('active', button.dataset.shape === boardShape));
         document.querySelectorAll('[data-wrap]').forEach(button => button.classList.toggle('active', (button.dataset.wrap === 'on') === boardWrap));
         document.querySelectorAll('[data-size]').forEach(button => button.classList.toggle('active', button.dataset.size === boardSize));
@@ -468,6 +471,7 @@
       const unit = boardElement.clientWidth / viewWidth;
       const W = hex || octagon ? Math.max(4, 2 * Math.round(unit / 2)) : Math.max(2, Math.round(unit)), tiles = octagon ? octagonSizes(W) : null;
       const H = hex ? Math.max(4, 2 * Math.round(cellHeight * W / 2)) : W, S = hex ? H * 3 / 4 : W;
+      wrapMetrics = { W, S, stepY };
       // Die Schrift folgt der exakten, nicht auf Pixel gerundeten Feldbreite und zoomt dadurch stufenlos mit.
       if (!octagon) setCellTextSize(boardElement.clientWidth / WRAP_VIEW_COLS, wrapZoom);
       const totalW = cols * W, totalH = rows * S, areaW = boardElement.clientWidth, areaH = boardElement.clientHeight;
@@ -708,6 +712,8 @@
       persistGameState();
     }
     function toggleFlag(index) { if (over || revealing) return; const cell = grid[index]; if (cell.open) return; message.innerHTML = ''; clearShovel(); clearHints(); cell.flag = !cell.flag; flagCount += cell.flag ? 1 : -1; updateGuessMarks(); updateStats(); }
+    const REVEAL_TOTAL_MS = 600;
+    const revealStepDelay = (cells, reduced) => Math.min(reduced ? 15 : 30, REVEAL_TOTAL_MS / Math.max(1, cells));
     function reveal(index) {
       if (over || revealing || grid[index].flag || grid[index].open) return;
       stopDetector(); clearShovel();
@@ -724,7 +730,8 @@
       if (!sequence.length) return;
       revealing = true;
       // Felder außerhalb der Ansicht sofort aufdecken; nur die sichtbaren nacheinander, im Takt ohne Lücken.
-      const delay = reduceMotion() ? 15 : 30, visible = sequence.filter(isPartlyVisible);
+      // Große Flächen: Der Takt wird so verkürzt, dass das ganze Aufdecken höchstens etwa 600 ms dauert und die Eingabe nicht lange gesperrt ist.
+      const visible = sequence.filter(isPartlyVisible), delay = revealStepDelay(visible.length, reduceMotion());
       const done = () => { revealTimers = []; revealing = false; updateGuessMarks(); updateStats(); if (openCount === grid.length - config().mines) win(); };
       sequence.forEach(current => { const cell = grid[current]; if (isPartlyVisible(current) || cell.open) return; cell.open = true; openCount++; draw(current); });
       updateStats();
@@ -813,6 +820,43 @@
       if (event.key === '+' || event.key === '=') { event.preventDefault(); setZoom(wrapZoom * 1.25); }
       else if (event.key === '-' || event.key === '_') { event.preventDefault(); setZoom(wrapZoom / 1.25); }
     });
+    // Tastatur auf einem Feld: F oder Umschalt+Eingabe/Leertaste setzt die Flagge (wie die rechte Maustaste); die Pfeiltasten
+    // wandern zum Nachbarfeld (randlos über den Rand hinweg), und die Ansicht folgt, bis das Feld ganz zu sehen ist.
+    const ARROW_STEPS = { ArrowLeft: [-1, 0], ArrowRight: [1, 0], ArrowUp: [0, -1], ArrowDown: [0, 1] };
+    const keyboardNeighbor = (index, dx, dy) => {
+      const { cols, rows, wrap } = config(); let x = index % cols + dx, y = Math.floor(index / cols) + dy;
+      if (wrap) { x = mod(x, cols); y = mod(y, rows); }
+      return x >= 0 && y >= 0 && x < cols && y < rows ? y * cols + x : -1;
+    };
+    function focusCell(index) {
+      const button = boardElement.children[index]; if (index < 0 || !grid[index] || !button) return;
+      if (config().wrap && wrapMetrics) {
+        let moved = false;
+        cancelAnimationFrame(panAnimation); panAnimation = 0;
+        if (button.style.display === 'none') { const target = offsetToCenter(index); offsetX += target.dx; offsetY += target.dy; layoutCells(); moved = true; }
+        const board = boardElement.getBoundingClientRect(), rect = button.getBoundingClientRect();
+        const left = rect.left - board.left - boardElement.clientLeft, top = rect.top - board.top - boardElement.clientTop;
+        const shiftX = left < 0 ? -left : Math.min(0, boardElement.clientWidth - rect.width - left), shiftY = top < 0 ? -top : Math.min(0, boardElement.clientHeight - rect.height - top);
+        if (shiftX || shiftY) { offsetX += shiftX / wrapMetrics.W; offsetY += shiftY * wrapMetrics.stepY / wrapMetrics.S; layoutCells(); moved = true; }
+        if (moved) { persistGameState(); if (!over && !revealing) updateGuessMarks(); }
+      }
+      button.focus({ preventScroll: true });
+    }
+    let flagKeyHeld = false;
+    boardElement.addEventListener('keydown', event => {
+      const button = event.target.closest?.('.cell');
+      if (!button || settingsDialog.open || event.metaKey || event.ctrlKey || event.altKey) return;
+      const index = Number(button.dataset.index);
+      if (event.key === 'f' || event.key === 'F' || (event.shiftKey && (event.key === 'Enter' || event.key === ' '))) {
+        // panEndedAt unterdrückt den Klick, den Eingabe- und Leertaste sonst auslösen würden.
+        event.preventDefault(); panEndedAt = Date.now(); flagKeyHeld = event.key === ' ';
+        if (!event.repeat) toggleFlag(index);
+        return;
+      }
+      const step = ARROW_STEPS[event.key]; if (!step || event.shiftKey) return;
+      event.preventDefault(); focusCell(keyboardNeighbor(index, step[0], step[1]));
+    });
+    boardElement.addEventListener('keyup', event => { if (event.key === ' ' && flagKeyHeld) { flagKeyHeld = false; event.preventDefault(); panEndedAt = Date.now(); } });
     document.querySelectorAll('[data-wrap]').forEach(button => button.addEventListener('click', () => { boardWrap = button.dataset.wrap === 'on'; refreshSettingsControls(); }));
     wrapBoardSizeInput.addEventListener('input', () => { wrapBoardSizeOutput.value = wrapBoardLabel(Number(wrapBoardSizeInput.value)); wrapBoardSizeOutput.textContent = wrapBoardSizeOutput.value; });
     wrapBoardSizeInput.addEventListener('change', () => { const raw = Number(wrapBoardSizeInput.value); const size = Math.round((raw - WRAP_BOARD_MIN) / 4) * 4 + WRAP_BOARD_MIN; if (!Number.isInteger(size) || size < WRAP_BOARD_MIN || size > WRAP_BOARD_MAX || size === wrapBoardSize) return; wrapBoardSize = size; refreshSettingsControls(); });

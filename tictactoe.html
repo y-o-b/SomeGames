@@ -152,7 +152,7 @@
       </div>
       <button class="new-game" id="newGame" type="button">Neues Spiel</button>
     </section>
-    <button class="version" data-version type="button" title="Klicken, um die Seite neu zu laden">Version 2.91</button>
+    <button class="version" data-version type="button" title="Klicken, um die Seite neu zu laden">Version 2.92</button>
     <script>const versionButton = document.querySelector('[data-version]'); versionButton.addEventListener('click', () => location.replace(`${location.pathname}?v=${Date.now()}`));</script>
   </main>
 
@@ -164,7 +164,7 @@
     const difficultyPanel = document.getElementById('difficulty');
     const scores = { X: 0, O: 0, draw: 0 };
     const wins = [[0,1,2],[3,4,5],[6,7,8],[0,3,6],[1,4,7],[2,5,8],[0,4,8],[2,4,6]];
-    let board = Array(9).fill(''), current = 'X', gameOver = false, mode = 'computer', difficulty = 'easy';
+    let board = Array(9).fill(''), current = 'X', gameOver = false, mode = 'computer', difficulty = 'easy', thinkTimer;
 
     function result(state) {
       for (const line of wins) if (line.every(i => state[i] && state[i] === state[line[0]])) return { winner: state[line[0]], line };
@@ -194,12 +194,12 @@
       board[index] = current; drawBoard();
       const outcome = result(board); if (outcome) return finish(outcome);
       current = current === 'X' ? 'O' : 'X';
-      if (mode === 'computer' && current === 'O') { setTurn('<b>Computer denkt nach …</b>'); setTimeout(computerMove, 450); }
-      else setTurn(`<b>${current === 'X' ? 'Spieler 1 (X)' : 'Spieler 2 (O)'} ist dran</b>`);
+      if (mode === 'computer' && current === 'O') { setTurn('<b>Computer denkt nach …</b>'); thinkTimer = setTimeout(computerMove, 450); }
+      else setTurn(mode === 'computer' ? '<b>Du bist dran</b> · Wähle ein Feld' : `<b>${current === 'X' ? 'Spieler 1 (X)' : 'Spieler 2 (O)'} ist dran</b>`);
       drawBoard();
     }
     function computerMove() {
-      if (gameOver) return;
+      if (gameOver || mode !== 'computer' || current !== 'O') return;
       const empty = board.map((value, i) => value ? null : i).filter(i => i !== null);
       let move;
       if (difficulty === 'easy') move = empty[Math.floor(Math.random() * empty.length)];
@@ -220,7 +220,7 @@
       board.forEach((value, i) => { if (!value) { board[i] = maximizing ? 'O' : 'X'; scores.push(minimax(!maximizing)); board[i] = ''; } });
       return maximizing ? Math.max(...scores) : Math.min(...scores);
     }
-    function reset() { board = Array(9).fill(''); current = 'X'; gameOver = false; document.querySelector('.game').classList.remove('victory'); drawBoard(); setTurn('<b>Du bist dran</b> · Wähle ein Feld'); }
+    function reset() { clearTimeout(thinkTimer); board = Array(9).fill(''); current = 'X'; gameOver = false; document.querySelector('.game').classList.remove('victory'); drawBoard(); setTurn(mode === 'computer' ? '<b>Du bist dran</b> · Wähle ein Feld' : '<b>Spieler 1 (X) ist dran</b>'); }
     modeButtons.forEach(button => button.addEventListener('click', () => { mode = button.dataset.mode; modeButtons.forEach(b => b.classList.toggle('active', b === button)); difficultyPanel.hidden = mode !== 'computer'; document.getElementById('labelX').textContent = mode === 'computer' ? 'Du (X)' : 'Spieler 1 (X)'; document.getElementById('labelO').textContent = mode === 'computer' ? 'Computer (O)' : 'Spieler 2 (O)'; reset(); }));
     difficultyButtons.forEach(button => button.addEventListener('click', () => { difficulty = button.dataset.difficulty; difficultyButtons.forEach(b => b.classList.toggle('active', b === button)); reset(); }));
     cells.forEach(cell => cell.addEventListener('click', () => play(Number(cell.dataset.index))));

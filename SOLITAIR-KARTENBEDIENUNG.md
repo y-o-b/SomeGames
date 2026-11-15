@@ -33,16 +33,16 @@ Eine Auswahl wird in `selected` als `{ source, index, cardIndex }` gespeichert:
 
 Alle sichtbaren Karten werden von `cardButton()` erzeugt. Maus (Klick) und Touch (`pointerup`) laufen über dieselbe Funktion `tapCard()`, ohne verzögerten Einzelklick:
 
-1. Ein erster Tap wählt die Karte bzw. Tableau-Folge aus und zeichnet die Auswahl neu.
+1. Ein einzelner Tap wählt nichts aus: Markieren per Einzelklick ist abgeschaltet, `tapCard()` merkt sich nur Karte und Zeit (`lastCardTap`).
 2. Ein weiterer Tap auf dieselbe Karten-ID innerhalb von 500 ms ruft `autoMove()` auf. Die Karte wird auf einen erlaubten Zielstapel bewegt; falls keiner passt, wird sie auf einen passenden Tableau-Stapel gesetzt.
-3. Ist bereits eine andere Karte ausgewählt, bewegt ein Tap auf eine Tableau-Karte die Auswahl in deren Spalte.
+3. Ist „💡 Tipp“ an, führt ein Tap auf das gestrichelt markierte Ziel oder ein Doppeltap auf die markierte Karte genau den Zug des Tipps aus (`playHint()`), nicht den erstbesten Automatikzug.
 4. Ein Tap auf einen Grundstapel verwendet dessen Capture-Phase-Handler. So wird auch ein belegter Grundstapel als Ziel erkannt, obwohl darin selbst ein Karten-Button liegt.
 
 Ein Touch-Tap ruft `tapCard()` direkt im `pointerup` auf und setzt `suppressClick`; der danach vom Browser erzeugte Click wird so nicht doppelt verarbeitet. Dasselbe gilt nach einem Touch-Drag.
 
 Die Buttons (Ziehstapel, Rückgängig, Gleiches Deck, Neues Spiel, Fertigspielen) verwenden `onTap()`: Touch löst direkt im `pointerup` aus (der Finger muss noch auf dem Button sein). Grund: Safari verschluckt sonst den ersten Click nach einem Touch-Drag. Nach jedem verarbeiteten Touch-Tap (Karte oder Button) verwirft `noteTouchTap()` Clicks 800 ms lang global. Das verhindert, dass der von Safari nachgeschobene Click ein anderes Element trifft, wenn sich das Layout inzwischen verschoben hat (z. B. „Fertigspielen" verschwindet und „Neues Spiel" liegt unter dem Finger).
 
-Tastatur: Leere Spalten und leere Zielstapel sind per Tab erreichbar und reagieren auf Enter und Leertaste (ausgewählte Karte dorthin legen).
+Tastatur und Hilfstechnik: Ein Click ohne Zeiger (`event.detail === 0`) läuft über `keyCard()` statt über `tapCard()`. Die erste Betätigung wählt die Karte bzw. Folge aus (`selected`, rot markiert), eine zweite auf derselben Karte macht den Automatikzug, eine auf der obersten Karte einer anderen Spalte oder auf einem Zielstapel legt die Auswahl dorthin. Leere Spalten und leere Zielstapel sind per Tab erreichbar und nehmen die Auswahl mit Enter oder Leertaste an. `render()` stellt den Fokus nach dem Neuzeichnen auf derselben Karte bzw. demselben Stapel wieder her.
 
 ## Ziehstapel
 
@@ -85,17 +85,17 @@ Karten, die gerade zum Ziel fliegen, stehen in `flyingIds`. `cardButton()` zeich
 
 ## Neues Spiel und Austeilen
 
-- Es gibt keinen eingebauten Ersatz für die Deck-Sammlung mehr. Die Spiele kommen ausschließlich aus `solitaire-decks/index.json` und den einzelnen Deckdateien `solitaire-decks/deck-*.json`. Der Index wird einmal geladen; beim Start eines Spiels wird gezielt eine Deckdatei geholt. Lässt sich der Index nicht laden, zeigt „Neues Spiel" eine Meldung und ändert nichts. Der nächste Versuch lädt den Index erneut.
+- Es gibt keinen eingebauten Ersatz für die Deck-Sammlung. Die Spiele kommen ausschließlich aus `solitaire-decks/index.json` und den einzelnen Deckdateien `solitaire-decks/deck-*.json`. Der Index wird beim ersten neuen Spiel geladen; `solvableDeck()` versucht dann höchstens zwei Deckdateien über das Netz und greift danach direkt auf Decks zurück, die der Service Worker schon gespeichert hat (`cachedDeckNames()`). So bleibt „Neues Spiel“ auch bei hängendem Netz kurz, und offline kommen die bereits gespielten Decks wieder. Während des Ladens startet kein zweiter Ladevorgang (`loadingDeck`); dauert es länger als 400 ms, steht „Deck wird geladen …“ unter dem Spielfeld. Lässt sich kein Deck laden, zeigt `start()` eine Meldung und ändert nichts; der nächste Versuch lädt den Index erneut. „Gleiches Deck“ ohne geladenes Deck verhält sich wie „Neues Spiel“.
 - Deckdateien werden über einen Inhalts-Hash benannt (`deck-<hash>.json`). Dasselbe Deck kann dadurch nicht doppelt abgelegt werden; das Skript dedupliziert zusätzlich beim Einlesen und Schreiben.
 - „Neues Spiel" und „Gleiches Deck" (`startNewGame()`) lassen alle 52 Karten von ihrer aktuellen Position (auch aus dem Haufen oder den Zielstapeln) an ihren Platz im neuen Spiel fliegen. Die Reihenfolge entspricht dem Austeilen: Spalte für Spalte reihum, zuletzt der Ziehstapel. Karten, die ihre Seite wechseln, drehen sich unterwegs (Breite skaliert auf nahe 0 und wieder zurück). Während des Austeilens ist das Spielfeld gesperrt. Bei „Bewegung reduzieren" entfällt die Animation.
 
-## Lösungshinweis
+## Lösungstipp
 
-- Der Button „💡 Lösung“ schaltet eine Markierung für den nächsten Zug aus den gespeicherten Lösungswegen des aktuellen Decks ein oder aus. `currentDeckSolutions` kommt aus der geladenen Deckdatei und wird im Spielstand mitgespeichert.
-- `findSolutionAction()` spielt die gespeicherten Lösungswege ab dem ursprünglichen Deck nach und vergleicht jeden Zwischenzustand mit dem aktuellen Spiel. Nur wenn der aktuelle Zustand exakt einem Präfix eines Weges entspricht, wird dessen nächste Aktion zurückgegeben. Weicht der Spieler vom Weg ab, liefert die Funktion `null` und es wird keine Karte mehr markiert.
-- `applySolutionMark()` markiert die betroffene Karte über `selected`; muss gezogen oder der Abwurfstapel neu ausgelegt werden, wird stattdessen der Ziehstapel (`#stock.solution-target`) hervorgehoben.
-- Beim Weiterblättern im Ziehstapel bleiben Stock und Abwurf veränderbar, ohne die Markierung zu verlieren: `solutionHintBoard` merkt sich das übrige Spielfeld (Tableau und Grundstapel). Solange es gleich bleibt, bleibt die letzte Markierung stehen; ist der gemerkte Zug nicht mehr ausführbar, wird der Ziehstapel erneut markiert. Erst wenn sich Tableau oder Grundstapel abweichend ändern, verschwindet die Markierung.
-- Die Markierung wird nach jedem Zug, nach dem Aufdecken einer Karte, bei „Rückgängig“ und beim Start eines Spiels neu berechnet. Bei Sieg, Haufenansicht oder laufender Austeil-/Fertigspiel-Animation bleibt sie aus.
+- Der Button „💡 Tipp“ (`solutionMode`) schaltet die Tipps ein oder aus. `currentDeckSolutions` kommt aus der geladenen Deckdatei (ein Lösungsweg je Deck, ohne Ziehzüge) und wird im Spielstand mitgespeichert.
+- `hintMap()` baut je Deck einmal eine Karte „Spielstand → nächster Zug“ aus dem gespeicherten Weg. Der Talon zählt darin nur als Kartenfolge; wo er gerade aufgeschlagen ist, ist egal. Liegt die benötigte Karte nicht oben, lautet der Tipp „ziehen“ bzw. „neu auslegen“ und der Ziehstapel wird markiert.
+- Abseits des gespeicherten Wegs rechnet `hintSearch()` selbst weiter: Bestensuche vom aktuellen Stand bis zum Sieg oder zurück auf einen bekannten Stand, mit derselben Bewertung wie `scripts/find-solvable-solitaire.py` und höchstens `HINT_SEARCH_LIMIT` Zuständen. Sie läuft in Scheiben von `HINT_SEARCH_SLICE` ms; solange steht „Ich suche einen Lösungsweg …“ da, der Tipp wird nachgereicht. Gefundene Wege kommen in die Karte, Stände ohne Fund werden gemerkt.
+- `updateHint()` übersetzt den Zug in die Anzeige, `markHint()` zeichnet sie: Quelle durchgezogen rot (über `cardButton()`), Ziel gestrichelt (`.solution-target`), dazu der Zug als Text. Ohne Fund wird „Rückgängig“ bzw. „Gleiches Deck“ markiert. „Kein Lösungsweg gefunden“ heißt nicht „unlösbar“: Das Budget kann erschöpft sein, und die Suche nutzt keine Züge vom Grundstapel zurück.
+- Der Tipp wird bei jedem `render()` neu bestimmt. Bei Sieg, Haufenansicht oder laufender Austeil-/Fertigspiel-Animation bleibt er aus; `start()` bricht eine laufende Suche ab.
 
 ## Fertigspielen und Spielende
 
@@ -117,7 +117,8 @@ Karten, die gerade zum Ziel fliegen, stehen in `flyingIds`. `cardButton()` zeich
 | Funktion | Aufgabe |
 | --- | --- |
 | `cardButton()` | Karten-UI, native Drag- und Touch-Pointer-Events |
-| `tapCard()` | Gemeinsame Tap-Logik für Maus und Touch: auswählen, verschieben, abwählen, Doppeltap |
+| `tapCard()` | Tap-Logik für Maus und Touch: Doppeltap = Automatikzug, Tap auf das Tipp-Ziel = Tipp ausführen |
+| `keyCard()` | Bedienung ohne Zeiger: auswählen, dann Ziel wählen oder Automatikzug |
 | `onTap()` | Button-Aktion direkt im Touch-`pointerup`, der folgende Click wird ignoriert |
 | `picked()` | Ermittelt die bewegte Karte bzw. Folge |
 | `autoMove()` | Findet für Doppeltap ein erlaubtes Ziel |

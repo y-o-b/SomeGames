@@ -130,7 +130,7 @@
       <div class="controls"><button class="undo" id="undo" type="button" disabled>↶ Rückgängig</button><button id="sameGame" class="undo" type="button">↻ Gleiches Deck</button><button id="solutionHint" type="button">💡 Tipp: Aus</button><button id="autoFinish" type="button" hidden>▶ Fertigspielen</button><button id="newGame" type="button">Neues Spiel</button></div>
       <div class="heap" id="heap" aria-hidden="true"></div>
     </section>
-    <button class="version" data-version type="button" title="Klicken, um die Seite neu zu laden">Version 2.91</button>
+    <button class="version" data-version type="button" title="Klicken, um die Seite neu zu laden">Version 2.92</button>
     <script>const versionButton = document.querySelector('[data-version]'); versionButton.addEventListener('click', () => location.replace(`${location.pathname}?v=${Date.now()}`));</script>
   </main>
   <script>
@@ -160,21 +160,42 @@
         deckCursor = Math.floor(Math.random() * deckIndex.length);
       } catch (error) { console.info('Deck-Index konnte nicht geladen werden.', error); }
     }
+    // Liest eine Deckdatei aus einer Antwort; null, wenn sie fehlt oder ungültig ist.
+    async function deckFrom(response) {
+      try {
+        if (!response?.ok) return null;
+        const data = await response.json();
+        if (!validDeck(data?.deckOrder)) return null;
+        currentDeckSolutions = Array.isArray(data.solutions) ? data.solutions : [];
+        return data.deckOrder.map(id => card(Math.floor(id / 13), id % 13));
+      } catch (error) { return null; }
+    }
+    // Namen der Decks, die der Service Worker schon einmal gespeichert hat (leer ohne Cache, z. B. in der App).
+    async function cachedDeckNames() {
+      try {
+        const names = new Set();
+        for (const key of await caches.keys()) for (const request of await (await caches.open(key)).keys()) { const match = new URL(request.url).pathname.match(/\/solitaire-decks\/(deck-[^/]+\.json)$/); if (match) names.add(match[1]); }
+        return deckIndex.filter(name => names.has(name));
+      } catch (error) { return []; }
+    }
+    // Holt ein Deck: höchstens DECK_NETWORK_TRIES Versuche über das Netz, danach ein schon gespeichertes Deck direkt aus dem
+    // Cache. Ohne diese Grenze liefe die Suche bei hängendem Netz durch den ganzen Index, mit Wartezeit je Datei.
+    const DECK_NETWORK_TRIES = 2, DECK_CACHE_TRIES = 5;
     async function solvableDeck() {
-      for (let attempt = 0; attempt < deckIndex.length; attempt++) {
+      for (let attempt = 0; attempt < Math.min(DECK_NETWORK_TRIES, deckIndex.length); attempt++) {
         const name = deckIndex[deckCursor++ % deckIndex.length];
-        try {
-          const response = await fetch(`solitaire-decks/${name}`, { cache: 'no-store' });
-          if (!response.ok) continue;
-          const data = await response.json();
-          if (!validDeck(data?.deckOrder)) continue;
-          currentDeckSolutions = Array.isArray(data.solutions) ? data.solutions : [];
-          return data.deckOrder.map(id => card(Math.floor(id / 13), id % 13));
-        } catch (error) { /* nächstes Deck versuchen */ }
+        const deck = await deckFrom(await fetch(`solitaire-decks/${name}`, { cache: 'no-store' }).catch(() => null));
+        if (deck) return deck;
+      }
+      const cached = await cachedDeckNames();
+      for (let attempt = 0; attempt < DECK_CACHE_TRIES && cached.length; attempt++) {
+        const [name] = cached.splice(Math.floor(Math.random() * cached.length), 1);
+        const deck = await deckFrom(await caches.match(new URL(`solitaire-decks/${name}`, location.href).href, { ignoreSearch: true }).catch(() => null));
+        if (deck) return deck;
       }
       return null;
     }
-    function start(deckToUse = null) { const dealt = deckToUse; if (!dealt) { message.innerHTML = '<b>Kartendecks konnten nicht geladen werden.</b> „Neues Spiel" versucht es erneut.'; return false; } clearInterval(timer); timer = null; clearHeap(); flyingIds.clear(); finishRun++; autoFinishing = false; lockBoard(false); document.querySelectorAll('.card-flight').forEach(flight => flight.remove()); message.innerHTML = `<b>Los geht's!</b> Lege Karten in absteigender Reihenfolge und wechselnden Farben.`; gamePanel.classList.remove('victory'); let cards = dealt.map(item => { const id = typeof item === 'string' ? item : item.id; const [suitIndex, rank] = id.split('-').map(Number); return card(suitIndex, rank); }); currentDeck = cards.map(item => item.id); tableau = Array.from({ length: 7 }, (_, column) => { const pile = cards.splice(0, column + 1); pile.forEach((card, index) => { card.faceUp = index === pile.length - 1; }); return pile; }); stock = cards; waste = []; foundations = suits.map(() => []); selected = null; history = []; moves = seconds = 0; render(); if (solutionMode) applySolutionMark(); updateStatus(); return true; }
+    function start(deckToUse = null) { const dealt = deckToUse; if (!dealt) { message.innerHTML = '<b>Kartendecks konnten nicht geladen werden.</b> „Neues Spiel" versucht es erneut.'; return false; } clearInterval(timer); timer = null; cancelPendingReveal(); hintJob = null; clearHeap(); flyingIds.clear(); finishRun++; autoFinishing = false; lockBoard(false); document.querySelectorAll('.card-flight').forEach(flight => flight.remove()); message.innerHTML = `<b>Los geht's!</b> Lege Karten in absteigender Reihenfolge und wechselnden Farben.`; gamePanel.classList.remove('victory'); let cards = dealt.map(item => { const id = typeof item === 'string' ? item : item.id; const [suitIndex, rank] = id.split('-').map(Number); return card(suitIndex, rank); }); currentDeck = cards.map(item => item.id); tableau = Array.from({ length: 7 }, (_, column) => { const pile = cards.splice(0, column + 1); pile.forEach((card, index) => { card.faceUp = index === pile.length - 1; }); return pile; }); stock = cards; waste = []; foundations = suits.map(() => []); selected = null; history = []; moves = seconds = 0; render(); if (solutionMode) applySolutionMark(); updateStatus(); return true; }
     function copyState() { return { tableau: tableau.map(column => column.map(card => ({ ...card }))), stock: stock.map(card => ({ ...card })), waste: waste.map(card => ({ ...card })), foundations: foundations.map(pile => pile.map(card => ({ ...card }))) }; }
     function sameStateWithoutFaceUp(first, second) { return JSON.stringify(first, (key, value) => key === 'faceUp' ? undefined : value) === JSON.stringify(second, (key, value) => key === 'faceUp' ? undefined : value); }
     function allCards() { return [...tableau.flat(), ...stock, ...waste, ...foundations.flat()]; }
@@ -233,6 +254,16 @@
       if (lastCardTap?.id === card.id && now - lastCardTap.time < 500) { lastCardTap = null; if (hint?.source === source && hint.index === index && (source === 'tableau' ? cardIndex >= hint.cardIndex : true) && playHint()) return; selected = { source, index, cardIndex }; autoMove(); return; }
       lastCardTap = { id: card.id, time: now };
     }
+    // Bedienung ohne Zeiger (Tastatur, Schaltersteuerung): Die erste Betätigung wählt die Karte bzw. Folge aus, die zweite
+    // auf derselben Karte macht den Automatikzug, eine auf einem anderen Stapel legt die Auswahl dorthin.
+    function keyCard(card, source, index, cardIndex) {
+      if ((source !== 'tableau' || cardIndex === tableau[index].length - 1) && hintAimsAt(source, index) && playHint()) return;
+      if (selected && selected.source === source && selected.index === index && selected.cardIndex === cardIndex) { if (!autoMove()) { selected = null; render(); } return; }
+      if (selected && source === 'tableau' && cardIndex === tableau[index].length - 1 && moveToTableau(index)) return;
+      if (selected && source === 'foundation' && moveToFoundation(index)) return;
+      selected = { source, index, cardIndex }; render();
+      message.innerHTML = `<b>${card.name}${card.suit}\uFE0E gewählt.</b> Wähle das Ziel oder betätige die Karte erneut für den Automatikzug.`;
+    }
     function finishRevealForDrag(card) {
       if (!revealedCards.includes(card)) return;
       document.querySelector(`[data-card-id="${card.id}"] .flip-inner`)?.getAnimations().forEach(animation => { try { animation.finish(); } catch (error) {} });
@@ -258,7 +289,9 @@
         const front = face(card); front.classList.add('flip-side', 'flip-front');
         flip.append(back, front); button.appendChild(flip);
       } else button.appendChild(face(card));
-      button.addEventListener('click', () => {
+      button.addEventListener('click', event => {
+        // Ein Click ohne Zeiger (detail 0) kommt von Tastatur oder Hilfstechnik.
+        if (event.detail === 0) { keyCard(card, source, index, cardIndex); return; }
         if (suppressClick) { if (performance.now() < suppressClickUntil) return; suppressClick = false; }
         tapCard(card, source, index, cardIndex);
       });
@@ -317,6 +350,8 @@
     function render() {
       if (heapMode) return renderHeapView();
       updateHint();
+      // render() baut alle Karten neu; der Tastaturfokus soll auf derselben Karte bzw. demselben Stapel bleiben.
+      const focused = document.activeElement, focusKey = !focused || !gamePanel.contains(focused) ? null : focused.dataset.cardId ? `[data-card-id="${focused.dataset.cardId}"]` : focused.dataset.column !== undefined ? `.column[data-column="${focused.dataset.column}"]` : focused.dataset.foundation !== undefined ? `[data-foundation="${focused.dataset.foundation}"]` : null;
       tableauElement.innerHTML = ''; tableau.forEach((column, columnIndex) => { const area = document.createElement('div'); area.className = 'column' + (column.length ? '' : ' empty'); area.dataset.column = columnIndex; if (!column.length) { area.tabIndex = 0; area.setAttribute('role', 'button'); area.setAttribute('aria-label', `Leere Spalte ${columnIndex + 1}`); area.addEventListener('keydown', event => { if ((event.key === 'Enter' || event.key === ' ') && event.target === area) { event.preventDefault(); moveToTableau(columnIndex); } }); } column.forEach((card, cardIndex) => { if (card.faceUp) area.appendChild(cardButton(card, 'tableau', columnIndex, cardIndex)); else { const back = document.createElement('div'); back.className = 'card-back'; const logo = document.createElement('img'); logo.className = 'card-logo'; logo.src = 'icons/solitaire.svg'; logo.alt = ''; back.appendChild(logo); back.setAttribute('role', 'img'); back.setAttribute('aria-label', 'Verdeckte Karte'); area.appendChild(back); } }); area.addEventListener('click', event => { if (event.target === area && !(hintAimsAt('tableau', columnIndex) && playHint())) moveToTableau(columnIndex); }); tableauElement.appendChild(area); });
       stockElement.disabled = !stock.length && !waste.length; stockElement.classList.toggle('empty', !stock.length); wasteElement.classList.toggle('has-card', Boolean(waste.length)); wasteElement.innerHTML = ''; if (waste.length) { wasteElement.appendChild(underCard(waste.length > 1 ? waste[waste.length - 2] : null)); wasteElement.appendChild(cardButton(waste[waste.length - 1], 'waste', 0)); }
       foundationsElement.innerHTML = '';
@@ -340,6 +375,7 @@
       document.getElementById('undo').disabled = won || history.length === 0;
       document.getElementById('sameGame').disabled = won;
       markHint();
+      if (focusKey) { const target = document.querySelector(focusKey), cards = target ? target.querySelectorAll('.playing-card') : []; (cards.length ? cards[cards.length - 1] : target)?.focus({ preventScroll: true }); }
     }
     function picked() { return selected?.source === 'waste' ? [waste[waste.length - 1]] : selected?.source === 'foundation' ? [foundations[selected.index].at(-1)] : selected ? tableau[selected.index].slice(selected.cardIndex) : []; }
     function removeSelected(reveal = true) { if (selected.source === 'waste') waste.pop(); else if (selected.source === 'foundation') foundations[selected.index].pop(); else { tableau[selected.index].splice(selected.cardIndex); if (reveal && tableau[selected.index].length) tableau[selected.index].at(-1).faceUp = true; } selected = null; }
@@ -540,7 +576,7 @@
       const duration = reduceMotion() ? 1 : 600, animation = flight.animate([{ transform: 'translate(0, 0) rotateY(0)' }, { transform: `translate(${destination.left - origin.left}px, ${destination.top - origin.top}px) rotateY(90deg)`, offset: .5 }, { transform: `translate(${destination.left - origin.left}px, ${destination.top - origin.top}px) rotateY(0)` }], { duration, easing: 'ease-in-out', fill: 'forwards' });
       setTimeout(() => { flight.replaceChildren(face(card)); }, duration / 2); animation.finished.catch(() => {}).then(() => { flight.remove(); target.style.visibility = ''; });
     }
-    function drawStock() { const origin = stockElement.getBoundingClientRect(), drawn = stock.length ? stock.at(-1) : null; saveState(); if (stock.length) { const card = stock.pop(); card.faceUp = true; waste.push(card); } else { stock = waste.reverse(); waste = []; } moves++; selected = null; render(); if (solutionMode) applySolutionMark(); updateStatus(); if (drawn) animateStockDraw(drawn, origin); }
+    function drawStock() { if (!tableau) return; const origin = stockElement.getBoundingClientRect(), drawn = stock.length ? stock.at(-1) : null; saveState(); if (stock.length) { const card = stock.pop(); card.faceUp = true; waste.push(card); } else { stock = waste.reverse(); waste = []; } moves++; selected = null; render(); if (solutionMode) applySolutionMark(); updateStatus(); if (drawn) animateStockDraw(drawn, origin); }
     // Nach einem Touch-Drag verschluckt Safari den nächsten Klick; Buttons reagieren daher direkt auf das Touch-pointerup.
     function onTap(button, action) {
       button.addEventListener('pointerup', event => {
@@ -660,13 +696,18 @@
       }
       return layout;
     }
-    let dealing = false;
+    let dealing = false, loadingDeck = false;
     // Neues Spiel und Gleiches Deck: Alle Karten fliegen von ihrer aktuellen Position an ihren Platz im neuen Spiel.
     async function startNewGame(deckToUse = null) {
-      if (dealing) return;
-      if (!deckToUse) {
-        if (!deckIndex.length) await loadSolvableDeals();
-        deckToUse = await solvableDeck();
+      if (dealing || loadingDeck) return;
+      if (!deckToUse?.length) {
+        // Solange geladen wird, startet kein zweiter Ladevorgang; dauert es spürbar, steht das unter dem Spielfeld.
+        loadingDeck = true;
+        const notice = setTimeout(() => { message.innerHTML = '<b>Deck wird geladen …</b>'; }, 400);
+        try {
+          if (!deckIndex.length) await loadSolvableDeals();
+          deckToUse = await solvableDeck();
+        } finally { clearTimeout(notice); loadingDeck = false; }
       }
       const before = tableau && !autoFinishing && !reduceMotion() ? cardLayout() : null;
       if (!start(deckToUse) || !before) return;
@@ -705,8 +746,8 @@
     // Gespeichert wird bei jeder Zustandsänderung (updateStatus) sowie beim Verlassen oder Verbergen der Seite, nicht mehr im Sekundentakt.
     document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'hidden') persistGame(); });
     window.addEventListener('pagehide', persistGame);
-    const dealsLoaded = loadSolvableDeals();
-    if (!restoreGame()) dealsLoaded.then(async () => { const deck = await solvableDeck(); if (deck) start(deck); });
+    // Ohne gespeicherten Stand beginnt ein neues Spiel; scheitert das Laden, sagt start() das unter dem Spielfeld.
+    if (!restoreGame()) startNewGame();
   </script>
   <script>if ('serviceWorker' in navigator) addEventListener('load', () => navigator.serviceWorker.register('sw.js').catch(() => {}));</script>
 </body>

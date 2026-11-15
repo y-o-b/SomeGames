@@ -244,6 +244,16 @@ def write_json(path: Path, data: object) -> None:
             os.unlink(temp_name)
 
 
+def valid_action(action: object) -> bool:
+    """Shape and ranges of one stored action; keeps bad indices away from the replay."""
+    if not isinstance(action, list) or not action or not all(type(value) is int for value in action):
+        return False
+    if ACTION_LENGTHS.get(action[0]) != len(action) or not 0 <= action[-1] < 52:
+        return False
+    columns = action[1:3] if action[0] == 2 else action[1:2] if action[0] in (0, 3) else []
+    return all(0 <= column < 7 for column in columns) and (action[0] != 2 or (action[3] >= 0 and action[4] >= 1))
+
+
 def stored_path(deck: list[int], item: dict) -> list[Action] | None:
     """The shortest stored path that wins under the full rules, without draw actions."""
     candidates = []
@@ -252,10 +262,7 @@ def stored_path(deck: list[int], item: dict) -> list[Action] | None:
         if not isinstance(solution, list):
             continue
         path = [action for action in solution if not (isinstance(action, list) and action and action[0] in (4, 5))]
-        if path and all(
-            isinstance(action, list) and action and all(type(value) is int for value in action) and ACTION_LENGTHS.get(action[0]) == len(action)
-            for action in path
-        ):
+        if path and all(valid_action(action) for action in path):
             candidates.append(path)
     for path in sorted(candidates, key=len):
         if path_wins(deck, path):
@@ -268,35 +275,53 @@ def deck_document(deck: list[int], path: list[Action]) -> dict:
 
 
 def read_index(directory: Path) -> list[str]:
+    """Deck file names: the stored index order first, then deck files on disk that the index does not list.
+
+    The directory is the source of truth, so a missing or outdated index.json is rebuilt instead of being
+    written back empty.
+    """
     try:
         index = json.loads((directory / "index.json").read_text(encoding="utf-8"))
     except FileNotFoundError:
-        return []
+        index = {"decks": []}
     names = index.get("decks") if isinstance(index, dict) else None
     if not isinstance(names, list):
         raise ValueError(f"{directory / 'index.json'} hat ein unbekanntes Format.")
-    return [name for name in names if isinstance(name, str) and name and "/" not in name and "\\" not in name]
+    listed = [name for name in dict.fromkeys(names) if isinstance(name, str) and name and "/" not in name and "\\" not in name]
+    on_disk = sorted(path.name for path in directory.glob("deck-*.json")) if directory.is_dir() else []
+    return listed + sorted(set(on_disk) - set(listed))
 
 
 def write_index(directory: Path, names: list[str]) -> None:
     write_json(directory / "index.json", {"version": 1, "rules": RULES, "decks": names})
 
 
-def load_decks(directory: Path, rewrite: bool) -> tuple[list[str], set[tuple[int, ...]], list[str]]:
-    """Read every indexed deck. Returns (usable names, their decks, names without a winning path).
+def load_decks(directory: Path, rewrite: bool) -> tuple[list[str], set[tuple[int, ...]], dict[str, str]]:
+    """Read every deck file. Returns (names for the index, their decks, problems by file name).
 
+    A file that exists but cannot be read stays in the index: the fault may be temporary, and dropping it
+    would remove the deck from the game for good. A file that is gone or holds no winning path is left out.
     With `rewrite`, files that are not yet in the one-path form are rewritten in place.
     """
-    names, decks, broken = [], set(), []
+    names: list[str] = []
+    decks: set[tuple[int, ...]] = set()
+    problems: dict[str, str] = {}
     for name in read_index(directory):
         try:
             item = json.loads((directory / name).read_text(encoding="utf-8"))
-        except (OSError, json.JSONDecodeError):
+        except FileNotFoundError:
+            problems[name] = "Datei fehlt, aus dem Index genommen"
+            continue
+        except OSError as error:
+            problems[name] = f"nicht lesbar ({error.strerror}), bleibt im Index"
+            names.append(name)
+            continue
+        except json.JSONDecodeError:
             item = None
         deck = item.get("deckOrder") if isinstance(item, dict) else None
         path = stored_path(deck, item) if valid_deck(deck) else None
         if path is None:
-            broken.append(name)
+            problems[name] = "kein gültiger Lösungsweg, nicht im Index (Datei bleibt liegen)"
             continue
         if tuple(deck) in decks:
             continue
@@ -305,7 +330,7 @@ def load_decks(directory: Path, rewrite: bool) -> tuple[list[str], set[tuple[int
         document = deck_document(deck, path)
         if rewrite and item != document:
             write_json(directory / name, document)
-    return names, decks, broken
+    return names, decks, problems
 
 
 def read_unsolved(path: Path) -> dict:
@@ -338,12 +363,12 @@ def main() -> int:
     if args.deck_dir.resolve() == args.unsolved_output.resolve():
         parser.error("--deck-dir und --unsolved-output müssen verschiedene Pfade sein.")
 
-    names, solved, broken = load_decks(args.deck_dir, rewrite=not args.verify)
-    for name in broken:
-        print(f"Warnung: {name} hat keinen gültigen Lösungsweg und fehlt im Index, die Datei bleibt liegen.", file=sys.stderr)
+    names, solved, problems = load_decks(args.deck_dir, rewrite=not args.verify)
+    for name, problem in problems.items():
+        print(f"Warnung: {name}: {problem}.", file=sys.stderr)
     if args.verify:
-        print(f"{len(names)} Decks geprüft, {len(broken)} ohne gültigen Lösungsweg.", file=sys.stderr)
-        return 1 if broken else 0
+        print(f"{len(solved)} Decks geprüft, {len(problems)} mit Problemen.", file=sys.stderr)
+        return 1 if problems else 0
 
     unsolved = read_unsolved(args.unsolved_output)
     unsolved["deals"] = [deal for deal in unsolved["deals"] if tuple(deal["deckOrder"]) not in solved]
