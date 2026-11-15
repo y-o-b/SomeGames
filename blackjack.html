@@ -52,11 +52,6 @@
     .stat { padding: 6px 3px; border: 2px solid #171717; border-radius: 10px; }
     .stat strong { display: block; font-size: 1.3rem; line-height: 1.1; }
     .stat span { color: var(--muted); font-size: .7rem; }
-    .bet-stat { display: flex; align-items: center; justify-content: center; gap: 7px; }
-    .bet-stat .bet-text { display: flex; flex-direction: column; align-items: flex-start; line-height: 1.1; }
-    .coin-stack { position: relative; flex: 0 0 auto; width: 32px; height: 32px; }
-    .coin { position: absolute; left: 50%; width: 30px; height: 11px; border: 2px solid #171717; border-radius: 50%; background: #FFD166; box-shadow: inset 0 -2px 0 rgba(23,23,23,.18); transform: translateX(-50%); }
-    .coin:last-child { background: #FFE28A; }
     .hands { display: grid; gap: 14px; margin-bottom: 12px; }
     .hand { position: relative; }
     .hand.dealer .cards { padding-right: calc(var(--card-w) + 8px); }
@@ -77,9 +72,6 @@
     .hand-group.lose { opacity: .55; }
     .hand-badge { color: var(--muted); font-size: .68rem; font-weight: 800; line-height: 1.2; }
     .hand-badge b { color: var(--text); }
-    .hand-meta { display: flex; align-items: center; gap: 6px; }
-    .hand-coins { position: relative; flex: 0 0 auto; width: 20px; height: 18px; }
-    .hand-coins .coin { width: 18px; height: 7px; border-width: 1.5px; }
     .card { position: relative; z-index: 1; flex: 0 0 auto; width: var(--card-w); height: calc(var(--card-w) * 1.4); padding: calc(3 * var(--u)); border: calc(2 * var(--u)) solid #171717; border-radius: calc(8 * var(--u)); background: #FFFFFF; box-shadow: calc(2 * var(--u)) calc(2 * var(--u)) 0 #171717; font-family: Arial, Helvetica, sans-serif; font-weight: 900; font-variant-emoji: text; }
     .card.red { color: var(--red); }
     .card .corner { position: absolute; font-size: calc(16.8 * var(--u)); line-height: 1; }
@@ -105,7 +97,7 @@
     .controls.with-split, .controls.with-double { grid-template-columns: repeat(3, 1fr); }
     .controls.with-split.with-double { grid-template-columns: repeat(4, 1fr); }
     .controls.with-split.with-double button { padding: 11px 6px; font-size: .82rem; }
-    .controls button { padding: 13px; border: 3px solid #171717; border-radius: 10px; font-weight: 800; box-shadow: 4px 4px 0 #171717; }
+    .controls button { min-width: 0; padding: 13px; border: 3px solid #171717; border-radius: 10px; font-weight: 800; box-shadow: 4px 4px 0 #171717; }
     .controls button:active:not(:disabled) { transform: translate(2px, 2px); box-shadow: 2px 2px 0 #171717; }
     .controls button:disabled { opacity: .45; cursor: default; }
     .controls button[hidden] { display: none; }
@@ -121,10 +113,6 @@
       .game { padding: 16px; }
       .stats { margin-bottom: 12px; }
       .stat strong { font-size: 1.15rem; }
-      .bet-stat { gap: 5px; }
-      .bet-stat .bet-text span { font-size: .62rem; }
-      .coin-stack { width: 28px; height: 28px; }
-      .coin { width: 26px; height: 10px; }
       .cards { gap: 5px; min-height: 86px; }
       .player-hands { gap: 6px; min-height: 86px; }
       :root { --card-w: 56px; }
@@ -134,6 +122,12 @@
     @media (max-width: 390px) {
       .game { padding: 13px; }
       :root { --card-w: 50px; }
+    }
+    @media (max-width: 380px) {
+      /* Vier Aktionen nebeneinander passen auf sehr schmalen Bildschirmen nicht; dann zwei Reihen. */
+      .controls.with-split.with-double { grid-template-columns: 1fr 1fr; }
+      .controls.with-split button,
+      .controls.with-double button { padding: 9px 5px; font-size: .78rem; }
     }
     /* Querformat auf flachen Bildschirmen: Dealer und Spieler liegen nebeneinander, damit alles ohne Scrollen passt. */
     @media (orientation: landscape) and (max-height: 520px) {
@@ -187,7 +181,7 @@
     <section class="game" aria-label="Blackjack-Spiel">
       <div class="stats" aria-label="Spielstand">
         <div class="stat"><strong id="bankroll">100</strong><span>Guthaben</span></div>
-        <div class="stat bet-stat"><div class="coin-stack" id="betCoins" aria-hidden="true"></div><div class="bet-text"><strong id="betValue">2</strong><span id="betLabel">Einsatz</span></div></div>
+        <div class="stat"><strong id="betValue">2</strong><span id="betLabel">Einsatz</span></div>
         <div class="stat"><strong id="rounds">0</strong><span>Runden</span></div>
       </div>
       <div class="hands">
@@ -216,7 +210,7 @@
         <button id="standButton" type="button" hidden>Halten</button>
       </div>
     </section>
-    <button class="version" data-version type="button" title="Klicken, um die Seite neu zu laden">Version 2.88</button>
+    <button class="version" data-version type="button" title="Klicken, um die Seite neu zu laden">Version 2.89</button>
     <script>const versionButton = document.querySelector('[data-version]'); versionButton.addEventListener('click', () => location.replace(`${location.pathname}?v=${Date.now()}`));</script>
 
     <dialog class="rules-dialog" id="rulesDialog" aria-labelledby="rulesTitle">
@@ -269,7 +263,7 @@
         </ul>
 
         <h3>Guthaben und Runden</h3>
-        <p>Der Einsatz bleibt immer bei <b>2 Chips</b> und ist als Chipstapel sichtbar. Nach der Runde zeigt derselbe Stapel die Auszahlung. Das Guthaben darf negativ werden – gespielt werden kann trotzdem weiter. Guthaben und Rundenzahl bleiben gespeichert.</p>
+        <p>Der Einsatz beträgt <b>2 Chips pro Hand</b> und erhöht sich beim Splitten und Verdoppeln entsprechend. Nach der Runde wird die Auszahlung angezeigt. Das Guthaben darf negativ werden – gespielt werden kann trotzdem weiter. Guthaben und Rundenzahl bleiben gespeichert.</p>
       </div>
     </dialog>
   </main>
@@ -280,7 +274,7 @@
     const RANKS = ['A', '2', '3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K'];
     const RANK_NAMES = { A: 'Ass', J: 'Bube', Q: 'Dame', K: 'König' };
     const cardValue = rank => rank === 'A' ? 11 : ['J', 'Q', 'K'].includes(rank) ? 10 : Number(rank);
-    const message = document.getElementById('message'), bankrollElement = document.getElementById('bankroll'), betValueElement = document.getElementById('betValue'), betLabelElement = document.getElementById('betLabel'), betCoinsElement = document.getElementById('betCoins'), roundsElement = document.getElementById('rounds');
+    const message = document.getElementById('message'), bankrollElement = document.getElementById('bankroll'), betValueElement = document.getElementById('betValue'), betLabelElement = document.getElementById('betLabel'), roundsElement = document.getElementById('rounds');
     const dealerCards = document.getElementById('dealerCards'), playerCards = document.getElementById('playerCards'), dealerScore = document.getElementById('dealerScore'), playerScore = document.getElementById('playerScore');
     const dealButton = document.getElementById('dealButton'), hitButton = document.getElementById('hitButton'), standButton = document.getElementById('standButton'), splitButton = document.getElementById('splitButton'), doubleButton = document.getElementById('doubleButton'), controls = document.querySelector('.controls');
     const deckElement = document.getElementById('deck');
@@ -299,19 +293,6 @@
 
     function save() { try { localStorage.setItem(STORAGE_KEY, JSON.stringify({ bankroll, bet, rounds })); } catch (error) { console.warn('Blackjack-Spielstand konnte nicht gespeichert werden.', error); } }
     function setMessage(html) { message.innerHTML = html; }
-    // Einsatz beziehungsweise Auszahlung als Chipstapel zeigen.
-    function fillCoins(container, amount, step) {
-      container.replaceChildren();
-      const count = Math.min(8, Math.max(0, amount));
-      for (let i = 0; i < count; i++) {
-        const coin = document.createElement('span');
-        coin.className = 'coin';
-        coin.style.bottom = `${i * step}px`;
-        coin.style.zIndex = String(i);
-        container.appendChild(coin);
-      }
-    }
-    function drawCoins(amount) { fillCoins(betCoinsElement, amount, 3); }
     function handValue(cards) { let total = cards.reduce((sum, card) => sum + card.value, 0), aces = cards.filter(card => card.rank === 'A').length; while (total > 21 && aces > 0) { total -= 10; aces -= 1; } return total; }
     const isBlackjack = cards => cards.length === 2 && handValue(cards) === 21;
     // Splitten geht nur mit zwei gleichwertigen Karten und höchstens vier Händen.
@@ -395,13 +376,9 @@
         else if (phase === 'done' && handResults[index]) group.classList.add(handResults[index]);
         else if (handDone[index]) group.classList.add('done');
         if (split) {
-          const meta = document.createElement('div'); meta.className = 'hand-meta';
           const badge = document.createElement('span'); badge.className = 'hand-badge';
-          badge.innerHTML = `Hand ${index + 1} · <b>${cards.length ? handValue(cards) : '–'}</b>${handDoubled[index] ? ' ×2' : ''}`;
-          const coins = document.createElement('span'); coins.className = 'hand-coins'; coins.setAttribute('aria-hidden', 'true');
-          fillCoins(coins, handStakes[index] || bet, 1.5);
-          meta.append(badge, coins);
-          group.appendChild(meta);
+          badge.innerHTML = `Hand ${index + 1} · <b>${cards.length ? handValue(cards) : '–'}</b> · ${handStakes[index] || bet} Chips${handDoubled[index] ? ' ×2' : ''}`;
+          group.appendChild(badge);
         }
         const row = document.createElement('div'); row.className = 'cards';
         cards.forEach((card, cardIndex) => {
@@ -416,11 +393,10 @@
     }
     function render() {
       bankrollElement.textContent = bankroll;
+      const totalStake = handStakes.reduce((sum, stake) => sum + stake, 0) || bet;
       const showPayout = phase === 'done';
-      const shownCoins = showPayout ? roundPayout : bet;
-      betValueElement.textContent = shownCoins;
+      betValueElement.textContent = showPayout ? roundPayout : totalStake;
       betLabelElement.textContent = showPayout ? 'Auszahlung' : 'Einsatz';
-      drawCoins(shownCoins);
       roundsElement.textContent = rounds;
       drawHand(dealerCards, dealer, holeHidden);
       drawPlayerHands();
