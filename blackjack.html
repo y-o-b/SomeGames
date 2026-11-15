@@ -123,9 +123,11 @@
       .game { padding: 13px; }
       :root { --card-w: 50px; }
     }
-    @media (max-width: 380px) {
-      /* Vier Aktionen nebeneinander passen auf sehr schmalen Bildschirmen nicht; dann zwei Reihen. */
+    @media (max-width: 600px) {
+      /* Vier Aktionen nebeneinander würden auf dem Handy abgeschnitten; daher zwei Reihen. */
       .controls.with-split.with-double { grid-template-columns: 1fr 1fr; }
+    }
+    @media (max-width: 380px) {
       .controls.with-split button,
       .controls.with-double button { padding: 9px 5px; font-size: .78rem; }
     }
@@ -210,7 +212,7 @@
         <button id="standButton" type="button" hidden>Halten</button>
       </div>
     </section>
-    <button class="version" data-version type="button" title="Klicken, um die Seite neu zu laden">Version 2.89</button>
+    <button class="version" data-version type="button" title="Klicken, um die Seite neu zu laden">Version 2.90</button>
     <script>const versionButton = document.querySelector('[data-version]'); versionButton.addEventListener('click', () => location.replace(`${location.pathname}?v=${Date.now()}`));</script>
 
     <dialog class="rules-dialog" id="rulesDialog" aria-labelledby="rulesTitle">
