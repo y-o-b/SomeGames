@@ -77,6 +77,9 @@
     .hand-group.lose { opacity: .55; }
     .hand-badge { color: var(--muted); font-size: .68rem; font-weight: 800; line-height: 1.2; }
     .hand-badge b { color: var(--text); }
+    .hand-meta { display: flex; align-items: center; gap: 6px; }
+    .hand-coins { position: relative; flex: 0 0 auto; width: 20px; height: 18px; }
+    .hand-coins .coin { width: 18px; height: 7px; border-width: 1.5px; }
     .card { position: relative; z-index: 1; flex: 0 0 auto; width: var(--card-w); height: calc(var(--card-w) * 1.4); padding: calc(3 * var(--u)); border: calc(2 * var(--u)) solid #171717; border-radius: calc(8 * var(--u)); background: #FFFFFF; box-shadow: calc(2 * var(--u)) calc(2 * var(--u)) 0 #171717; font-family: Arial, Helvetica, sans-serif; font-weight: 900; font-variant-emoji: text; }
     .card.red { color: var(--red); }
     .card .corner { position: absolute; font-size: calc(16.8 * var(--u)); line-height: 1; }
@@ -213,7 +216,7 @@
         <button id="standButton" type="button" hidden>Halten</button>
       </div>
     </section>
-    <button class="version" data-version type="button" title="Klicken, um die Seite neu zu laden">Version 2.87</button>
+    <button class="version" data-version type="button" title="Klicken, um die Seite neu zu laden">Version 2.88</button>
     <script>const versionButton = document.querySelector('[data-version]'); versionButton.addEventListener('click', () => location.replace(`${location.pathname}?v=${Date.now()}`));</script>
 
     <dialog class="rules-dialog" id="rulesDialog" aria-labelledby="rulesTitle">
@@ -297,17 +300,18 @@
     function save() { try { localStorage.setItem(STORAGE_KEY, JSON.stringify({ bankroll, bet, rounds })); } catch (error) { console.warn('Blackjack-Spielstand konnte nicht gespeichert werden.', error); } }
     function setMessage(html) { message.innerHTML = html; }
     // Einsatz beziehungsweise Auszahlung als Chipstapel zeigen.
-    function drawCoins(amount) {
-      betCoinsElement.replaceChildren();
+    function fillCoins(container, amount, step) {
+      container.replaceChildren();
       const count = Math.min(8, Math.max(0, amount));
       for (let i = 0; i < count; i++) {
         const coin = document.createElement('span');
         coin.className = 'coin';
-        coin.style.bottom = `${i * 3}px`;
+        coin.style.bottom = `${i * step}px`;
         coin.style.zIndex = String(i);
-        betCoinsElement.appendChild(coin);
+        container.appendChild(coin);
       }
     }
+    function drawCoins(amount) { fillCoins(betCoinsElement, amount, 3); }
     function handValue(cards) { let total = cards.reduce((sum, card) => sum + card.value, 0), aces = cards.filter(card => card.rank === 'A').length; while (total > 21 && aces > 0) { total -= 10; aces -= 1; } return total; }
     const isBlackjack = cards => cards.length === 2 && handValue(cards) === 21;
     // Splitten geht nur mit zwei gleichwertigen Karten und höchstens vier Händen.
@@ -390,7 +394,15 @@
         if (phase === 'player' && index === activeHand) group.classList.add('active');
         else if (phase === 'done' && handResults[index]) group.classList.add(handResults[index]);
         else if (handDone[index]) group.classList.add('done');
-        if (split) { const badge = document.createElement('span'); badge.className = 'hand-badge'; badge.innerHTML = `Hand ${index + 1} · <b>${cards.length ? handValue(cards) : '–'}</b>${handDoubled[index] ? ' ×2' : ''}`; group.appendChild(badge); }
+        if (split) {
+          const meta = document.createElement('div'); meta.className = 'hand-meta';
+          const badge = document.createElement('span'); badge.className = 'hand-badge';
+          badge.innerHTML = `Hand ${index + 1} · <b>${cards.length ? handValue(cards) : '–'}</b>${handDoubled[index] ? ' ×2' : ''}`;
+          const coins = document.createElement('span'); coins.className = 'hand-coins'; coins.setAttribute('aria-hidden', 'true');
+          fillCoins(coins, handStakes[index] || bet, 1.5);
+          meta.append(badge, coins);
+          group.appendChild(meta);
+        }
         const row = document.createElement('div'); row.className = 'cards';
         cards.forEach((card, cardIndex) => {
           const element = cardElement(card, false);
