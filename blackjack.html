@@ -52,6 +52,11 @@
     .stat { padding: 6px 3px; border: 2px solid #171717; border-radius: 10px; }
     .stat strong { display: block; font-size: 1.3rem; line-height: 1.1; }
     .stat span { color: var(--muted); font-size: .7rem; }
+    .bet-stat { display: flex; align-items: center; justify-content: center; gap: 7px; }
+    .bet-stat .bet-text { display: flex; flex-direction: column; align-items: flex-start; line-height: 1.1; }
+    .coin-stack { position: relative; flex: 0 0 auto; width: 32px; height: 32px; }
+    .coin { position: absolute; left: 50%; width: 30px; height: 11px; border: 2px solid #171717; border-radius: 50%; background: #FFD166; box-shadow: inset 0 -2px 0 rgba(23,23,23,.18); transform: translateX(-50%); }
+    .coin:last-child { background: #FFE28A; }
     .hands { display: grid; gap: 14px; margin-bottom: 12px; }
     .hand { position: relative; }
     .hand.dealer .cards { padding-right: calc(var(--card-w) + 8px); }
@@ -113,6 +118,10 @@
       .game { padding: 16px; }
       .stats { margin-bottom: 12px; }
       .stat strong { font-size: 1.15rem; }
+      .bet-stat { gap: 5px; }
+      .bet-stat .bet-text span { font-size: .62rem; }
+      .coin-stack { width: 28px; height: 28px; }
+      .coin { width: 26px; height: 10px; }
       .cards { gap: 5px; min-height: 86px; }
       .player-hands { gap: 6px; min-height: 86px; }
       :root { --card-w: 56px; }
@@ -175,7 +184,7 @@
     <section class="game" aria-label="Blackjack-Spiel">
       <div class="stats" aria-label="Spielstand">
         <div class="stat"><strong id="bankroll">100</strong><span>Guthaben</span></div>
-        <div class="stat"><strong id="betValue">10</strong><span>Einsatz</span></div>
+        <div class="stat bet-stat"><div class="coin-stack" id="betCoins" aria-hidden="true"></div><div class="bet-text"><strong id="betValue">2</strong><span id="betLabel">Einsatz</span></div></div>
         <div class="stat"><strong id="rounds">0</strong><span>Runden</span></div>
       </div>
       <div class="hands">
@@ -204,7 +213,7 @@
         <button id="standButton" type="button" hidden>Halten</button>
       </div>
     </section>
-    <button class="version" data-version type="button" title="Klicken, um die Seite neu zu laden">Version 2.86</button>
+    <button class="version" data-version type="button" title="Klicken, um die Seite neu zu laden">Version 2.87</button>
     <script>const versionButton = document.querySelector('[data-version]'); versionButton.addEventListener('click', () => location.replace(`${location.pathname}?v=${Date.now()}`));</script>
 
     <dialog class="rules-dialog" id="rulesDialog" aria-labelledby="rulesTitle">
@@ -257,7 +266,7 @@
         </ul>
 
         <h3>Guthaben und Runden</h3>
-        <p>Der Einsatz bleibt immer bei <b>2 Chips</b>. Das Guthaben darf negativ werden – gespielt werden kann trotzdem weiter. Guthaben und Rundenzahl bleiben gespeichert.</p>
+        <p>Der Einsatz bleibt immer bei <b>2 Chips</b> und ist als Chipstapel sichtbar. Nach der Runde zeigt derselbe Stapel die Auszahlung. Das Guthaben darf negativ werden – gespielt werden kann trotzdem weiter. Guthaben und Rundenzahl bleiben gespeichert.</p>
       </div>
     </dialog>
   </main>
@@ -268,13 +277,13 @@
     const RANKS = ['A', '2', '3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K'];
     const RANK_NAMES = { A: 'Ass', J: 'Bube', Q: 'Dame', K: 'König' };
     const cardValue = rank => rank === 'A' ? 11 : ['J', 'Q', 'K'].includes(rank) ? 10 : Number(rank);
-    const message = document.getElementById('message'), bankrollElement = document.getElementById('bankroll'), betValueElement = document.getElementById('betValue'), roundsElement = document.getElementById('rounds');
+    const message = document.getElementById('message'), bankrollElement = document.getElementById('bankroll'), betValueElement = document.getElementById('betValue'), betLabelElement = document.getElementById('betLabel'), betCoinsElement = document.getElementById('betCoins'), roundsElement = document.getElementById('rounds');
     const dealerCards = document.getElementById('dealerCards'), playerCards = document.getElementById('playerCards'), dealerScore = document.getElementById('dealerScore'), playerScore = document.getElementById('playerScore');
     const dealButton = document.getElementById('dealButton'), hitButton = document.getElementById('hitButton'), standButton = document.getElementById('standButton'), splitButton = document.getElementById('splitButton'), doubleButton = document.getElementById('doubleButton'), controls = document.querySelector('.controls');
     const deckElement = document.getElementById('deck');
     const insuranceControls = document.getElementById('insuranceControls'), insureButton = document.getElementById('insureButton'), declineInsuranceButton = document.getElementById('declineInsuranceButton'), insuranceAmountElement = document.getElementById('insuranceAmount'), doubledTag = document.getElementById('doubledTag');
     const rulesButton = document.getElementById('rulesButton'), rulesDialog = document.getElementById('rulesDialog'), rulesClose = document.getElementById('rulesClose');
-    let bankroll = START_BANKROLL, bet = BET, rounds = 0, deck = [], playerHands = [[]], activeHand = 0, handDone = [], handCounts = [], handStakes = [], handDoubled = [], handResults = [], dealer = [], phase = 'bet', holeHidden = false, insurance = 0, insuranceBet = 0;
+    let bankroll = START_BANKROLL, bet = BET, rounds = 0, deck = [], playerHands = [[]], activeHand = 0, handDone = [], handCounts = [], handStakes = [], handDoubled = [], handResults = [], dealer = [], phase = 'bet', holeHidden = false, insurance = 0, insuranceBet = 0, roundPayout = 0;
 
     try {
       const saved = JSON.parse(localStorage.getItem(STORAGE_KEY) || 'null');
@@ -287,6 +296,18 @@
 
     function save() { try { localStorage.setItem(STORAGE_KEY, JSON.stringify({ bankroll, bet, rounds })); } catch (error) { console.warn('Blackjack-Spielstand konnte nicht gespeichert werden.', error); } }
     function setMessage(html) { message.innerHTML = html; }
+    // Einsatz beziehungsweise Auszahlung als Chipstapel zeigen.
+    function drawCoins(amount) {
+      betCoinsElement.replaceChildren();
+      const count = Math.min(8, Math.max(0, amount));
+      for (let i = 0; i < count; i++) {
+        const coin = document.createElement('span');
+        coin.className = 'coin';
+        coin.style.bottom = `${i * 3}px`;
+        coin.style.zIndex = String(i);
+        betCoinsElement.appendChild(coin);
+      }
+    }
     function handValue(cards) { let total = cards.reduce((sum, card) => sum + card.value, 0), aces = cards.filter(card => card.rank === 'A').length; while (total > 21 && aces > 0) { total -= 10; aces -= 1; } return total; }
     const isBlackjack = cards => cards.length === 2 && handValue(cards) === 21;
     // Splitten geht nur mit zwei gleichwertigen Karten und höchstens vier Händen.
@@ -383,7 +404,11 @@
     }
     function render() {
       bankrollElement.textContent = bankroll;
-      betValueElement.textContent = bet;
+      const showPayout = phase === 'done';
+      const shownCoins = showPayout ? roundPayout : bet;
+      betValueElement.textContent = shownCoins;
+      betLabelElement.textContent = showPayout ? 'Auszahlung' : 'Einsatz';
+      drawCoins(shownCoins);
       roundsElement.textContent = rounds;
       drawHand(dealerCards, dealer, holeHidden);
       drawPlayerHands();
@@ -448,6 +473,7 @@
         else text = `<b>${wins} von ${playerHands.length} Händen gewonnen.</b> ${pushes ? `${pushes} unentschieden. ` : ''}${note}`;
       }
       if (insurance > 0) text += dealerBlackjack ? ` <b>Versicherung:</b> +${insurance * 2} Guthaben.` : ' <b>Versicherung verloren.</b>';
+      roundPayout = payout;
       bankroll += payout; insurance = 0; save(); render(); setMessage(text);
     }
     function dealerTurn() {
@@ -462,7 +488,7 @@
       if (phase === 'player' || phase === 'dealer' || phase === 'dealing' || phase === 'insurance') return;
       bankroll -= bet; deck = newDeck(); dealer = [];
       playerHands = [[]]; activeHand = 0; handDone = [false]; handCounts = [0]; handStakes = [bet]; handDoubled = [false]; handResults = [];
-      insurance = 0; insuranceBet = Math.floor(bet / 2);
+      insurance = 0; insuranceBet = Math.floor(bet / 2); roundPayout = 0;
       dealerCards.dataset.count = '0';
       playerHands[0].push(deck.pop()); dealer.push(deck.pop()); playerHands[0].push(deck.pop()); dealer.push(deck.pop());
       holeHidden = true; phase = 'dealing';
