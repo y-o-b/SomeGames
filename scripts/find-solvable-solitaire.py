@@ -38,6 +38,8 @@ RULES = "klondike-draw-1-unlimited-redeals-no-foundation-return"
 DEFAULT_DECK_DIR = Path(__file__).resolve().parent.parent / "solitaire-decks"
 DEFAULT_UNSOLVED_OUTPUT = Path(__file__).resolve().parent.parent / "deals-without-solutions.json"
 ACTION_LENGTHS = {0: 3, 1: 2, 2: 6, 3: 3}
+# Raise when solve() or priority() changes, so deals an older solver gave up on are searched again by --backfill-limit.
+SOLVER = 2
 
 Action = list[int]
 Columns = tuple[tuple[tuple[int, ...], int], ...]  # a column is (cards, face_up_count)
@@ -388,7 +390,7 @@ def main() -> int:
         if path is not None and not path_wins(deck, path):
             raise ValueError(f"Gefundener Weg besteht die Regelprüfung nicht: {deck}")
         if path is None:
-            return False, {"status": "exhausted" if exhausted else "search_limit", "statesExpanded": expanded}
+            return False, {"status": "exhausted" if exhausted else "search_limit", "statesExpanded": expanded, "solver": SOLVER}
         name = deck_file_name(deck)
         write_json(args.deck_dir / name, deck_document(deck, path))
         names.append(name)
@@ -400,7 +402,14 @@ def main() -> int:
         # Decks ohne Lösung reihum ab dem gespeicherten Zeiger erneut prüfen; erschöpfend widerlegte bleiben außen vor.
         deals = unsolved["deals"]
         cursor = unsolved["solutionSearchCursor"] % max(1, len(deals))
-        pending = [deal for deal in deals[cursor:] + deals[:cursor] if (deal.get("solutionSearch") or {}).get("status") != "exhausted"]
+        def worth_retrying(deal: dict) -> bool:
+            # Not worth it: proven unsolvable, or this same solver already spent at least this budget (the search is deterministic).
+            record = deal.get("solutionSearch") or {}
+            if record.get("status") == "exhausted":
+                return False
+            return record.get("solver") != SOLVER or record.get("statesExpanded", 0) < args.max_states
+
+        pending = [deal for deal in deals[cursor:] + deals[:cursor] if worth_retrying(deal)]
         for deal in pending[: args.backfill_limit]:
             index = deals.index(deal)
             is_solved, record = search(deal["deckOrder"])

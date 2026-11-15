@@ -130,7 +130,7 @@
       <div class="controls"><button class="undo" id="undo" type="button" disabled>↶ Rückgängig</button><button id="sameGame" class="undo" type="button">↻ Gleiches Deck</button><button id="solutionHint" type="button">💡 Tipp: Aus</button><button id="autoFinish" type="button" hidden>▶ Fertigspielen</button><button id="newGame" type="button">Neues Spiel</button></div>
       <div class="heap" id="heap" aria-hidden="true"></div>
     </section>
-    <button class="version" data-version type="button" title="Klicken, um die Seite neu zu laden">Version 2.92</button>
+    <button class="version" data-version type="button" title="Klicken, um die Seite neu zu laden">Version 2.93</button>
     <script>const versionButton = document.querySelector('[data-version]'); versionButton.addEventListener('click', () => location.replace(`${location.pathname}?v=${Date.now()}`));</script>
   </main>
   <script>
@@ -414,6 +414,9 @@
       const flip = column => { if (column.length && column[column.length - 1] < 0) column[column.length - 1] = -column[column.length - 1] - 1; };
       const toFoundation = () => { const suit = Math.floor(n / 13); if (n % 13 !== f[suit]) return false; f[suit]++; return true; };
       const fromTalon = () => { const index = t.indexOf(n); if (index < 0) return false; t.splice(index, 1); return true; };
+      // Spalten nur über ganze Zahlen 0–6 ansprechen: Schlüssel wie "__proto__" aus einer manipulierten Datei bleiben draußen.
+      const isColumn = value => Number.isInteger(value) && value >= 0 && value < cols.length;
+      if (!(action[0] === 1 || (isColumn(action[1]) && (action[0] !== 2 || isColumn(action[2]))))) return null;
       if (action[0] === 0) { const column = cols[action[1]]; if (!column || column[column.length - 1] !== n || !toFoundation()) return null; column.pop(); flip(column); }
       else if (action[0] === 1) { if (!fromTalon() || !toFoundation()) return null; }
       else if (action[0] === 2) {
@@ -446,7 +449,7 @@
         if (!state || !hintWon(state)) continue;
         steps.forEach(([key, action], index) => { const rest = steps.length - index, known = map.get(key); if (!known || rest < known.rest) map.set(key, { action, rest }); });
       }
-      hintCache = { deck, solutions: currentDeckSolutions, map, failed: new Set() };
+      hintCache = { deck, solutions: currentDeckSolutions, map, failed: new Map() };
       return map;
     }
     function hintMoves(state) {
@@ -507,7 +510,8 @@
           }
           if (performance.now() >= until) { setTimeout(slice, 0); return; }
         }
-        cache.failed.add(originKey); finish();
+        // 'dead': alles Erreichbare durchsucht; 'limit': Budget ausgeschöpft, der Stand kann trotzdem lösbar sein.
+        cache.failed.set(originKey, heap.length ? 'limit' : 'dead'); finish();
       };
       slice();
       job.later = true;
@@ -526,11 +530,13 @@
     function updateHint() {
       hint = null;
       if (!solutionMode || !tableau || heapMode || autoFinishing || dealing || gamePanel.classList.contains('victory') || !currentDeck.length || !currentDeckSolutions.length) return;
-      const action = hintAction(hintStateOf({ tableau, stock, waste, foundations }));
+      const state = hintStateOf({ tableau, stock, waste, foundations }), action = hintAction(state);
       if (action === 'pending') { hint = { pending: true, html: '<b>Ich suche einen Lösungsweg …</b>' }; return; }
       if (!action) {
         const map = hintMap(), back = history.some(state => map.has(hintKey(hintStateOf(state))));
-        hint = { lost: true, back, html: '<b>Von hier finde ich keinen Lösungsweg.</b> ' + (back ? '„Rückgängig" führt zurück auf einen bekannten Weg.' : '„Gleiches Deck" beginnt von vorn.') };
+        // Die Suche holt keine Karten vom Grundstapel zurück; nur mit dieser Einschränkung ist ein erschöpfter Suchraum ein Beweis.
+        const dead = hintCache.failed.get(hintKey(state)) === 'dead';
+        hint = { lost: true, back, html: (dead ? '<b>Von hier ist das Spiel nicht mehr lösbar</b> (außer mit Karten vom Grundstapel zurück). ' : '<b>Von hier finde ich keinen Lösungsweg.</b> ') + (back ? '„Rückgängig" führt zurück auf einen bekannten Weg.' : '„Gleiches Deck" beginnt von vorn.') };
         return;
       }
       const n = action[action.length - 1], column = action[0] === 2 ? action[2] : action[0] === 3 ? action[1] : null;

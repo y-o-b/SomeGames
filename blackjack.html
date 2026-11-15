@@ -212,7 +212,7 @@
         <button id="standButton" type="button" hidden>Halten</button>
       </div>
     </section>
-    <button class="version" data-version type="button" title="Klicken, um die Seite neu zu laden">Version 2.92</button>
+    <button class="version" data-version type="button" title="Klicken, um die Seite neu zu laden">Version 2.93</button>
     <script>const versionButton = document.querySelector('[data-version]'); versionButton.addEventListener('click', () => location.replace(`${location.pathname}?v=${Date.now()}`));</script>
 
     <dialog class="rules-dialog" id="rulesDialog" aria-labelledby="rulesTitle">
@@ -232,7 +232,7 @@
         <h3>Spielablauf</h3>
         <ol>
           <li>Der Einsatz ist fest auf <b>2 Chips</b> gesetzt – „Karten geben“ antippen.</li>
-          <li>Du und der Dealer erhalten je zwei Karten. Eine Dealer-Karte bleibt verdeckt.</li>
+          <li>Du und der Dealer erhalten je zwei Karten. Eine Dealer-Karte bleibt verdeckt. Zeigt die offene Karte ein Ass oder einen Zehnerwert, prüft der Dealer vor deinem Zug auf Blackjack – hat er einen, endet die Runde sofort.</li>
           <li><b>Karte</b> gibt dir eine weitere Karte, <b>Halten</b> beendet deine Hand. Mit <b>Verdoppeln</b> setzt du den doppelten Einsatz und bekommst genau eine Karte. Zeigt der Dealer ein Ass, kannst du vorher eine <b>Versicherung</b> abschließen.</li>
           <li>Danach deckt der Dealer auf und zieht so lange, bis er mindestens 17 hat. Ab 17 hält er.</li>
           <li>Wer näher an 21 liegt, gewinnt. Bei Gleichstand bleibt der Einsatz erhalten.</li>
@@ -271,6 +271,7 @@
   </main>
 
   <script>
+    // BET muss gerade sein: Blackjack-Gewinn (3:2) und Versicherung (halber Einsatz) werden sonst abgerundet.
     const STORAGE_KEY = 'y-o-b.blackjack.save.v1', BET = 2, START_BANKROLL = 100;
     const SUITS = [{ symbol: '♠', name: 'Pik', red: false }, { symbol: '♥', name: 'Herz', red: true }, { symbol: '♦', name: 'Karo', red: true }, { symbol: '♣', name: 'Kreuz', red: false }];
     const RANKS = ['A', '2', '3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K'];
@@ -282,6 +283,9 @@
     const deckElement = document.getElementById('deck');
     const insuranceControls = document.getElementById('insuranceControls'), insureButton = document.getElementById('insureButton'), declineInsuranceButton = document.getElementById('declineInsuranceButton'), insuranceAmountElement = document.getElementById('insuranceAmount'), doubledTag = document.getElementById('doubledTag');
     const rulesButton = document.getElementById('rulesButton'), rulesDialog = document.getElementById('rulesDialog'), rulesClose = document.getElementById('rulesClose');
+    const actionButtons = [dealButton, hitButton, standButton, splitButton, doubleButton, insureButton, declineInsuranceButton];
+    const cardName = card => `${card.suitName} ${RANK_NAMES[card.rank] || card.rank}`;
+    let focusPending = false;
     let bankroll = START_BANKROLL, bet = BET, rounds = 0, deck = [], playerHands = [[]], activeHand = 0, handDone = [], handCounts = [], handStakes = [], handDoubled = [], handResults = [], dealer = [], phase = 'bet', holeHidden = false, insurance = 0, insuranceBet = 0, roundPayout = 0;
 
     try {
@@ -330,7 +334,7 @@
         return element;
       }
       element.className = 'card' + (card.red ? ' red' : '');
-      element.setAttribute('aria-label', `${card.suitName} ${RANK_NAMES[card.rank] || card.rank}`);
+      element.setAttribute('aria-label', cardName(card));
       [['corner top-left', card.rank], ['corner top-right', card.suit + '\uFE0E'], ['suit center-suit', card.suit + '\uFE0E']].forEach(([className, text]) => {
         const span = document.createElement('span'); span.className = className; span.textContent = text; element.appendChild(span);
       });
@@ -394,8 +398,11 @@
       });
     }
     function render() {
+      // Vor dem Aus- und Einblenden merken, wo der Fokus liegt: Ein Knopf verliert ihn in dem Moment, in dem er verschwindet.
+      const focusedBefore = document.activeElement;
       bankrollElement.textContent = bankroll;
-      const totalStake = handStakes.reduce((sum, stake) => sum + stake, 0) || bet;
+      // Eine gekaufte Versicherung zählt bis zum Rundenende zum Einsatz.
+      const totalStake = (handStakes.reduce((sum, stake) => sum + stake, 0) || bet) + insurance;
       const showPayout = phase === 'done';
       betValueElement.textContent = showPayout ? roundPayout : totalStake;
       betLabelElement.textContent = showPayout ? 'Auszahlung' : 'Einsatz';
@@ -410,6 +417,7 @@
       dealButton.hidden = busy;
       hitButton.hidden = phase !== 'player';
       standButton.hidden = phase !== 'player';
+      hitButton.disabled = false; standButton.disabled = false;
       insuranceControls.hidden = phase !== 'insurance';
       insureButton.disabled = false;
       insuranceAmountElement.textContent = insuranceBet;
@@ -427,6 +435,14 @@
       const handText = playerHands.map((cards, index) => `${playerHands.length > 1 ? `Hand ${index + 1}: ` : ''}${cards.length ? handValue(cards) : 'leer'}`).join(', ');
       playerCards.setAttribute('aria-label', playerHands.some(cards => cards.length) ? `Deine Karten – ${handText}` : 'Noch keine Karten');
       animateNewCards();
+      // Tastaturfokus: Verschwindet der gedrückte Knopf, zur nächsten sichtbaren Hauptaktion wechseln.
+      const onAction = actionButtons.includes(focusedBefore);
+      if (onAction && (focusedBefore.hidden || focusedBefore.disabled || (insuranceControls.hidden && insuranceControls.contains(focusedBefore)))) focusPending = true;
+      const focused = document.activeElement;
+      if (focusPending && (onAction || !focused || focused === document.body)) {
+        const next = phase === 'player' ? hitButton : phase === 'insurance' ? insureButton : dealButton.hidden ? null : dealButton;
+        if (next) { next.focus(); focusPending = false; }
+      } else focusPending = false;
     }
     function finishRound() {
       if (phase === 'done') return;
@@ -459,6 +475,7 @@
         const pushes = handResults.filter(result => result === 'push').length;
         const note = dealerTotal > 21 ? `Der Dealer überkauft sich mit ${dealerTotal}.` : `Dealer ${dealerTotal}.`;
         if (wins === playerHands.length) text = `<b>Alle ${playerHands.length} Hände gewonnen!</b> ${note}`;
+        else if (playerHands.every(cards => handValue(cards) > 21)) text = '<b>Alle Hände überkauft.</b> Der Dealer gewinnt.';
         else if (wins === 0 && pushes === 0) text = `<b>Alle Hände verloren.</b> ${note}`;
         else text = `<b>${wins} von ${playerHands.length} Händen gewonnen.</b> ${pushes ? `${pushes} unentschieden. ` : ''}${note}`;
       }
@@ -468,8 +485,10 @@
     }
     function dealerTurn() {
       phase = 'dealer'; holeHidden = false; render();
+      // Sind alle Hände überkauft, deckt der Dealer nur auf und zieht nicht mehr.
+      const allBust = playerHands.every(cards => handValue(cards) > 21);
       const draw = () => {
-        if (handValue(dealer) < 17) { dealer.push(deck.pop()); render(); setTimeout(draw, 700); }
+        if (!allBust && handValue(dealer) < 17) { dealer.push(deck.pop()); render(); setTimeout(draw, 700); }
         else finishRound();
       };
       setTimeout(draw, 550);
@@ -526,21 +545,24 @@
       activeHand = next;
       if (handValue(playerHands[activeHand]) === 21) { handDone[activeHand] = true; advance(); return; }
       render();
+      setMessage(`<b>Hand ${activeHand + 1} ist dran.</b> ${actionsText()}`);
     }
     // Kurze Pause, damit die letzte Karte sichtbar bleibt, dann zur nächsten Hand.
     function finishActiveHand() {
-      // Kein Neuzeichnen hier: Das würde die laufende Kartenanimation abbrechen.
+      // Kein Neuzeichnen hier: Das würde die laufende Kartenanimation abbrechen. Die Knöpfe nur sperren.
       phase = 'dealer';
+      if (actionButtons.includes(document.activeElement)) focusPending = true;
+      [hitButton, standButton, splitButton, doubleButton].forEach(button => { button.disabled = true; });
       setTimeout(() => { phase = 'player'; advance(); }, 750);
     }
     function hit() {
       if (phase !== 'player') return;
       const cards = playerHands[activeHand];
       cards.push(deck.pop());
-      const total = handValue(cards);
-      if (total > 21) setMessage(`<b>Überkauft!</b> ${total} ist zu viel.`);
-      else if (total === 21) setMessage('<b>21!</b> Die Hand steht.');
-      else setMessage(canSplit() ? '<b>Noch eine Karte?</b> Nehmen, splitten oder halten.' : '<b>Noch eine Karte?</b> Nehmen oder halten.');
+      const total = handValue(cards), name = cardName(cards[cards.length - 1]);
+      if (total > 21) setMessage(`<b>Überkauft!</b> ${name} – ${total} ist zu viel.`);
+      else if (total === 21) setMessage(`<b>21!</b> ${name} – die Hand steht.`);
+      else setMessage(`<b>${name} – du hast ${total}.</b> Noch eine Karte oder halten?`);
       render();
       if (total > 21) { handDone[activeHand] = true; finishActiveHand(); }
       else if (total === 21) { handDone[activeHand] = true; finishActiveHand(); }
@@ -573,8 +595,8 @@
       bankroll -= bet; save(); handStakes[activeHand] += bet; handDoubled[activeHand] = true;
       const cards = playerHands[activeHand];
       cards.push(deck.pop());
-      const total = handValue(cards);
-      setMessage(total > 21 ? `<b>Überkauft!</b> ${total} ist zu viel.` : '<b>Verdoppelt!</b> Eine Karte, dann steht die Hand.');
+      const total = handValue(cards), name = cardName(cards[cards.length - 1]);
+      setMessage(total > 21 ? `<b>Überkauft!</b> ${name} – ${total} ist zu viel.` : `<b>Verdoppelt!</b> ${name} – du hast ${total}. Die Hand steht.`);
       render();
       handDone[activeHand] = true;
       finishActiveHand();

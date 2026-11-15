@@ -84,7 +84,7 @@
     .board { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; max-width: 390px; margin: 0 auto 22px; }
     .cell { aspect-ratio: 1; border-radius: 10px; background: #FFFFFF; border: 3px solid #171717; color: var(--text); font-size: clamp(2.8rem, 13vw, 5rem); font-weight: 800; line-height: 1; box-shadow: 3px 3px 0 #171717; transition: background .15s; }
     .cell:focus-visible, .mode:focus-visible, .new-game:focus-visible { outline: 3px solid var(--cyan); outline-offset: 3px; }
-    .cell:disabled { cursor: default; }
+    .cell[aria-disabled="true"] { cursor: default; }
     .cell.x { color: var(--cyan); }
     .cell.o { color: var(--pink); }
     .cell.winner { background: #EF4B3F; color: #FFFFFF; border-color: #171717; animation: winnerPop .65s ease; }
@@ -139,20 +139,20 @@
         <div class="score-card"><strong id="scoreO">0</strong><span id="labelO">Computer (O)</span></div>
       </div>
       <div class="turn" id="turn" aria-live="polite"><b>Du bist dran</b> · Wähle ein Feld</div>
-      <div class="board" role="grid" aria-label="Spielfeld">
-        <button class="cell" data-index="0" role="gridcell" aria-label="Feld 1" type="button"></button>
-        <button class="cell" data-index="1" role="gridcell" aria-label="Feld 2" type="button"></button>
-        <button class="cell" data-index="2" role="gridcell" aria-label="Feld 3" type="button"></button>
-        <button class="cell" data-index="3" role="gridcell" aria-label="Feld 4" type="button"></button>
-        <button class="cell" data-index="4" role="gridcell" aria-label="Feld 5" type="button"></button>
-        <button class="cell" data-index="5" role="gridcell" aria-label="Feld 6" type="button"></button>
-        <button class="cell" data-index="6" role="gridcell" aria-label="Feld 7" type="button"></button>
-        <button class="cell" data-index="7" role="gridcell" aria-label="Feld 8" type="button"></button>
-        <button class="cell" data-index="8" role="gridcell" aria-label="Feld 9" type="button"></button>
+      <div class="board" role="group" aria-label="Spielfeld">
+        <button class="cell" data-index="0" aria-label="Feld 1" type="button"></button>
+        <button class="cell" data-index="1" aria-label="Feld 2" type="button"></button>
+        <button class="cell" data-index="2" aria-label="Feld 3" type="button"></button>
+        <button class="cell" data-index="3" aria-label="Feld 4" type="button"></button>
+        <button class="cell" data-index="4" aria-label="Feld 5" type="button"></button>
+        <button class="cell" data-index="5" aria-label="Feld 6" type="button"></button>
+        <button class="cell" data-index="6" aria-label="Feld 7" type="button"></button>
+        <button class="cell" data-index="7" aria-label="Feld 8" type="button"></button>
+        <button class="cell" data-index="8" aria-label="Feld 9" type="button"></button>
       </div>
       <button class="new-game" id="newGame" type="button">Neues Spiel</button>
     </section>
-    <button class="version" data-version type="button" title="Klicken, um die Seite neu zu laden">Version 2.92</button>
+    <button class="version" data-version type="button" title="Klicken, um die Seite neu zu laden">Version 2.93</button>
     <script>const versionButton = document.querySelector('[data-version]'); versionButton.addEventListener('click', () => location.replace(`${location.pathname}?v=${Date.now()}`));</script>
   </main>
 
@@ -174,7 +174,8 @@
     function drawBoard() {
       cells.forEach((cell, i) => {
         cell.textContent = board[i]; cell.className = 'cell' + (board[i] ? ' ' + board[i].toLowerCase() : '');
-        cell.disabled = Boolean(board[i]) || gameOver || (mode === 'computer' && current === 'O');
+        // aria-disabled statt disabled: das Feld behält den Tastaturfokus; play() weist unzulässige Züge ab.
+        cell.setAttribute('aria-disabled', String(Boolean(board[i]) || gameOver || (mode === 'computer' && current === 'O')));
         cell.setAttribute('aria-label', board[i] ? `Feld ${i + 1}: ${board[i]}` : `Feld ${i + 1}: frei`);
       });
       document.getElementById('scoreX').textContent = scores.X;
@@ -210,19 +211,20 @@
     function findTactical(mark) { for (const line of wins) { const values = line.map(i => board[i]); if (values.filter(v => v === mark).length === 2 && values.includes('')) return line[values.indexOf('')]; } return null; }
     function bestMove() {
       let bestScore = -Infinity, move = 0;
-      board.forEach((value, i) => { if (!value) { board[i] = 'O'; const score = minimax(false); board[i] = ''; if (score > bestScore) { bestScore = score; move = i; } } });
+      board.forEach((value, i) => { if (!value) { board[i] = 'O'; const score = minimax(false, 1); board[i] = ''; if (score > bestScore) { bestScore = score; move = i; } } });
       return move;
     }
-    function minimax(maximizing) {
+    // Tiefe im Ergebnis: schnelle Siege und späte Niederlagen werden bevorzugt.
+    function minimax(maximizing, depth) {
       const outcome = result(board);
-      if (outcome) return outcome.winner === 'O' ? 10 : outcome.winner === 'X' ? -10 : 0;
+      if (outcome) return outcome.winner === 'O' ? 10 - depth : outcome.winner === 'X' ? depth - 10 : 0;
       const scores = [];
-      board.forEach((value, i) => { if (!value) { board[i] = maximizing ? 'O' : 'X'; scores.push(minimax(!maximizing)); board[i] = ''; } });
+      board.forEach((value, i) => { if (!value) { board[i] = maximizing ? 'O' : 'X'; scores.push(minimax(!maximizing, depth + 1)); board[i] = ''; } });
       return maximizing ? Math.max(...scores) : Math.min(...scores);
     }
     function reset() { clearTimeout(thinkTimer); board = Array(9).fill(''); current = 'X'; gameOver = false; document.querySelector('.game').classList.remove('victory'); drawBoard(); setTurn(mode === 'computer' ? '<b>Du bist dran</b> · Wähle ein Feld' : '<b>Spieler 1 (X) ist dran</b>'); }
-    modeButtons.forEach(button => button.addEventListener('click', () => { mode = button.dataset.mode; modeButtons.forEach(b => b.classList.toggle('active', b === button)); difficultyPanel.hidden = mode !== 'computer'; document.getElementById('labelX').textContent = mode === 'computer' ? 'Du (X)' : 'Spieler 1 (X)'; document.getElementById('labelO').textContent = mode === 'computer' ? 'Computer (O)' : 'Spieler 2 (O)'; reset(); }));
-    difficultyButtons.forEach(button => button.addEventListener('click', () => { difficulty = button.dataset.difficulty; difficultyButtons.forEach(b => b.classList.toggle('active', b === button)); reset(); }));
+    modeButtons.forEach(button => button.addEventListener('click', () => { mode = button.dataset.mode; modeButtons.forEach(b => b.classList.toggle('active', b === button)); difficultyPanel.hidden = mode !== 'computer'; document.getElementById('labelX').textContent = mode === 'computer' ? 'Du (X)' : 'Spieler 1 (X)'; document.getElementById('labelO').textContent = mode === 'computer' ? 'Computer (O)' : 'Spieler 2 (O)'; scores.X = scores.O = scores.draw = 0; reset(); }));
+    difficultyButtons.forEach(button => button.addEventListener('click', () => { difficulty = button.dataset.difficulty; difficultyButtons.forEach(b => b.classList.toggle('active', b === button)); scores.X = scores.O = scores.draw = 0; reset(); }));
     cells.forEach(cell => cell.addEventListener('click', () => play(Number(cell.dataset.index))));
     document.getElementById('newGame').addEventListener('click', reset);
     drawBoard();

@@ -115,11 +115,11 @@
         <div class="player" id="player2">Spieler 2<strong>0</strong></div>
       </div>
       <p class="message" id="message" aria-live="polite"><b>Bereit?</b> Finde das erste Paar.</p>
-      <div class="board" id="board" role="grid" aria-label="Memory-Spielfeld"></div>
+      <div class="board" id="board" role="group" aria-label="Memory-Spielfeld"></div>
       <button class="new-game" id="newGame" type="button">Neues Spiel</button>
       <a class="symbols-link" href="memory-symbols.html">Alle Symbole ansehen&nbsp; →</a>
     </section>
-    <button class="version" data-version type="button" title="Klicken, um die Seite neu zu laden">Version 2.92</button>
+    <button class="version" data-version type="button" title="Klicken, um die Seite neu zu laden">Version 2.93</button>
     <script>const versionButton = document.querySelector('[data-version]'); versionButton.addEventListener('click', () => location.replace(`${location.pathname}?v=${Date.now()}`));</script>
   </main>
   <script src="memory-symbols.js"></script>
@@ -157,10 +157,11 @@
     let run = 0, heapTimer = null;
     // Nach dem Sieg sammeln sich Karten mit gleicher Aufdeckzahl bzw. pro Spieler in eigenen Haufen.
     function startHeap() {
-      const piles = new Map();
+      const piles = new Map(), rest = [];
       if (mode === 'two') { piles.set('1', []); piles.set('2', []); }
-      [...boardElement.querySelectorAll('.memory-card')].forEach(card => { const key = mode === 'two' ? (card.dataset.owner || '1') : String(Number(card.dataset.reveals) || 1); if (!piles.has(key)) piles.set(key, []); piles.get(key).push(card); });
-      const groups = [...piles.entries()].sort(([first], [second]) => Number(first) - Number(second)), board = boardElement.getBoundingClientRect();
+      // Die einzelne Karte ohne Partner (5 × 5) gehört niemandem und bekommt einen eigenen Haufen.
+      [...boardElement.querySelectorAll('.memory-card')].forEach(card => { if (!card.classList.contains('matched')) { rest.push(card); return; } const key = mode === 'two' ? (card.dataset.owner || '1') : String(Number(card.dataset.reveals) || 1); if (!piles.has(key)) piles.set(key, []); piles.get(key).push(card); });
+      const groups = [...piles.entries()].sort(([first], [second]) => Number(first) - Number(second)), board = boardElement.getBoundingClientRect(); if (rest.length) groups.push(['', rest]);
       const sample = boardElement.children[0], cardWidth = sample.getBoundingClientRect().width, cardHeight = sample.getBoundingClientRect().height;
       const columns = Math.min(groups.length, Math.max(1, Math.floor((board.width + 12) / (cardWidth + 12)))), rows = Math.ceil(groups.length / columns), cellWidth = board.width / columns, cellHeight = board.height / rows;
       const heapRun = run, flights = [];
@@ -190,7 +191,7 @@
         groups.forEach(([count, pile], pileIndex) => {
           const column = pileIndex % columns, row = Math.floor(pileIndex / columns);
           const label = document.createElement('span'); label.className = 'pile-count';
-          label.textContent = `${mode === 'two' ? `Spieler ${count} · ` : ''}${pile.length} ${pile.length === 1 ? 'Karte' : 'Karten'}`;
+          label.textContent = `${count === '' ? 'Übrig · ' : mode === 'two' ? `Spieler ${count} · ` : ''}${pile.length} ${pile.length === 1 ? 'Karte' : 'Karten'}`;
           label.style.left = `${column * cellWidth + cellWidth / 2 - 3}px`;
           label.style.top = `${row * cellHeight + (cellHeight - cardHeight) / 2 + (pile.length - 1) * 2 + cardHeight + 8}px`;
           boardElement.appendChild(label);
@@ -201,7 +202,7 @@
       clearInterval(timer); gamePanel.classList.remove('victory'); const pairCount = size === 24 ? 12 : size; const chosen = shuffle(icons).slice(0, size === 24 ? pairCount + 1 : pairCount); cards = shuffle(size === 24 ? chosen.slice(0, pairCount).flatMap(icon => [icon, icon]).concat([chosen[pairCount]]) : chosen.flatMap(icon => [icon, icon])); first = second = null; locked = stacked; currentPlayer = 1; playerScores = [0, 0]; moves = pairs = seconds = 0;
       boardElement.dataset.size = size; applyBoardLayout(); updateSizeLabels(); boardElement.innerHTML = '';
       const totalCells = cards.length;
-      cards.forEach((icon, index) => { const card = document.createElement('button'); card.className = 'memory-card'; card.type = 'button'; card.dataset.index = index; card.dataset.icon = icon.symbol; card.style.setProperty('--symbol-bg', icon.color); card.setAttribute('role', 'gridcell'); card.setAttribute('aria-label', `Karte ${index + 1}, verdeckt`); card.addEventListener('click', () => flip(card)); boardElement.appendChild(card); });
+      cards.forEach((icon, index) => { const card = document.createElement('button'); card.className = 'memory-card'; card.type = 'button'; card.dataset.index = index; card.dataset.icon = icon.symbol; card.style.setProperty('--symbol-bg', icon.color); card.setAttribute('aria-label', `Karte ${index + 1}, verdeckt`); card.addEventListener('click', () => flip(card)); boardElement.appendChild(card); });
       if (stacked) [...boardElement.querySelectorAll('.memory-card')].forEach((card, index) => { const center = centerOffset(card); card.style.zIndex = cards.length - index; setPose(card, pose(center.x + jitter(3), center.y + jitter(3), jitter(8), 0)); });
       document.getElementById('time').textContent = '0:00'; updateStats(); document.getElementById('message').innerHTML = mode === 'two' ? '<b>Spieler 1 ist dran.</b> Finde ein Paar.' : '<b>Bereit?</b> Finde das erste Paar.';
     }
@@ -215,6 +216,7 @@
       else {
       locked = true; old.forEach(card => { settle(card); setPose(card, currentPose(card)); });
       await Promise.all(old.map((card, index) => { const center = centerOffset(card); card.style.zIndex = index; return fly(card, pose(center.x + jitter(3), center.y + jitter(3), jitter(8), card._pose.flip), 450, index * 12); }));
+      if (myRun !== run) return;
       old.forEach(card => { const center = centerOffset(card); card.classList.remove('matched', 'flipped'); setPose(card, pose(center.x + jitter(3), center.y + jitter(3), jitter(8), 0)); });
       }
       for (let round = 0; round < 2 && myRun === run; round++) {
@@ -223,7 +225,7 @@
       if (myRun !== run) return;
       if (old.length) build(true);
       const dealt = [...boardElement.children];
-      await Promise.all(dealt.map((card, index) => fly(card, pose(), 450, index * 45).then(() => { card.style.zIndex = ''; card.style.transform = ''; card.style.transition = ''; card._pose = null; })));
+      await Promise.all(dealt.map((card, index) => fly(card, pose(), 450, index * 45).then(() => { if (myRun !== run) return; card.style.zIndex = ''; card.style.transform = ''; card.style.transition = ''; card._pose = null; })));
       if (myRun !== run) return;
       locked = false; beginTimer();
     }
@@ -235,7 +237,7 @@
       count.textContent = reveals; card.classList.add('flipped'); card.setAttribute('aria-label', `Karte ${Number(card.dataset.index) + 1}: ${card.dataset.icon}, ${reveals}× aufgedeckt`);
       if (!first) { first = card; return; }
       second = card; moves++; updateStats(); locked = true;
-      if (first.dataset.icon === second.dataset.icon) { first.classList.add('matched'); second.classList.add('matched'); pairs++; if (mode === 'two') { first.dataset.owner = second.dataset.owner = String(currentPlayer); playerScores[currentPlayer - 1]++; } first = second = null; locked = false; updateStats(); if (pairs === Math.floor(cards.length / 2)) { clearInterval(timer); const result = mode === 'two' ? (playerScores[0] === playerScores[1] ? 'Unentschieden!' : `Spieler ${playerScores[0] > playerScores[1] ? 1 : 2} gewinnt!`) : 'Gewonnen!'; gamePanel.classList.add('victory'); heapTimer = setTimeout(startHeap, 800); document.getElementById('message').innerHTML = `<b>${result}</b> ${moves} Züge in ${document.getElementById('time').textContent}.`; } else if (mode === 'two') document.getElementById('message').innerHTML = `<b>Spieler ${currentPlayer} bleibt dran.</b> Noch ein Versuch!`; }
+      if (first.dataset.icon === second.dataset.icon) { first.classList.add('matched'); second.classList.add('matched'); pairs++; if (mode === 'two') { first.dataset.owner = second.dataset.owner = String(currentPlayer); playerScores[currentPlayer - 1]++; } first = second = null; locked = false; updateStats(); if (pairs === Math.floor(cards.length / 2)) { clearInterval(timer); const result = mode === 'two' ? (playerScores[0] === playerScores[1] ? 'Unentschieden!' : `Spieler ${playerScores[0] > playerScores[1] ? 1 : 2} gewinnt!`) : 'Gewonnen!'; gamePanel.classList.add('victory'); heapTimer = setTimeout(startHeap, 800); document.getElementById('message').innerHTML = `<b>${result}</b> ${moves} Züge in ${document.getElementById('time').textContent}.`; } else document.getElementById('message').innerHTML = mode === 'two' ? `<b>Spieler ${currentPlayer} bleibt dran.</b> Noch ein Versuch!` : `<b>Paar gefunden!</b> ${pairs} von ${Math.floor(cards.length / 2)} Paaren, ${moves} ${moves === 1 ? 'Zug' : 'Züge'}.`; }
       else { const flipRun = run; setTimeout(() => { if (flipRun !== run) return; [first, second].forEach(item => { item.classList.remove('flipped'); item.setAttribute('aria-label', `Karte ${Number(item.dataset.index) + 1}, verdeckt`); }); first = second = null; if (mode === 'two') { currentPlayer = currentPlayer === 1 ? 2 : 1; document.getElementById('message').innerHTML = `<b>Spieler ${currentPlayer} ist dran.</b> Finde ein Paar.`; } locked = false; updateStats(); }, 1400); }
     }
     document.querySelectorAll('.mode').forEach(button => button.addEventListener('click', () => { mode = button.dataset.mode; document.querySelectorAll('.mode').forEach(item => item.classList.toggle('active', item === button)); document.getElementById('players').hidden = mode !== 'two'; start(); }));

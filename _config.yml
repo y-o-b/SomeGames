@@ -1,0 +1,7 @@
+# GitHub Pages baut die Seite mit Jekyll. Entwicklerdateien gehören nicht auf die Website.
+exclude:
+  - scripts
+  - deals-without-solutions.json
+  - AGENTS.md
+  - README.md
+  - SOLITAIR-KARTENBEDIENUNG.md

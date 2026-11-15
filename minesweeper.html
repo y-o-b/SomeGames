@@ -85,8 +85,8 @@
       body.board-view-mode.side-collapsed header,
       body.board-view-mode.side-collapsed .back-button,
       body.board-view-mode.side-collapsed .overlay-hint,
-      body.board-view-mode.side-collapsed .game .stats,
-      body.board-view-mode.side-collapsed .game .new-game { display: none; }
+      body.board-view-mode.side-collapsed .game:not(.finished) .stats,
+      body.board-view-mode.side-collapsed .game:not(.finished) .new-game { display: none; }
       body.board-view-mode.side-collapsed .game.wrap-mode .board.wrap { right: 0; }
       body.board-view-mode.side-collapsed .side-toggle { right: var(--side-right); }
       body.board-view-mode.side-collapsed .side-toggle svg { transform: rotate(180deg); }
@@ -245,9 +245,9 @@
         </div>
       </div>
       <button class="settings-done" id="settingsDone" type="button">Spiel starten</button>
-      <button class="version" data-version type="button" title="Klicken, um die Seite neu zu laden">Version 2.92</button>
+      <button class="version" data-version type="button" title="Klicken, um die Seite neu zu laden">Version 2.93</button>
     </dialog>
-    <button class="version" data-version type="button" title="Klicken, um die Seite neu zu laden">Version 2.92</button>
+    <button class="version" data-version type="button" title="Klicken, um die Seite neu zu laden">Version 2.93</button>
     <script>document.querySelectorAll('[data-version]').forEach(versionButton => { versionButton.addEventListener('click', () => location.replace(`${location.pathname}?v=${Date.now()}`)); });</script>
   </main>
   <script>
@@ -268,7 +268,7 @@
     const viewCols = () => WRAP_VIEW_COLS / wrapZoom, viewRows = () => wrapViewRows / wrapZoom;
     function minimumZoom() {
       if (innerWidth <= innerHeight) return ZOOM_PORTRAIT_MIN;
-      const stepY = boardShape === 'hex' ? .75 * 2 / Math.sqrt(3) : 1;
+      const stepY = config().shape === 'hex' ? .75 * 2 / Math.sqrt(3) : 1;
       const portraitRows = Math.min(WRAP_VIEW_ROWS_MAX, WRAP_VIEW_COLS * innerWidth / innerHeight / stepY);
       return Math.max(ZOOM_MIN, Math.min(ZOOM_PORTRAIT_MIN, wrapViewRows / portraitRows));
     }
@@ -277,6 +277,7 @@
     const SHAPE_STORAGE_KEY = 'y-o-b.minesweeper.shape.v1', WRAP_STORAGE_KEY = 'y-o-b.minesweeper.wrap.v1', WRAP_BOARD_SIZE_KEY = 'y-o-b.minesweeper.wrap-board-size.v1', SIZE_STORAGE_KEY = 'y-o-b.minesweeper.size.v1', MINE_COUNT_STORAGE_KEY = 'y-o-b.minesweeper.mine-count.v1', MINE_PERCENT_STORAGE_KEY = 'y-o-b.minesweeper.mine-percent.v1', LEVEL_STORAGE_KEY = 'y-o-b.minesweeper.level.v1', GAME_STATE_KEY = 'y-o-b.minesweeper.game.v1';
     let boardShape = 'square', boardWrap = true, wrapBoardSize = 9, offsetX = 0, offsetY = 0, pan = null, panEndedAt = 0, panFrame = 0, ghosts = [], boardSize = '9x9', mineCount = 10, minePercent = 20, activeConfig = null, grid = [], over = false, placed = false, seconds = 0, timer = null, openCount = 0, flagCount = 0, pressTimer = null, longPressed = false, autoSafeTimer = null, revealTimers = [], revealing = false, detectorTimers = [], detectorRun = 0, shovelIndex = null, gameSaveTimer = null;
     const clamp = (value, min, max) => Math.min(max, Math.max(min, value));
+    const inRect = (x, y, rect) => x >= rect.left && x <= rect.right && y >= rect.top && y <= rect.bottom;
     const settingsCells = () => { const { cols, rows } = boardWrap ? wrappedDimensions(wrapBoardSize, boardShape) : boardSizes[boardSize]; return cols * rows; };
     const minesForPercent = (cells, percent) => Math.max(1, Math.round(cells * percent / 100));
     const percentForMines = (cells, mines) => clamp(Math.round(mines / cells * 100 / 10) * 10, MINE_PERCENT_MIN, MINE_PERCENT_MAX);
@@ -334,7 +335,7 @@
       wrapBoardSize = clamp(wrapBoardSize, WRAP_BOARD_MIN, WRAP_BOARD_MAX);
       settingsTimerWasRunning = timer !== null;
       if (settingsTimerWasRunning) { clearInterval(timer); timer = null; }
-      clearTimeout(autoSafeTimer); autoSafeTimer = null; stopDetector();
+      clearTimeout(autoSafeTimer); autoSafeTimer = null; clearTimeout(zoomTimer); zoomTimer = null; stopDetector();
       refreshSettingsControls(); settingsDialog.showModal();
     }
     function cancelSettings() {
@@ -353,7 +354,12 @@
     document.getElementById('settingsDone').addEventListener('click', applySettingsAndStart);
     settingsDialog.addEventListener('cancel', cancelSettings);
     // Ein Tipp neben das Popup verwirft die Änderungen.
-    settingsDialog.addEventListener('click', event => { if (event.target === settingsDialog) { settingsDialog.close(); cancelSettings(); } });
+    // Nur der Bereich außerhalb des Kastens zählt (der Rand und die Lücken im Popup melden ebenfalls den Dialog als Ziel),
+    // und nur, wenn dort auch gedrückt wurde – nicht, wenn ein Regler nach außen gezogen und dort losgelassen wird.
+    const onBackdrop = event => event.target === settingsDialog && !inRect(event.clientX, event.clientY, settingsDialog.getBoundingClientRect());
+    let backdropPressed = false;
+    settingsDialog.addEventListener('pointerdown', event => { backdropPressed = onBackdrop(event); });
+    settingsDialog.addEventListener('click', event => { if (backdropPressed && onBackdrop(event)) { settingsDialog.close(); cancelSettings(); } backdropPressed = false; });
     function saveSettings() { try { localStorage.setItem(SHAPE_STORAGE_KEY, boardShape); localStorage.setItem(WRAP_STORAGE_KEY, boardWrap ? 'on' : 'off'); localStorage.setItem(WRAP_BOARD_SIZE_KEY, String(wrapBoardSize)); localStorage.setItem(SIZE_STORAGE_KEY, boardSize); localStorage.setItem(MINE_COUNT_STORAGE_KEY, String(mineCount)); localStorage.setItem(MINE_PERCENT_STORAGE_KEY, String(minePercent)); } catch (error) { console.warn('Detektor-Einstellungen konnten nicht gespeichert werden.', error); } }
     function persistGameStateNow() {
       if (!grid.length || !activeConfig || settingsDialog.open) return;
@@ -371,7 +377,7 @@
     function restoreGameState() {
       try {
         const saved = JSON.parse(localStorage.getItem(GAME_STATE_KEY) || 'null');
-        if (!saved || saved.version !== 1 || !['square', 'hex', 'octagon'].includes(saved.boardShape) || typeof saved.boardWrap !== 'boolean' || !boardSizes[saved.boardSize] || !Number.isInteger(saved.wrapBoardSize) || saved.wrapBoardSize < WRAP_BOARD_LEGACY_MIN || saved.wrapBoardSize > WRAP_BOARD_MAX || !Number.isInteger(saved.mineCount) || !Number.isInteger(saved.mines)) return null;
+        if (!saved || saved.version !== 1 || !['square', 'hex', 'octagon'].includes(saved.boardShape) || saved.boardWrap !== true || !boardSizes[saved.boardSize] || !Number.isInteger(saved.wrapBoardSize) || saved.wrapBoardSize < WRAP_BOARD_LEGACY_MIN || saved.wrapBoardSize > WRAP_BOARD_MAX || !Number.isInteger(saved.mineCount) || !Number.isInteger(saved.mines)) return null;
         const selectedSize = boardSizes[saved.boardSize], maxMines = saved.boardWrap ? Math.max(Math.min(300, Math.max(60, Math.floor(saved.wrapBoardSize * saved.wrapBoardSize * .5))), minesForPercent((saved.wrapBoardSize + 1) ** 2, MINE_PERCENT_MAX)) : ({ '9x9': 60, '12x12': 80, '12x21': 120 })[saved.boardSize];
         const rotate = !saved.boardWrap && saved.boardSize === '12x21' && tabletLandscape();
         const { cols, rows } = saved.boardWrap ? wrappedDimensions(saved.wrapBoardSize, saved.boardShape) : { cols: rotate ? selectedSize.rows : selectedSize.cols, rows: rotate ? selectedSize.cols : selectedSize.rows };
@@ -519,6 +525,7 @@
       activeConfig = selectedConfig(); updateSizeButtons(); updateWrapBoardSizeControl();
       appElement.classList.toggle('tablet-wide', !boardWrap && boardSize === '12x21' && tabletLandscape());
       stopDetector();
+      clearTimeout(zoomTimer); zoomTimer = null; cancelAnimationFrame(panAnimation); panAnimation = 0;
       shovelIndex = null;
       gamePanel.classList.toggle('medium-mode', boardSize === '12x12'); gamePanel.classList.toggle('hard-mode', boardSize === '12x21'); gamePanel.classList.toggle('wrap-mode', config().wrap);
       clearInterval(timer); timer = null; clearTimeout(pressTimer); clearTimeout(autoSafeTimer); revealTimers.forEach(clearTimeout); revealTimers = []; revealing = false; autoSafeTimer = null; const { cols, rows } = config();
@@ -532,7 +539,7 @@
         button.addEventListener('animationend', event => { if (event.animationName === 'revealCell') { cell.opening = false; button.classList.remove('opening'); } });
         button.addEventListener('click', event => {
           if (Date.now() - panEndedAt < 350) return;
-          message.innerHTML = '';
+          if (!over) message.innerHTML = '';
           if (longPressed) { longPressed = false; return; }
           if (shovelIndex === index && (event.target.closest?.('.shovel-action') || event.detail === 0)) { clearShovel(); reveal(index); return; }
           selectShovel(index);
@@ -592,11 +599,12 @@
     // Randlos: Ein Feld zählt nur als erreichbar, wenn eine seiner Kopien mit der Mitte im sichtbaren Fenster liegt.
     function visibleElement(index) {
       if (!config().wrap) return boardElement.children[index];
-      const board = boardElement.getBoundingClientRect();
+      // Im Vollbild liegen Statistik und „Neues Spiel“ über dem Brett; ein Feld darunter gilt nicht als sichtbar.
+      const board = boardElement.getBoundingClientRect(), covers = boardViewActive() ? [document.querySelector('.stats'), document.getElementById('newGame')].map(element => element.getBoundingClientRect()).filter(rect => rect.width && rect.height) : [];
       return [boardElement.children[index], ...(ghosts[index] || [])].find(element => {
         if (element.style.display === 'none') return false;
         const rect = element.getBoundingClientRect(), x = rect.left + rect.width / 2, y = rect.top + rect.height / 2;
-        return x >= board.left && x <= board.right && y >= board.top && y <= board.bottom;
+        return inRect(x, y, board) && !covers.some(cover => inRect(x, y, cover));
       }) || null;
     }
     const isVisibleCell = index => Boolean(visibleElement(index));
@@ -759,7 +767,7 @@
       layoutCells();
       persistGameState();
       clearTimeout(autoSafeTimer); autoSafeTimer = null; stopDetector(); clearShovel();
-      clearTimeout(zoomTimer); zoomTimer = setTimeout(() => { zoomTimer = null; if (!over && !revealing) updateGuessMarks(); }, 300);
+      clearTimeout(zoomTimer); zoomTimer = setTimeout(() => { zoomTimer = null; if (!over && !revealing && !settingsDialog.open) updateGuessMarks(); }, 300);
     }
     // Verschieben im Randlos-Modus: erst ab 12 px Bewegung, stufenlos; mit zwei Fingern wird gezoomt.
     boardElement.addEventListener('pointerdown', event => {
@@ -779,10 +787,12 @@
       if (pinch) {
         if (activePointers.size < 2) return;
         const [a, b] = [...activePointers.values()];
-        panEndedAt = Date.now(); setZoom(pinch.zoom * Math.hypot(a.x - b.x, a.y - b.y) / pinch.distance);
+        panEndedAt = Date.now(); setZoom(pinch.zoom * Math.hypot(a.x - b.x, a.y - b.y) / pinch.distance, { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 });
         return;
       }
       if (!pan || event.pointerId !== pan.id) return;
+      // Maus außerhalb des Bretts losgelassen: Das pointerup kam nie an; ohne gedrückte Taste nicht weiterziehen.
+      if (event.pointerType === 'mouse' && !event.buttons) { activePointers.delete(event.pointerId); pan = null; boardElement.classList.remove('panning'); return; }
       const dx = event.clientX - pan.x, dy = event.clientY - pan.y;
       if (!pan.active) { if (Math.hypot(dx, dy) < 12) return; pan.active = true; clearTimeout(pressTimer); pressTimer = null; clearTimeout(autoSafeTimer); autoSafeTimer = null; stopDetector(); clearShovel(); boardElement.classList.add('panning'); try { boardElement.setPointerCapture(pan.id); } catch (error) {} }
       // Stufenlos: eine Feldbreite entspricht boardElement.clientWidth / viewCols(); einmal je Bild neu zeichnen.
@@ -793,7 +803,7 @@
     ['pointerup', 'pointercancel'].forEach(type => boardElement.addEventListener(type, event => {
       activePointers.delete(event.pointerId);
       if (pinch) { if (activePointers.size < 2) { pinch = null; pan = null; panEndedAt = Date.now(); boardElement.classList.remove('panning'); persistGameState(); } return; }
-      if (!pan || event.pointerId !== pan.id) return; const wasPanning = pan.active; if (wasPanning) { panEndedAt = Date.now(); boardElement.classList.remove('panning'); persistGameState(); } pan = null; if (wasPanning && !over && !revealing) requestAnimationFrame(() => requestAnimationFrame(() => { if (!over && !revealing && !pan?.active) updateGuessMarks(); }));
+      if (!pan || event.pointerId !== pan.id) return; const wasPanning = pan.active; if (wasPanning) { panEndedAt = Date.now(); boardElement.classList.remove('panning'); persistGameState(); } pan = null; if (wasPanning && !over && !revealing) requestAnimationFrame(() => requestAnimationFrame(() => { if (!over && !revealing && !pan?.active && !settingsDialog.open) updateGuessMarks(); }));
     }));
     // Desktop: Mausrad und Trackpad-Pinch (Chrome, Firefox, Edge melden Pinch als Rad mit Ctrl) zoomen um den Mauszeiger.
     // Kleine Radschritte sammeln sich in wheelZoom, weil setZoom auf Hundertstel rundet.
