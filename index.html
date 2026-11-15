@@ -37,6 +37,10 @@
     footer { margin-top: 22px; color: var(--muted); font-size: .78rem; }
     .version { margin-top: 8px; padding: 0; border: 0; color: var(--muted); background: transparent; font: inherit; font-size: .72rem; cursor: pointer; }
     .version:focus-visible { outline: 2px solid #171717; outline-offset: 3px; }
+    /* Schlichter Textlink: hebt die Knopf-Gestaltung der Spiel-Links (a) wieder auf. */
+    .privacy { display: inline-block; margin-top: 8px; padding: 0; border: 0; border-radius: 0; color: var(--muted); background: transparent; font-size: .72rem; font-weight: 400; text-decoration: underline; box-shadow: none; }
+    .privacy:hover { transform: none; filter: none; }
+    .privacy[hidden] { display: none; }
     /* Schmale Bildschirme (iPhone): Icon links, Text und Knopf rechts, damit alle Spiele auf einen Blick passen. */
     @media (max-width: 600px) {
       body { padding: 14px 14px 8px; align-content: start; }
@@ -90,7 +94,10 @@
       </div>
     </div>
     <footer>Eine kleine Spielpause gefällig?</footer>
-      <button class="version" data-version type="button" title="Klicken, um die Seite neu zu laden">Version 2.93</button>
+    <!-- Nur auf der Website sichtbar: Die App liefert die Datenschutzseite nicht mit. -->
+    <a class="privacy" href="datenschutz.html" data-web-only hidden>Datenschutz</a>
+      <button class="version" data-version type="button" title="Klicken, um die Seite neu zu laden">Version 2.94</button>
+    <script>if (location.protocol === 'https:' || location.protocol === 'http:') document.querySelectorAll('[data-web-only]').forEach(element => { element.hidden = false; });</script>
     <script>const versionButton = document.querySelector('[data-version]'); versionButton.addEventListener('click', () => location.replace(`${location.pathname}?v=${Date.now()}`));</script>
   </main>
   <script>if ('serviceWorker' in navigator) addEventListener('load', () => navigator.serviceWorker.register('sw.js').catch(() => {}));</script>
