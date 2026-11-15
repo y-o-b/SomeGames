@@ -118,18 +118,18 @@
       :root { --card-w: 56px; }
       .message { font-size: .84rem; }
       .controls button { padding: 12px; }
+      /* Drei oder vier Aktionen: kleinere Schrift, damit „Verdoppeln“ nicht abgeschnitten wird. */
+      .controls.with-split button,
+      .controls.with-double button { padding: 11px 6px; font-size: .8rem; }
+      .controls.with-split.with-double { grid-template-columns: 1fr 1fr; }
     }
     @media (max-width: 390px) {
       .game { padding: 13px; }
       :root { --card-w: 50px; }
     }
-    @media (max-width: 600px) {
-      /* Vier Aktionen nebeneinander würden auf dem Handy abgeschnitten; daher zwei Reihen. */
-      .controls.with-split.with-double { grid-template-columns: 1fr 1fr; }
-    }
     @media (max-width: 380px) {
       .controls.with-split button,
-      .controls.with-double button { padding: 9px 5px; font-size: .78rem; }
+      .controls.with-double button { padding: 9px 4px; font-size: .72rem; }
     }
     /* Querformat auf flachen Bildschirmen: Dealer und Spieler liegen nebeneinander, damit alles ohne Scrollen passt. */
     @media (orientation: landscape) and (max-height: 520px) {
@@ -212,7 +212,7 @@
         <button id="standButton" type="button" hidden>Halten</button>
       </div>
     </section>
-    <button class="version" data-version type="button" title="Klicken, um die Seite neu zu laden">Version 2.90</button>
+    <button class="version" data-version type="button" title="Klicken, um die Seite neu zu laden">Version 2.91</button>
     <script>const versionButton = document.querySelector('[data-version]'); versionButton.addEventListener('click', () => location.replace(`${location.pathname}?v=${Date.now()}`));</script>
 
     <dialog class="rules-dialog" id="rulesDialog" aria-labelledby="rulesTitle">
