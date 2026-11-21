@@ -2,7 +2,7 @@
   "id": "./",
   "name": "LittleGames",
   "short_name": "Spiele",
-  "version": "2.96",
+  "version": "2.97",
   "description": "Kleine Spiele für zwischendurch: Tic Tac Toe, Memory, Solitär, Detektor, Blackjack und Schiebepuzzle.",
   "lang": "de",
   "dir": "ltr",
