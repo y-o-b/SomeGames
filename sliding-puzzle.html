@@ -1,0 +1,375 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="theme-color" content="#4B8ED8" />
+  <meta name="description" content="Schiebepuzzle: Ordne die Kacheln von 1 bis 15, indem du sie in das freie Feld schiebst." />
+  <link rel="manifest" href="manifest.webmanifest" />
+  <meta name="application-name" content="Spiele" />
+  <meta name="mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-title" content="Spiele" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+  <link rel="icon" href="icons/sliding-puzzle.svg" type="image/svg+xml" />
+  <link rel="apple-touch-icon" href="icons/sliding-puzzle-180.png" />
+  <title>Schiebepuzzle</title>
+  <style>
+    /* Spiele: kein Markieren von Text, auch kein Lupen- oder Kopiermenü beim langen Drücken; Eingabefelder ausgenommen. */
+    html { -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; }
+    input, textarea { -webkit-user-select: text; user-select: text; }
+    :root { --bg: #4B8ED8; --panel: #FFFFFF; --text: #171717; --muted: rgba(23,23,23,.7); --red: #EF4B3F; --yellow: #FFD166; }
+    * { box-sizing: border-box; }
+    body { min-height: 100vh; margin: 0; padding: 24px 16px 30px; display: grid; justify-items: center; align-content: start; color: var(--text); background: var(--bg); font: 16px/1.5 Arial, Helvetica, sans-serif; }
+    .app { width: min(100%, 560px); }
+    header { position: relative; display: flex; align-items: center; justify-content: center; text-align: center; margin-bottom: 24px; }
+    h1 { margin: 0; font-size: clamp(2.1rem, 8.5vw, 3.7rem); line-height: .95; letter-spacing: -.07em; }
+    .back-button { display: grid; place-items: center; width: 44px; height: 44px; position: absolute; left: 0; top: 50%; margin-top: -22px; border: 3px solid #171717; border-radius: 50%; color: #171717; background: #FFFFFF; box-shadow: 3px 3px 0 #171717; text-decoration: none; -webkit-tap-highlight-color: transparent; transition: transform .12s, box-shadow .12s; }
+    .back-button svg { display: block; width: 24px; height: 24px; margin-right: 2px; fill: none; stroke: currentColor; stroke-width: 3.2; stroke-linecap: round; stroke-linejoin: round; }
+    .back-button:active { transform: translate(2px, 2px); box-shadow: 1px 1px 0 #171717; }
+    .back-button:focus-visible { outline: 3px solid #EF4B3F; outline-offset: 3px; }
+    .version { display: block; margin: 14px auto 0; padding: 0; border: 0; color: var(--muted); background: transparent; font: inherit; font-size: .72rem; cursor: pointer; }
+    .version:focus-visible { outline: 2px solid #171717; outline-offset: 3px; }
+    .game { padding: clamp(14px, 4vw, 26px); border: 3px solid #171717; border-radius: 18px; background: var(--panel); box-shadow: 7px 7px 0 #171717; }
+    button { border: 0; color: inherit; font: inherit; cursor: pointer; }
+    .size-switch { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; padding: 5px; margin-bottom: 16px; background: #171717; border-radius: 10px; }
+    .size { padding: 10px 6px; border-radius: 10px; color: rgba(255,255,255,.8); background: transparent; font-weight: 700; transition: .2s ease; }
+    .size.active { color: var(--text); background: var(--panel); box-shadow: 3px 3px 0 var(--red); }
+    .size:focus-visible, .controls button:focus-visible, .tile:focus-visible span { outline: 3px solid var(--red); outline-offset: 2px; }
+    .stats { display: grid; grid-template-columns: 1fr 1fr; gap: 9px; margin-bottom: 12px; text-align: center; }
+    .stat { padding: 7px 4px; border: 2px solid #171717; border-radius: 10px; }
+    .stat strong { display: block; font-size: 1.3rem; line-height: 1.1; font-variant-numeric: tabular-nums; }
+    .stat span { color: var(--muted); font-size: .7rem; }
+    .message { min-height: 40px; margin: 0 0 12px; color: var(--muted); text-align: center; font-size: .88rem; line-height: 1.35; }
+    .message b { color: var(--text); }
+    .board { container-type: inline-size; position: relative; width: 100%; max-width: min(100%, 420px, 62vh); aspect-ratio: 1; margin: 0 auto 18px; padding: 3px; border: 3px solid #171717; border-radius: 12px; background: #171717; touch-action: manipulation; }
+    .board.locked .tile { cursor: default; }
+    .tile, .gap { position: absolute; top: 0; left: 0; width: calc(100% / var(--n)); height: calc(100% / var(--n)); padding: 3px; transform: translate(calc(var(--x) * 100%), calc(var(--y) * 100%)); transition: transform .17s cubic-bezier(.25,.75,.35,1); }
+    .tile { background: transparent; -webkit-tap-highlight-color: transparent; }
+    .tile span { display: grid; place-items: center; width: 100%; height: 100%; border: 3px solid #171717; border-radius: 9px; background: #FFFFFF; box-shadow: 3px 3px 0 #171717; font-weight: 900; line-height: 1; font-variant-numeric: tabular-nums; }
+    .tile.home span { color: #2A6DB3; background: #E8F1FC; }
+    .tile:active span { transform: translate(2px, 2px); box-shadow: 1px 1px 0 #171717; }
+    .tile span { transition: transform .1s, box-shadow .1s; }
+    .gap { pointer-events: none; }
+    .gap::after { content: ''; display: block; width: 100%; height: 100%; border: 3px dashed rgba(255,255,255,.45); border-radius: 9px; background: rgba(255,255,255,.06); }
+    .board.n3 .tile span { font-size: clamp(1.9rem, 12cqw, 3.4rem); }
+    .board.n4 .tile span { font-size: clamp(1.1rem, 8.5cqw, 2.3rem); }
+    .board.n5 .tile span { font-size: clamp(.8rem, 6.6cqw, 1.7rem); }
+    .board.dense .tile, .board.dense .gap { padding: 2px; }
+    .board.dense .tile span { border-width: 2px; border-radius: 7px; box-shadow: 2px 2px 0 #171717; }
+    .board.dense .gap::after { border-width: 2px; border-radius: 7px; }
+    @keyframes victoryPulse { 0%, 100% { transform: scale(1); } 35% { transform: scale(1.025) rotate(-.4deg); } 70% { transform: scale(1.01) rotate(.4deg); } }
+    .board.victory { animation: victoryPulse .8s ease; }
+    @keyframes deniedShake { 0%, 100% { transform: translateX(0); } 25% { transform: translateX(-4px); } 75% { transform: translateX(4px); } }
+    .tile.denied span { animation: deniedShake .28s ease; }
+    .controls { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+    .controls button { padding: 13px 8px; border: 3px solid #171717; border-radius: 10px; font-weight: 800; box-shadow: 4px 4px 0 #171717; transition: transform .12s, box-shadow .12s, filter .15s; }
+    .controls button:hover { filter: brightness(1.06); }
+    .controls button:active { transform: translate(2px, 2px); box-shadow: 2px 2px 0 #171717; }
+    #solutionButton { background: var(--yellow); }
+    #shuffleButton { color: #FFFFFF; background: var(--red); }
+    @media (max-width: 600px) {
+      body { min-height: 100vh; min-height: 100svh; padding: max(18px, env(safe-area-inset-top)) 14px max(14px, env(safe-area-inset-bottom)); }
+      header { margin-bottom: 18px; }
+      h1 { font-size: clamp(1.9rem, 8.5vw, 2.7rem); }
+      .game { padding: 16px; }
+      .size-switch { gap: 4px; padding: 4px; margin-bottom: 14px; }
+      .size { padding: 9px 4px; font-size: .92rem; }
+      .stats { gap: 8px; margin-bottom: 10px; }
+      .stat strong { font-size: 1.15rem; }
+      .message { min-height: 36px; margin-bottom: 10px; font-size: .84rem; }
+      .board { margin-bottom: 16px; }
+      .controls { gap: 8px; }
+      .controls button { padding: 12px 5px; font-size: .88rem; }
+      .version { margin-top: 10px; }
+    }
+    @media (max-width: 390px) {
+      .game { padding: 13px; }
+      .controls button { font-size: .82rem; }
+    }
+  </style>
+</head>
+<body>
+  <main class="app">
+    <header>
+      <a class="back-button" href="index.html" aria-label="Zur Startseite" title="Zur Startseite"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 4 7 12l8 8"/></svg></a>
+      <h1>Schiebepuzzle</h1>
+    </header>
+
+    <section class="game" aria-label="Schiebepuzzle">
+      <div class="size-switch" role="group" aria-label="Puzzle-Größe">
+        <button class="size" data-size="3" type="button">3 × 3</button>
+        <button class="size active" data-size="4" type="button">4 × 4</button>
+        <button class="size" data-size="5" type="button">5 × 5</button>
+      </div>
+      <div class="stats" aria-label="Spielstand">
+        <div class="stat"><strong id="moves">0</strong><span>Züge</span></div>
+        <div class="stat"><strong id="time">0:00</strong><span>Zeit</span></div>
+      </div>
+      <div class="message" id="message" role="status" aria-live="polite">Tippe eine Kachel neben dem freien Feld an.</div>
+      <div class="board n4 dense" id="board" style="--n: 4" role="group" aria-label="Spielfeld"></div>
+      <div class="controls">
+        <button id="solutionButton" type="button">Lösung anzeigen</button>
+        <button id="shuffleButton" type="button">Neu mischen</button>
+      </div>
+    </section>
+    <button class="version" data-version type="button" title="Klicken, um die Seite neu zu laden">Version 2.96</button>
+    <script>const versionButton = document.querySelector('[data-version]'); versionButton.addEventListener('click', () => location.replace(`${location.pathname}?v=${Date.now()}`));</script>
+  </main>
+
+  <script>
+    const board = document.getElementById('board');
+    const messageEl = document.getElementById('message');
+    const movesEl = document.getElementById('moves');
+    const timeEl = document.getElementById('time');
+    const solutionButton = document.getElementById('solutionButton');
+    const shuffleButton = document.getElementById('shuffleButton');
+    const sizeButtons = Array.from(document.querySelectorAll('.size'));
+
+    let size = 4;
+    let state = [];
+    let tiles = new Map();
+    let blank = 0;
+    let history = [];
+    let moves = 0;
+    let finished = false;
+    let playing = false;
+    let playbackTimer = null;
+    let messageTimer = null;
+    let startedAt = null;
+    let elapsed = 0;
+    let timerId = null;
+
+    function formatTime(ms) {
+      const total = Math.floor(ms / 1000);
+      return Math.floor(total / 60) + ':' + String(total % 60).padStart(2, '0');
+    }
+
+    function neighbors(index) {
+      const row = Math.floor(index / size);
+      const col = index % size;
+      const list = [];
+      if (row > 0) list.push(index - size);
+      if (row < size - 1) list.push(index + size);
+      if (col > 0) list.push(index - 1);
+      if (col < size - 1) list.push(index + 1);
+      return list;
+    }
+
+    function swap(a, b) {
+      const tmp = state[a];
+      state[a] = state[b];
+      state[b] = tmp;
+      blank = state.indexOf(0);
+    }
+
+    function isSolved() {
+      const last = state.length - 1;
+      return state.every((value, index) => index === last ? value === 0 : value === index + 1);
+    }
+
+    function setMessage(html, transient) {
+      clearTimeout(messageTimer);
+      messageEl.innerHTML = html;
+      if (transient) messageTimer = setTimeout(() => {
+        if (!finished && !playing) setMessage('Tippe eine Kachel neben dem freien Feld an.');
+      }, 2400);
+    }
+
+    function updateMoves() {
+      movesEl.textContent = String(moves);
+    }
+
+    function startTimer() {
+      if (timerId !== null || finished) return;
+      startedAt = Date.now() - elapsed;
+      timerId = setInterval(() => {
+        elapsed = Date.now() - startedAt;
+        timeEl.textContent = formatTime(elapsed);
+      }, 250);
+    }
+
+    function stopTimer() {
+      if (timerId !== null) {
+        clearInterval(timerId);
+        timerId = null;
+      }
+      if (startedAt !== null) {
+        elapsed = Date.now() - startedAt;
+        startedAt = null;
+        timeEl.textContent = formatTime(elapsed);
+      }
+    }
+
+    function createBoard() {
+      board.innerHTML = '';
+      board.style.setProperty('--n', size);
+      board.classList.remove('n3', 'n4', 'n5', 'dense', 'locked', 'victory');
+      board.classList.add('n' + size);
+      if (size > 3) board.classList.add('dense');
+      tiles = new Map();
+      for (let value = 1; value < size * size; value++) {
+        const tile = document.createElement('button');
+        tile.type = 'button';
+        tile.className = 'tile';
+        tile.dataset.value = String(value);
+        tile.setAttribute('aria-label', 'Kachel ' + value);
+        const face = document.createElement('span');
+        face.textContent = String(value);
+        tile.append(face);
+        tile.addEventListener('click', () => selectTile(value, tile));
+        tiles.set(value, tile);
+        board.append(tile);
+      }
+      const gap = document.createElement('div');
+      gap.className = 'gap';
+      gap.setAttribute('aria-hidden', 'true');
+      board.append(gap);
+    }
+
+    function render() {
+      state.forEach((value, index) => {
+        if (!value) return;
+        const tile = tiles.get(value);
+        tile.style.setProperty('--x', index % size);
+        tile.style.setProperty('--y', Math.floor(index / size));
+        tile.classList.toggle('home', index === value - 1);
+      });
+      const gap = board.querySelector('.gap');
+      gap.style.setProperty('--x', blank % size);
+      gap.style.setProperty('--y', Math.floor(blank / size));
+    }
+
+    function selectTile(value, tile) {
+      if (playing) return;
+      const index = state.indexOf(value);
+      if (finished) {
+        setMessage('Das Puzzle ist gelöst – mische neu für eine neue Runde.', true);
+        return;
+      }
+      if (neighbors(blank).indexOf(index) === -1) {
+        setMessage('Nur Kacheln direkt neben dem freien Feld lassen sich verschieben.', true);
+        tile.classList.remove('denied');
+        void tile.offsetWidth;
+        tile.classList.add('denied');
+        return;
+      }
+      history.push([index, blank]);
+      swap(index, blank);
+      moves++;
+      updateMoves();
+      startTimer();
+      render();
+      if (isSolved()) win();
+    }
+
+    function win() {
+      finished = true;
+      stopTimer();
+      board.classList.add('victory');
+      setMessage('<b>Gelöst!</b> ' + moves + (moves === 1 ? ' Zug' : ' Züge') + ' · ' + formatTime(elapsed));
+    }
+
+    function stopPlayback() {
+      playing = false;
+      if (playbackTimer !== null) {
+        clearTimeout(playbackTimer);
+        playbackTimer = null;
+      }
+      board.classList.remove('locked');
+      solutionButton.textContent = 'Lösung anzeigen';
+    }
+
+    function finishPlayback() {
+      stopPlayback();
+      if (isSolved()) {
+        finished = true;
+        stopTimer();
+        board.classList.add('victory');
+        setMessage('<b>Lösung gezeigt</b> · Ohne Wertung');
+      } else {
+        setMessage('Lösung beendet.');
+      }
+    }
+
+    function toggleSolution() {
+      if (playing) {
+        stopPlayback();
+        setMessage('Lösung gestoppt – du kannst weiterspielen.');
+        return;
+      }
+      if (finished) {
+        setMessage('Das Puzzle ist bereits gelöst.', true);
+        return;
+      }
+      if (history.length === 0) {
+        setMessage('Kein Lösungsweg verfügbar – bitte neu mischen.', true);
+        return;
+      }
+      playing = true;
+      stopTimer();
+      board.classList.add('locked');
+      solutionButton.textContent = 'Lösung stoppen';
+      const total = history.length;
+      const delay = total > 60 ? 70 : total > 30 ? 95 : 140;
+      setMessage('<b>Lösung</b> · ' + total + ' Züge');
+      const step = () => {
+        if (!playing) return;
+        const entry = history.pop();
+        if (!entry) { finishPlayback(); return; }
+        swap(entry[0], entry[1]);
+        render();
+        if (history.length === 0) {
+          finishPlayback();
+        } else {
+          playbackTimer = setTimeout(step, delay);
+        }
+      };
+      playbackTimer = setTimeout(step, 260);
+    }
+
+    function scramble() {
+      stopPlayback();
+      stopTimer();
+      finished = false;
+      moves = 0;
+      elapsed = 0;
+      startedAt = null;
+      updateMoves();
+      timeEl.textContent = formatTime(0);
+      createBoard();
+      state = Array.from({ length: size * size }, (_, index) => index === size * size - 1 ? 0 : index + 1);
+      blank = size * size - 1;
+      history = [];
+      const steps = Math.max(40, size * size * 5);
+      let previousBlank = -1;
+      const randomMove = () => {
+        const options = neighbors(blank).filter(index => index !== previousBlank);
+        const pick = options[Math.floor(Math.random() * options.length)];
+        previousBlank = blank;
+        history.push([pick, blank]);
+        swap(pick, blank);
+      };
+      for (let i = 0; i < steps; i++) randomMove();
+      let safety = 0;
+      while (isSolved() && safety++ < 50) randomMove();
+      render();
+      setMessage('Tippe eine Kachel neben dem freien Feld an.');
+    }
+
+    sizeButtons.forEach(button => button.addEventListener('click', () => {
+      const next = Number(button.dataset.size);
+      if (next === size) return;
+      size = next;
+      sizeButtons.forEach(b => b.classList.toggle('active', b === button));
+      scramble();
+    }));
+
+    shuffleButton.addEventListener('click', scramble);
+    solutionButton.addEventListener('click', toggleSolution);
+
+    scramble();
+  </script>
+  <script>if ('serviceWorker' in navigator) addEventListener('load', () => navigator.serviceWorker.register('sw.js').catch(() => {}));</script>
+</body>
+</html>

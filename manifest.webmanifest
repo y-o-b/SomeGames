@@ -2,8 +2,8 @@
   "id": "./",
   "name": "LittleGames",
   "short_name": "Spiele",
-  "version": "2.95",
-  "description": "Kleine Spiele für zwischendurch: Tic Tac Toe, Memory, Solitär, Detektor und Blackjack.",
+  "version": "2.96",
+  "description": "Kleine Spiele für zwischendurch: Tic Tac Toe, Memory, Solitär, Detektor, Blackjack und Schiebepuzzle.",
   "lang": "de",
   "dir": "ltr",
   "start_url": "./",
@@ -86,6 +86,17 @@
       "icons": [
         {
           "src": "icons/blackjack-180.png",
+          "sizes": "180x180",
+          "type": "image/png"
+        }
+      ]
+    },
+    {
+      "name": "Schiebepuzzle",
+      "url": "sliding-puzzle.html",
+      "icons": [
+        {
+          "src": "icons/sliding-puzzle-180.png",
           "sizes": "180x180",
           "type": "image/png"
         }

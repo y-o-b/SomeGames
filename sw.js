@@ -1,7 +1,7 @@
 // Service Worker: macht die Seite offline nutzbar.
 // Strategie: Netzwerk zuerst (mit kurzem Timeout), bei Fehler oder Offline aus dem Cache.
 // So sieht man online immer den neuesten Stand, offline den zuletzt geladenen.
-const CACHE = 'y-o-b-v150';
+const CACHE = 'y-o-b-v151';
 const NETWORK_TIMEOUT_MS = 4000;
 
 // Alles, was die Spiele zum Starten brauchen. Neue Dateien hier ergänzen und CACHE erhöhen.
@@ -16,6 +16,7 @@ const PRECACHE = [
   'minesweeper.html',
   'blackjack.html',
   'datenschutz.html',
+  'sliding-puzzle.html',
   'solitaire-decks/index.json',
   'VERSION',
   'manifest.webmanifest',
@@ -37,7 +38,9 @@ const PRECACHE = [
   'icons/minesweeper.svg',
   'icons/minesweeper-180.png',
   'icons/blackjack.svg',
-  'icons/blackjack-180.png'
+  'icons/blackjack-180.png',
+  'icons/sliding-puzzle.svg',
+  'icons/sliding-puzzle-180.png'
 ];
 
 self.addEventListener('install', event => {
