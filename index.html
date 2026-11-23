@@ -43,16 +43,18 @@
     .privacy[hidden] { display: none; }
     /* Schmale Bildschirme (iPhone): Icon links, Text und Knopf rechts, damit alle Spiele auf einen Blick passen. */
     @media (max-width: 600px) {
-      body { padding: 14px 14px 8px; align-content: start; }
-      .card { display: grid; grid-template-columns: 56px 1fr; column-gap: 14px; align-items: center; padding: 14px 16px; text-align: left; }
+      body { padding: 10px 14px 8px; align-content: start; }
+      .games { gap: 10px; }
+      .card { display: grid; grid-template-columns: 48px 1fr; column-gap: 12px; align-items: center; padding: 8px 14px; text-align: left; box-shadow: 5px 5px 0 #171717; }
       .card + .card { margin-top: 0; }
-      .game-icon { grid-row: span 3; width: 56px; height: 56px; margin: 0; align-self: start; }
-      .card h2 { margin: 0 0 2px; font-size: 1.15rem; }
-      .card p { margin: 0 0 10px; max-width: none; font-size: .82rem; line-height: 1.35; }
-      .card a { justify-self: start; padding: 8px 16px; font-size: .9rem; box-shadow: 3px 3px 0 #171717; }
-      footer { margin-top: 12px; }
+      .game-icon { grid-row: span 3; width: 48px; height: 48px; margin: 0; align-self: center; }
+      .card h2 { margin: 0; font-size: 1.08rem; line-height: 1.25; }
+      .card p { margin: 0 0 6px; max-width: none; font-size: .8rem; line-height: 1.3; }
+      .card a { justify-self: start; padding: 5px 14px; font-size: .85rem; line-height: 1.3; box-shadow: 3px 3px 0 #171717; }
+      footer { margin-top: 10px; line-height: 1.3; }
+      .version, .privacy { margin-top: 4px; }
       /* Die Karten teilen sich die ganze Bildschirmhöhe; reicht sie nicht, scrollt die Seite wie zuvor. */
-      body { min-height: 100vh; min-height: 100dvh; display: flex; flex-direction: column; align-items: center; padding-bottom: 20px; }
+      body { min-height: 100vh; min-height: 100dvh; display: flex; flex-direction: column; align-items: center; padding-bottom: 12px; }
       .hero { flex: 1; display: flex; flex-direction: column; }
       .games { flex: 1; grid-auto-rows: 1fr; }
       .card { align-content: center; }
@@ -109,7 +111,7 @@
     <footer>Eine kleine Spielpause gefällig?</footer>
     <!-- Nur auf der Website sichtbar: Die App liefert die Datenschutzseite nicht mit. -->
     <a class="privacy" href="datenschutz.html" data-web-only hidden>Datenschutz</a>
-      <button class="version" data-version type="button" title="Klicken, um die Seite neu zu laden">Version 2.97</button>
+      <button class="version" data-version type="button" title="Klicken, um die Seite neu zu laden">Version 2.98</button>
     <script>if (location.protocol === 'https:' || location.protocol === 'http:') document.querySelectorAll('[data-web-only]').forEach(element => { element.hidden = false; });</script>
     <script>const versionButton = document.querySelector('[data-version]'); versionButton.addEventListener('click', () => location.replace(`${location.pathname}?v=${Date.now()}`));</script>
   </main>
